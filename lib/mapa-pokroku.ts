@@ -4,6 +4,7 @@
 
 import 'server-only'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { getSemesterDateRange } from '@/lib/mapa-pokroku-shared'
 
 // Re-exportuj vše ze shared, aby server stránky měly jeden import
 export * from '@/lib/mapa-pokroku-shared'
@@ -208,6 +209,160 @@ export async function getVystupyWithHodnoceni(
           }
         : null,
     })
+  }
+
+  return result
+}
+
+/**
+ * F1 — poznámky ke kompetencím žáka (časová osa na dítě × výstup).
+ * Vrací všechny poznámky napříč obdobími (longitudinálně), seskupené dle vystup_id,
+ * řazené od nejnovější. RLS zajišťuje, že průvodce vidí jen žáky své skupiny.
+ * `can_edit` = aktuální uživatel je autor (nebo vedení).
+ */
+export async function getPoznamkyForStudent(
+  studentId: string
+): Promise<Record<string, import('@/lib/mapa-pokroku-shared').KompetencePoznamka[]>> {
+  const supabase = await createSupabaseServerClient()
+
+  // Aktuální staff (autor/oprávnění)
+  const { data: { user } } = await supabase.auth.getUser()
+  let currentStaffId: string | null = null
+  let isVedeni = false
+  if (user) {
+    const { data: me } = await supabase
+      .from('staff')
+      .select('id, role')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    currentStaffId = me?.id ?? null
+    isVedeni = me?.role === 'director' || me?.role === 'vp'
+  }
+
+  const { data: poznamky, error } = await supabase
+    .from('kompetence_poznamky')
+    .select('id, vystup_id, text, school_year, semester, autor_id, created_at')
+    .eq('student_id', studentId)
+    .order('created_at', { ascending: false })
+
+  // Degradace bezpečně i bez migrace (tabulka ještě neexistuje) → prázdná mapa
+  if (error || !poznamky) return {}
+
+  // Jména autorů jedním dotazem
+  const autorIds = Array.from(
+    new Set(poznamky.map((p) => p.autor_id).filter((x): x is string => Boolean(x)))
+  )
+  const jmenoById = new Map<string, string>()
+  if (autorIds.length) {
+    const { data: staff } = await supabase
+      .from('staff')
+      .select('id, first_name, last_name')
+      .in('id', autorIds)
+    for (const s of staff ?? []) {
+      jmenoById.set(
+        s.id,
+        `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim()
+      )
+    }
+  }
+
+  const result: Record<
+    string,
+    import('@/lib/mapa-pokroku-shared').KompetencePoznamka[]
+  > = {}
+  for (const p of poznamky) {
+    if (!result[p.vystup_id]) result[p.vystup_id] = []
+    result[p.vystup_id].push({
+      id: p.id,
+      vystup_id: p.vystup_id,
+      text: p.text,
+      school_year: p.school_year,
+      semester: p.semester as number,
+      autor_id: p.autor_id ?? null,
+      autor_jmeno: p.autor_id ? jmenoById.get(p.autor_id) ?? null : null,
+      created_at: p.created_at,
+      can_edit: isVedeni || (currentStaffId != null && p.autor_id === currentStaffId),
+    })
+  }
+
+  return result
+}
+
+/**
+ * F2 — „důkaz ze dne": pro každý výstup dny v daném pololetí, kdy se ve třídě
+ * dělal (svp_vazby → tridni_kniha_zaznamy skupiny žáka) a dítě nechybělo
+ * (měkká definice: NENÍ záznam o absenci). Vrací Record<vystup_id, DenDukaz[]>.
+ * Řetězec je čistě databázový (žádná AI). Degraduje na {} při chybě/díře v datech.
+ */
+export async function getDenniDukazForStudent(
+  studentId: string,
+  schoolYear: string,
+  semester: number
+): Promise<Record<string, import('@/lib/mapa-pokroku-shared').DenDukaz[]>> {
+  const supabase = await createSupabaseServerClient()
+  const { start, end } = getSemesterDateRange(schoolYear, semester)
+
+  // 1) Aktivní skupiny žáka pro daný školní rok
+  const { data: memberships, error: memErr } = await supabase
+    .from('group_memberships')
+    .select('group_id')
+    .eq('student_id', studentId)
+    .eq('school_year', schoolYear)
+    .is('valid_to', null)
+  if (memErr || !memberships?.length) return {}
+  const groupIds = Array.from(new Set(memberships.map((m) => m.group_id)))
+
+  // 2) Záznamy dní těchto skupin v rozsahu pololetí
+  const { data: zaznamy, error: zErr } = await supabase
+    .from('tridni_kniha_zaznamy')
+    .select('id, datum, nazev, typ_zaznamu')
+    .in('group_id', groupIds)
+    .eq('school_year', schoolYear)
+    .gte('datum', start)
+    .lte('datum', end)
+  if (zErr || !zaznamy?.length) return {}
+  const zaznamById = new Map(zaznamy.map((z) => [z.id, z]))
+  const zaznamIds = zaznamy.map((z) => z.id)
+
+  // 3) Potvrzené vazby výstup↔den (ai_navrh se ignoruje)
+  const { data: vazby, error: vErr } = await supabase
+    .from('svp_vazby')
+    .select('zaznam_id, vystup_id')
+    .in('zaznam_id', zaznamIds)
+    .in('zdroj', ['manual', 'ai_potvrzeno', 'tridnice_import'])
+  if (vErr || !vazby?.length) return {}
+
+  // 4) Dny, kdy byl žák zapsán jako NEPŘÍTOMEN (měkká definice „nechybělo")
+  const datumy = Array.from(new Set(zaznamy.map((z) => z.datum)))
+  const { data: absence } = await supabase
+    .from('attendance_records')
+    .select('date')
+    .eq('student_id', studentId)
+    .in('date', datumy)
+    .in('status', ['absent_excused', 'absent_unexcused'])
+  const absentDates = new Set((absence ?? []).map((a) => a.date))
+
+  // 5) Sestavení: vazba → den (mimo dny absence), dedup dnů per výstup
+  const result: Record<string, import('@/lib/mapa-pokroku-shared').DenDukaz[]> = {}
+  const seen = new Set<string>() // `${vystup_id}|${zaznam_id}`
+  for (const v of vazby) {
+    const z = zaznamById.get(v.zaznam_id)
+    if (!z || absentDates.has(z.datum)) continue
+    const key = `${v.vystup_id}|${v.zaznam_id}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    if (!result[v.vystup_id]) result[v.vystup_id] = []
+    result[v.vystup_id].push({
+      zaznam_id: z.id,
+      datum: z.datum,
+      nazev: z.nazev,
+      typ_zaznamu: z.typ_zaznamu,
+    })
+  }
+
+  // Seřadit dny vzestupně dle data
+  for (const vId of Object.keys(result)) {
+    result[vId].sort((a, b) => a.datum.localeCompare(b.datum))
   }
 
   return result

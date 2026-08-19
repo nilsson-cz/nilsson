@@ -2,16 +2,17 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 // Import POUZE ze shared — nikdy z lib/mapa-pokroku (server-only)
 import {
   VystupWithHodnoceni,
   StupenZvladnuti,
+  DenDukaz,
+  KompetencePoznamka,
   STUPEN_OPTIONS,
   STUPEN_SELECT_CLASS,
-  STUPEN_LABELS,
-  STUPEN_BADGE_CLASS,
 } from '@/lib/mapa-pokroku-shared'
 
 // ---------------------------------------------------------------------------
@@ -32,13 +33,22 @@ type Props = {
   schoolYear: string
   semester: number
   initialData: Record<string, VystupWithHodnoceni[]>
+  denniDukaz: Record<string, DenDukaz[]>
+  poznamky: Record<string, KompetencePoznamka[]>
 }
 
 // ---------------------------------------------------------------------------
 // EditForm
 // ---------------------------------------------------------------------------
 
-export function EditForm({ studentId, schoolYear, semester, initialData }: Props) {
+export function EditForm({
+  studentId,
+  schoolYear,
+  semester,
+  initialData,
+  denniDukaz,
+  poznamky,
+}: Props) {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
 
@@ -276,6 +286,8 @@ export function EditForm({ studentId, schoolYear, semester, initialData }: Props
                 key={v.id}
                 vystup={v}
                 hodnoceni={h}
+                dny={denniDukaz[v.id] ?? []}
+                poznamky={poznamky[v.id] ?? []}
                 onStupenChange={(stupen) => saveStupen(v.id, stupen)}
                 onPoznamkaSave={(poznamka) => savePoznamka(v.id, poznamka)}
               />
@@ -294,11 +306,15 @@ export function EditForm({ studentId, schoolYear, semester, initialData }: Props
 function VystupRow({
   vystup,
   hodnoceni,
+  dny,
+  poznamky,
   onStupenChange,
   onPoznamkaSave,
 }: {
   vystup: VystupWithHodnoceni
   hodnoceni: HodnoceniState
+  dny: DenDukaz[]
+  poznamky: KompetencePoznamka[]
   onStupenChange: (stupen: StupenZvladnuti | null) => void
   onPoznamkaSave: (poznamka: string) => void
 }) {
@@ -377,6 +393,155 @@ function VystupRow({
           )}
         </div>
       )}
+
+      <DukazZeDne stupen={hodnoceni.stupen} dny={dny} poznamky={poznamky} />
     </div>
   )
+}
+
+// ---------------------------------------------------------------------------
+// DukazZeDne — F2: dny, kdy se výstup dělal a dítě nechybělo, + poznámky (F1)
+// ---------------------------------------------------------------------------
+
+const TYP_ZAZNAMU_LABEL: Record<string, string> = {
+  vyuka: 'Výuka',
+  expedice: 'Expedice',
+  projekt: 'Projekt',
+  sportovni_kurz: 'Sportovní kurz',
+  kulturni_akce: 'Kulturní akce',
+  prazdniny: 'Prázdniny',
+  reditelske_volno: 'Ředitelské volno',
+}
+
+function formatDatumKratke(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('cs-CZ', {
+      day: 'numeric',
+      month: 'numeric',
+      year: '2-digit',
+    })
+  } catch {
+    return iso.slice(0, 10)
+  }
+}
+
+function DukazZeDne({
+  stupen,
+  dny,
+  poznamky,
+}: {
+  stupen: StupenZvladnuti | null
+  dny: DenDukaz[]
+  poznamky: KompetencePoznamka[]
+}) {
+  const [open, setOpen] = useState(false)
+
+  const pocetDnu = dny.length
+  const pocetPozn = poznamky.length
+  if (pocetDnu === 0 && pocetPozn === 0) return null
+
+  // Nudge: rozpor „zatím nezačali" × výstup se prokazatelně dělal
+  const jeRozpor = stupen === 'nezacali' && pocetDnu > 0
+
+  return (
+    <div className="mt-2.5 pl-16">
+      {jeRozpor ? (
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="w-full text-left flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 hover:bg-amber-100 transition"
+        >
+          <span className="mt-px">⚠️</span>
+          <span>
+            Tento výstup se dělal <strong>{pocetDnu}×</strong> ve dnech, kdy dítě
+            nechybělo. Opravdu „zatím nezačali“?
+            <span className="ml-1 text-amber-600 underline">
+              {open ? 'skrýt' : 'zobrazit dny'}
+            </span>
+          </span>
+        </button>
+      ) : (
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="inline-flex items-center gap-2 text-xs text-gray-400 hover:text-gray-600 transition"
+          title="Důkaz ze dne a poznámky"
+        >
+          {pocetDnu > 0 && (
+            <span>
+              📅 {pocetDnu} {sklonujDny(pocetDnu)}
+            </span>
+          )}
+          {pocetPozn > 0 && (
+            <span>
+              💬 {pocetPozn} {sklonujPozn(pocetPozn)}
+            </span>
+          )}
+          <span className="underline">{open ? 'skrýt' : 'zobrazit'}</span>
+        </button>
+      )}
+
+      {open && (
+        <div className="mt-2 space-y-3 border-l-2 border-gray-100 pl-3">
+          {pocetDnu > 0 && (
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">
+                Dny ve třídnici
+              </p>
+              <ul className="space-y-1">
+                {dny.map((d) => (
+                  <li key={d.zaznam_id} className="text-sm">
+                    <Link
+                      href={`/dashboard/tridni-kniha/${d.zaznam_id}`}
+                      className="text-indigo-600 hover:text-indigo-800 hover:underline"
+                    >
+                      {formatDatumKratke(d.datum)}
+                    </Link>
+                    <span className="text-gray-400"> · </span>
+                    <span className="text-gray-500">
+                      {TYP_ZAZNAMU_LABEL[d.typ_zaznamu] ?? d.typ_zaznamu}
+                    </span>
+                    {d.nazev && (
+                      <span className="text-gray-600"> — {d.nazev}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {pocetPozn > 0 && (
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">
+                Poznámky ke kompetenci
+              </p>
+              <ul className="space-y-2">
+                {poznamky.map((p) => (
+                  <li key={p.id} className="text-sm">
+                    <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                      {p.text}
+                    </p>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      {formatDatumKratke(p.created_at)}
+                      {p.autor_jmeno && ` · ${p.autor_jmeno}`}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function sklonujDny(n: number): string {
+  if (n === 1) return 'den'
+  if (n >= 2 && n <= 4) return 'dny'
+  return 'dní'
+}
+
+function sklonujPozn(n: number): string {
+  if (n === 1) return 'poznámka'
+  if (n >= 2 && n <= 4) return 'poznámky'
+  return 'poznámek'
 }
