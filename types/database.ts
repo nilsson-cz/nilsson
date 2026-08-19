@@ -263,6 +263,46 @@ export type Database = {
           },
         ]
       }
+      bulletin_post_students: {
+        Row: {
+          group_id: string
+          post_id: string
+          student_id: string
+        }
+        Insert: {
+          group_id: string
+          post_id: string
+          student_id: string
+        }
+        Update: {
+          group_id?: string
+          post_id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulletin_post_students_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulletin_post_students_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "bulletin_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulletin_post_students_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bulletin_posts: {
         Row: {
           author_id: string
@@ -5332,6 +5372,13 @@ export type Database = {
           last_name: string
         }[]
       }
+      bulletin_resolve_target_students: {
+        Args: { p_group_ids: string[]; p_school_year: string }
+        Returns: {
+          group_id: string
+          student_id: string
+        }[]
+      }
       can_read_guardian: { Args: { p_guardian_id: string }; Returns: boolean }
       can_read_student: { Args: { p_student_id: string }; Returns: boolean }
       current_guardian_id: { Args: never; Returns: string }
@@ -5543,6 +5590,16 @@ export type Database = {
           valid_until: string
         }[]
       }
+      get_bulletin_read_by_class: {
+        Args: { p_post_id: string }
+        Returns: {
+          class_id: string
+          class_name: string
+          opened: boolean
+          student_id: string
+          student_name: string
+        }[]
+      }
       get_consent_overview: {
         Args: { p_school_year: string }
         Returns: {
@@ -5745,6 +5802,26 @@ export type Database = {
         Returns: number
       }
       lunch_cutoff_ts: { Args: { p_date: string }; Returns: string }
+      lunch_day_editable: {
+        Args: { p_date: string }
+        Returns: {
+          auto_cancelled: boolean
+          first_name: string
+          last_name: string
+          ordered: boolean
+          student_id: string
+          trida: string
+        }[]
+      }
+      lunch_day_roster: {
+        Args: { p_date: string }
+        Returns: {
+          first_name: string
+          last_name: string
+          student_id: string
+          trida: string
+        }[]
+      }
       lunch_effective_orders: {
         Args: { p_date: string }
         Returns: {
@@ -5765,6 +5842,10 @@ export type Database = {
       lunch_ordering_open: { Args: { p_date: string }; Returns: boolean }
       lunch_school_year: { Args: { p_date: string }; Returns: string }
       lunch_set_order: {
+        Args: { p_menu_date: string; p_ordered: boolean; p_student_id: string }
+        Returns: undefined
+      }
+      lunch_staff_set_order: {
         Args: { p_menu_date: string; p_ordered: boolean; p_student_id: string }
         Returns: undefined
       }

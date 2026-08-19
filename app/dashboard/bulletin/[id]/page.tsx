@@ -174,8 +174,7 @@ export default async function BulletinDetailPage({ params }: PageProps) {
 
   // Přehled otevření po třídách – jen pro odeslané zprávy
   const { data: readRows } = p.email_sent_at
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ? await (supabase as any).rpc('get_bulletin_read_by_class', { p_post_id: p.id })
+    ? await supabase.rpc('get_bulletin_read_by_class', { p_post_id: p.id })
     : { data: [] };
 
   // Autor

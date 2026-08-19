@@ -1,0 +1,25 @@
+# ── Release-mirror: co se NIKDY nesmí dostat do veřejného snapshotu ──────────
+# Uplatní se při `git archive` (viz scripts/publish-release.ps1). Duplicitní
+# pojistka je přímo v publish skriptu (maže tytéž cesty po extrakci), takže i
+# kdyby tenhle soubor nebyl v archivovaném commitu, snapshot zůstane čistý.
+
+Nilsson_documentation/       export-ignore
+.github/                     export-ignore
+.claude/                     export-ignore
+supabase/.temp/              export-ignore
+fio-export.json              export-ignore
+patch_debug.ps1              export-ignore
+scripts/publish-release.ps1  export-ignore
+README.md                    export-ignore
+
+# datové/seed soubory (kdyby se někdy omylem commitly)
+demo-schema.sql              export-ignore
+svp_vystupy.sql              export-ignore
+apply-log.txt                export-ignore
+scripts/seed-demo/           export-ignore
+
+# tvrdá pojistka na tajemství (i tak jsou gitignored a netrackované)
+*.key                        export-ignore
+*.pem                        export-ignore
+*.csr                        export-ignore
+.env*                        export-ignore

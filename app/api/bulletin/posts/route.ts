@@ -127,8 +127,7 @@ export async function POST(req: NextRequest) {
   //     Vyloučení ZZ se neaplikuje – dítě zůstává cílem i když se jednomu ZZ
   //     e-mail nepošle. Roster je fixní k okamžiku vytvoření (viz TRD R4).
   {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: targetStudents, error: tsError } = await (supabase as any)
+    const { data: targetStudents, error: tsError } = await supabase
       .rpc('bulletin_resolve_target_students', {
         p_group_ids:   body.group_ids ?? [],
         p_school_year: schoolYear,
@@ -141,8 +140,7 @@ export async function POST(req: NextRequest) {
       const studentRows = (targetStudents as { student_id: string; group_id: string }[])
         .map(s => ({ post_id: post.id, student_id: s.student_id, group_id: s.group_id }));
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: bpsError } = await (supabase as any)
+      const { error: bpsError } = await supabase
         .from('bulletin_post_students')
         .insert(studentRows);
 
