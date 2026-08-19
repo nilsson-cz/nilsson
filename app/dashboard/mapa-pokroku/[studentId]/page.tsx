@@ -5,10 +5,10 @@ import { notFound } from 'next/navigation'
 import {
   getStudentInfo,
   getVystupyWithHodnoceni,
+  getPoznamkyForStudent,
   getCurrentSchoolYearAndSemester,
-  STUPEN_LABELS,
-  STUPEN_BADGE_CLASS,
 } from '@/lib/mapa-pokroku'
+import VystupRadek from './_components/VystupRadek'
 
 type Props = {
   params: Promise<{ studentId: string }>
@@ -28,12 +28,10 @@ export default async function StudentDetailPage({ params, searchParams }: Props)
   const student = await getStudentInfo(studentId)
   if (!student) notFound()
 
-  const vstupyByPredmet = await getVystupyWithHodnoceni(
-    studentId,
-    student.rocnik,
-    schoolYear,
-    semester
-  )
+  const [vstupyByPredmet, poznamkyByVystup] = await Promise.all([
+    getVystupyWithHodnoceni(studentId, student.rocnik, schoolYear, semester),
+    getPoznamkyForStudent(studentId),
+  ])
 
   const allVystupy = Object.values(vstupyByPredmet).flat()
   const filled = allVystupy.filter((v) => v.hodnoceni?.stupen).length
@@ -108,27 +106,14 @@ export default async function StudentDetailPage({ params, searchParams }: Props)
                 </div>
                 <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden divide-y divide-gray-50">
                   {vystupy.map((v) => (
-                    <div key={v.id} className="flex items-start gap-3 px-4 py-3">
-                      <span className="text-xs font-mono text-gray-300 mt-0.5 w-14 flex-shrink-0">
-                        {v.kod}
-                      </span>
-                      <p className="flex-1 text-sm text-gray-700 leading-relaxed">
-                        {v.vystup_text}
-                      </p>
-                      <div className="flex-shrink-0 ml-2">
-                        {v.hodnoceni?.stupen ? (
-                          <span
-                            className={`inline-block text-xs px-2 py-0.5 rounded-full ${
-                              STUPEN_BADGE_CLASS[v.hodnoceni.stupen]
-                            }`}
-                          >
-                            {STUPEN_LABELS[v.hodnoceni.stupen]}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-200">—</span>
-                        )}
-                      </div>
-                    </div>
+                    <VystupRadek
+                      key={v.id}
+                      studentId={studentId}
+                      schoolYear={schoolYear}
+                      semester={semester}
+                      vystup={v}
+                      poznamky={poznamkyByVystup[v.id] ?? []}
+                    />
                   ))}
                 </div>
               </section>

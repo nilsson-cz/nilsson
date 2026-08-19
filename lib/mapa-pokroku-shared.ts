@@ -44,6 +44,27 @@ export type VystupWithHodnoceni = {
   } | null
 }
 
+// F1 — poznámka ke kompetenci (časová osa na dítě × výstup)
+export type KompetencePoznamka = {
+  id: string
+  vystup_id: string
+  text: string
+  school_year: string
+  semester: number
+  autor_id: string | null
+  autor_jmeno: string | null
+  created_at: string
+  can_edit: boolean // aktuální uživatel je autor (nebo vedení)
+}
+
+// F2 — den, kdy se výstup ve třídě dělal a dítě nechybělo (důkaz ze dne)
+export type DenDukaz = {
+  zaznam_id: string
+  datum: string
+  nazev: string
+  typ_zaznamu: string
+}
+
 // ---------------------------------------------------------------------------
 // Konstanty
 // ---------------------------------------------------------------------------
@@ -97,4 +118,21 @@ export function getCurrentSchoolYearAndSemester(): {
     month >= 9 ? `${year}/${year + 1}` : `${year - 1}/${year}`
   const semester: 1 | 2 = month >= 2 && month <= 8 ? 2 : 1
   return { schoolYear, semester }
+}
+
+/**
+ * Rozsah dat pololetí ze školního roku — stejná konvence jako
+ * getCurrentSchoolYearAndSemester (1. pol. = zář–led, 2. pol. = úno–srp).
+ * schoolYear ve tvaru '2025/2026'. Vrací ISO datumy (včetně obou konců).
+ */
+export function getSemesterDateRange(
+  schoolYear: string,
+  semester: number
+): { start: string; end: string } {
+  const [a, b] = schoolYear.split('/').map((s) => parseInt(s, 10))
+  // fallback při nevalidním vstupu — prázdný (nemožný) rozsah
+  if (!a || !b) return { start: '9999-12-31', end: '0001-01-01' }
+  return semester === 1
+    ? { start: `${a}-09-01`, end: `${b}-01-31` }
+    : { start: `${b}-02-01`, end: `${b}-08-31` }
 }

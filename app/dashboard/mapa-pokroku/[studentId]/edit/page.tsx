@@ -5,6 +5,8 @@ import { notFound } from 'next/navigation'
 import {
   getStudentInfo,
   getVystupyWithHodnoceni,
+  getPoznamkyForStudent,
+  getDenniDukazForStudent,
   getCurrentSchoolYearAndSemester,
 } from '@/lib/mapa-pokroku'
 import { EditForm } from './_components/EditForm'
@@ -27,12 +29,11 @@ export default async function EditPage({ params, searchParams }: Props) {
   const student = await getStudentInfo(studentId)
   if (!student) notFound()
 
-  const vstupyByPredmet = await getVystupyWithHodnoceni(
-    studentId,
-    student.rocnik,
-    schoolYear,
-    semester
-  )
+  const [vstupyByPredmet, denniDukaz, poznamky] = await Promise.all([
+    getVystupyWithHodnoceni(studentId, student.rocnik, schoolYear, semester),
+    getDenniDukazForStudent(studentId, schoolYear, semester),
+    getPoznamkyForStudent(studentId),
+  ])
 
   return (
     <div className="max-w-3xl mx-auto py-8 px-4">
@@ -57,6 +58,8 @@ export default async function EditPage({ params, searchParams }: Props) {
         schoolYear={schoolYear}
         semester={semester}
         initialData={vstupyByPredmet}
+        denniDukaz={denniDukaz}
+        poznamky={poznamky}
       />
     </div>
   )

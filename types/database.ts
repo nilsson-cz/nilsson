@@ -2306,6 +2306,64 @@ export type Database = {
           },
         ]
       }
+      kompetence_poznamky: {
+        Row: {
+          autor_id: string | null
+          created_at: string
+          id: string
+          school_year: string
+          semester: number
+          student_id: string
+          text: string
+          updated_at: string
+          vystup_id: string
+        }
+        Insert: {
+          autor_id?: string | null
+          created_at?: string
+          id?: string
+          school_year: string
+          semester: number
+          student_id: string
+          text: string
+          updated_at?: string
+          vystup_id: string
+        }
+        Update: {
+          autor_id?: string | null
+          created_at?: string
+          id?: string
+          school_year?: string
+          semester?: number
+          student_id?: string
+          text?: string
+          updated_at?: string
+          vystup_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kompetence_poznamky_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kompetence_poznamky_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kompetence_poznamky_vystup_id_fkey"
+            columns: ["vystup_id"]
+            isOneToOne: false
+            referencedRelation: "svp_vystupy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lunch_allergens: {
         Row: {
           code: number
