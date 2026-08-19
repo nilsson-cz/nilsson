@@ -1,0 +1,171 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+/* ══════════════════════════════════════════════════════════════════════
+   Globální design tokeny
+   ══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans, Arial, Helvetica, sans-serif);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Portálový token systém
+   Scope: .portal-layout (app/portal/layout.tsx)
+   Záměr: sjednotit všechny sekce portálu pod jeden token systém,
+   aby Omluvenky, Docházka, Platby, Třídnice, Tripartity a Souhlasy
+   vypadaly konzistentně bez ohledu na to, která stránka je aktivní.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.portal-layout {
+  /* Pozadí */
+  --portal-bg:            #f5f4f1;
+  --portal-surface:       #ffffff;
+  --portal-surface-hover: #f1efe8;
+
+  /* Texty — vše dostatečně tmavé pro WCAG AA */
+  --portal-text:          #1a1a18;   /* primární, nadpisy */
+  --portal-text-muted:    #444441;   /* sekundární, popisky */
+  --portal-text-subtle:   #888780;   /* terciární, metadata */
+
+  /* Ohraničení */
+  --portal-border:        rgba(0, 0, 0, 0.10);
+  --portal-border-md:     rgba(0, 0, 0, 0.18);
+
+  /* Akcent — teal (sjednoceno s personálním dashboardem) */
+  --portal-accent:        #0f6e56;
+  --portal-accent-mid:    #1d9e75;
+  --portal-accent-subtle: #e1f5ee;
+
+  /* Stavové barvy */
+  --portal-danger:        #a32d2d;
+  --portal-danger-subtle: #fcebeb;
+  --portal-warn:          #854f0b;
+  --portal-warn-subtle:   #faeeda;
+  --portal-info:          #185fa5;
+  --portal-info-subtle:   #e6f1fb;
+  --portal-success:       #0f6e56;
+  --portal-success-subtle:#e1f5ee;
+
+  /* Poloměry */
+  --portal-radius:        8px;
+  --portal-radius-lg:     12px;
+}
+
+/* ── Dark mode portálu ─────────────────────────────────────────────── */
+.dark .portal-layout {
+  --portal-bg:            #1c1c1a;
+  --portal-surface:       #242422;
+  --portal-surface-hover: #2c2c2a;
+
+  --portal-text:          #edece6;
+  --portal-text-muted:    #b4b2a9;
+  --portal-text-subtle:   #888780;
+
+  --portal-border:        rgba(255, 255, 255, 0.10);
+  --portal-border-md:     rgba(255, 255, 255, 0.18);
+
+  --portal-accent:        #5dcaa5;   /* světlejší teal — čitelný na tmavém pozadí */
+  --portal-accent-mid:    #1d9e75;
+  --portal-accent-subtle: #04342c;
+
+  --portal-danger:        #f09595;
+  --portal-danger-subtle: #501313;
+  --portal-warn:          #ef9f27;
+  --portal-warn-subtle:   #412402;
+  --portal-info:          #85b7eb;
+  --portal-info-subtle:   #042c53;
+  --portal-success:       #5dcaa5;
+  --portal-success-subtle:#04342c;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Portál — sdílené utility třídy
+   Použití: className="portal-card" atd. na stránkách portálu.
+   Nahrazují lokální hardcoded barvy, které způsobovaly nekonzistenci
+   mezi sekcemi (bug report 2026-06-17).
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Karta — bílý povrch s ohraničením */
+.portal-card {
+  background: var(--portal-surface);
+  border: 0.5px solid var(--portal-border);
+  border-radius: var(--portal-radius-lg);
+  overflow: hidden;
+}
+
+/* Řádek v kartě */
+.portal-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 0.5px solid var(--portal-border);
+}
+.portal-row:last-child {
+  border-bottom: none;
+}
+
+/* Nadpis sekce */
+.portal-section-title {
+  font-size: 0.875rem;       /* 14px */
+  font-weight: 500;
+  color: var(--portal-text); /* OPRAVA: bylo tmavě modré → zanikalo v dark mode */
+  margin-bottom: 0.5rem;
+}
+
+/* Primární text (formulářová pole, vstupy) */
+.portal-input-text {
+  color: var(--portal-text); /* OPRAVA: bylo šedé/světlé → špatná čitelnost v omluvenkovém formuláři */
+}
+
+/* Metrika karta */
+.portal-metric {
+  background: var(--portal-surface-hover);
+  border-radius: var(--portal-radius);
+  padding: 1rem;
+}
+.portal-metric-label {
+  font-size: 0.75rem;
+  color: var(--portal-text-subtle);
+  margin-bottom: 0.25rem;
+}
+.portal-metric-value {
+  font-size: 1.375rem;
+  font-weight: 500;
+  color: var(--portal-text);
+}
+
+/* Stavové pilulky */
+.portal-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.portal-pill-danger  { background: var(--portal-danger-subtle);  color: var(--portal-danger);  }
+.portal-pill-warn    { background: var(--portal-warn-subtle);    color: var(--portal-warn);    }
+.portal-pill-success { background: var(--portal-success-subtle); color: var(--portal-success); }
+.portal-pill-info    { background: var(--portal-info-subtle);    color: var(--portal-info);    }
