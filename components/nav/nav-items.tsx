@@ -488,8 +488,17 @@ export const NAV_ITEMS: NavItem[] = [
     tint: T.slate,
   },
   {
+    href: '/dashboard/obedy',
+    label: 'Obědy — kdo jde na oběd',
+    icon: Icons.lunch,
+    roles: ['director', 'vp', 'guide', 'assistant', 'vychovatel'],
+    primaryFor: [],
+    desc: 'Denní přehled strávníků po třídách',
+    tint: T.orange,
+  },
+  {
     href: '/dashboard/sprava-skoly/obedy',
-    label: 'Obědy',
+    label: 'Obědy — nastavení SMS',
     icon: Icons.lunch,
     roles: ['director'],
     primaryFor: [],
@@ -558,7 +567,7 @@ function has(list: AllRoles[], roleSet: string[]): boolean {
 // kurátovaný seznam ředitelských modulů (data smí číst přes RLS, chybí jen menu).
 // V produkci flag vypnutý = nulová změna.
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
-const DEMO_READONLY_HREFS = new Set<string>(['/dashboard/platby', '/dashboard/druzina', '/dashboard/vykaz-ku', '/dashboard/rozvrh'])
+const DEMO_READONLY_HREFS = new Set<string>(['/dashboard/platby', '/dashboard/druzina', '/dashboard/vykaz-ku', '/dashboard/rozvrh', '/dashboard/obedy'])
 
 export function resolveNav(roleSet: string[]) {
   const demoUnlock = DEMO_MODE && roleSet.includes('readonly')
