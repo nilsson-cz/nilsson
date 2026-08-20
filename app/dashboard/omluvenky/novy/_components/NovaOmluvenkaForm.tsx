@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createOmluvenka } from '@/app/actions/omluvenky'
+import AbsenceTerminFields from '@/components/omluvenky/AbsenceTerminFields'
 
 type Student = {
   id: string
@@ -110,32 +111,7 @@ export default function NovaOmluvenkaForm({ students, guardiansByStudent }: Prop
       </div>
 
       {/* Termín */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Datum od <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="date"
-            name="date_from"
-            required
-            defaultValue={today}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Datum do <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="date"
-            name="date_to"
-            required
-            defaultValue={today}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-      </div>
+      <AbsenceTerminFields today={today} />
 
       {/* Důvod */}
       <div>

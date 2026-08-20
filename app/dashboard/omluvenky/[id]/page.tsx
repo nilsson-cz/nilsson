@@ -32,6 +32,9 @@ export default async function OmluvenkaDetailPage({
       id,
       date_from,
       date_to,
+      je_castecna,
+      time_from,
+      time_to,
       reason,
       status,
       note_internal,
@@ -120,9 +123,15 @@ export default async function OmluvenkaDetailPage({
               {req.date_from === req.date_to
                 ? new Date(req.date_from).toLocaleDateString('cs-CZ')
                 : `${new Date(req.date_from).toLocaleDateString('cs-CZ')} – ${new Date(req.date_to).toLocaleDateString('cs-CZ')}`}
-              <span className="text-gray-400 text-xs block mt-0.5">
-                {weekdayCount} {weekdayCount === 1 ? 'pracovní den' : weekdayCount <= 4 ? 'pracovní dny' : 'pracovních dnů'}
-              </span>
+              {req.je_castecna ? (
+                <span className="text-gray-400 text-xs block mt-0.5">
+                  část dne {hhmm(req.time_from)}–{hhmm(req.time_to)}
+                </span>
+              ) : (
+                <span className="text-gray-400 text-xs block mt-0.5">
+                  {weekdayCount} {weekdayCount === 1 ? 'pracovní den' : weekdayCount <= 4 ? 'pracovní dny' : 'pracovních dnů'}
+                </span>
+              )}
             </dd>
           </div>
           <div className="col-span-2">
@@ -164,7 +173,11 @@ export default async function OmluvenkaDetailPage({
 
       {/* Panel schválení/zamítnutí — pouze pro pending + oprávněné role */}
       {canApprove && (
-        <ApprovalPanel absenceRequestId={id} weekdayCount={weekdayCount} />
+        <ApprovalPanel
+          absenceRequestId={id}
+          weekdayCount={weekdayCount}
+          jeCastecna={!!req.je_castecna}
+        />
       )}
 
       {/* Vygenerované záznamy docházky */}
@@ -184,7 +197,9 @@ export default async function OmluvenkaDetailPage({
                     weekday: 'short', day: 'numeric', month: 'numeric'
                   })}
                 </span>
-                <span className="text-gray-500">{ar.hodiny} hod. — omluveno</span>
+                <span className="text-gray-500">
+                  {ar.hodiny} hod. — {ar.status === 'partially_excused' ? 'částečně omluveno' : 'omluveno'}
+                </span>
               </li>
             ))}
           </ul>
@@ -222,6 +237,11 @@ function StatusBadge({ status }: { status: string }) {
       {label}
     </span>
   )
+}
+
+/** 'HH:MM:SS' → 'HH:MM' (Postgres TIME může vracet sekundy). */
+function hhmm(t: string | null): string {
+  return t ? t.slice(0, 5) : ''
 }
 
 function countWeekdays(from: Date, to: Date): number {

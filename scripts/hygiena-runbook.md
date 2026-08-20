@@ -64,7 +64,7 @@ nebo srovnat živou DB.
 ### 2. Backend audit (SQL)
 
 Spusť [`scripts/db-audit.sql`](./db-audit.sql) v Supabase SQL editoru
-**pod adminem** (service role — jinak RLS maskuje počty). Projdi dotazy 1–9:
+**pod adminem** (service role — jinak RLS maskuje počty). Projdi dotazy 1–9b:
 
 | # | Co hledá | Reakce |
 |---|----------|--------|
@@ -77,7 +77,8 @@ Spusť [`scripts/db-audit.sql`](./db-audit.sql) v Supabase SQL editoru
 | 6 | Téměř duplicitní tabulky | rozhodnout o sloučení/migraci |
 | 7 | „Studené" tabulky | kandidát na karanténu |
 | 8 | Drift (soupis tabulek) | porovnat s bodem 1 |
-| 9 | SECURITY DEFINER funkce | ověřit EXECUTE granty (viz migrace 053) |
+| 9 | SECDEF funkce spustitelné rolí `anon` (+ heuristika guardu, sloupec `riziko`) | `VYSOKÉ` = prověřit tělo a hardenit (revoke anon; guardless doplnit i interní guard, jinak leak i pro `authenticated`). **NEREVOKOVAT** RLS predikáty — has_role, enrollment_is_owner_on_application, identity primitivy. Detail: [`secdef-audit.sql`](./secdef-audit.sql), vzor migrací 086/087 |
+| 9b| Generátor REVOKE příkazů | zkopírovat, vynechat RLS predikáty z #9, spustit |
 
 ### 3. Frontend audit (mrtvý kód)
 

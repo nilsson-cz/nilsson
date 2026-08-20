@@ -2,7 +2,7 @@
 
 export const DEFAULT_HODINY_DEN = 5
 
-export type AttendanceStatus = 'present' | 'absent_excused' | 'absent_unexcused'
+export type AttendanceStatus = 'present' | 'absent_excused' | 'partially_excused' | 'absent_unexcused'
 export type AttendanceStatusAll = AttendanceStatus | 'remote'
 
 export interface Group {
@@ -52,6 +52,7 @@ export interface BulkRangeParams {
 export const STATUS_LABELS: Record<AttendanceStatus, string> = {
   present: 'Přítomen/a',
   absent_excused: 'Omluven/a',
+  partially_excused: 'Částečně omluven/a',
   absent_unexcused: 'Neomluven/a',
 }
 
