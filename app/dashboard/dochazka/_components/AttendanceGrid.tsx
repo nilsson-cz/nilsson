@@ -64,6 +64,7 @@ function StudentRow({ index, student, row, onChange }: RowProps) {
         'border-b transition-colors',
         row.isDirty ? 'bg-amber-50 dark:bg-amber-950/20' : '',
         row.status === 'absent_excused' ? 'text-blue-700 dark:text-blue-400' : '',
+        row.status === 'partially_excused' ? 'text-sky-700 dark:text-sky-400' : '',
         row.status === 'absent_unexcused' ? 'text-red-700 dark:text-red-400' : '',
       ].join(' ')}
     >
@@ -89,6 +90,12 @@ function StudentRow({ index, student, row, onChange }: RowProps) {
             colorClass="bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300"
             activeClass="ring-2 ring-blue-500 font-bold"
             onClick={() => setStatus('absent_excused')}
+          />
+          <StatusButton
+            label="Č" title="Částečně omluven/a" active={row.status === 'partially_excused'}
+            colorClass="bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-900/30 dark:text-sky-300"
+            activeClass="ring-2 ring-sky-500 font-bold"
+            onClick={() => setStatus('partially_excused')}
           />
           <StatusButton
             label="N" title="Neomluven/a" active={row.status === 'absent_unexcused'}

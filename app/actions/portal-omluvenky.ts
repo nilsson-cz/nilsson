@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { notifyDiscord, embedNovaOmluvenka } from '@/lib/discord'
+import { parseAbsenceWindow } from '@/lib/omluvenky-hodiny'
 
 export type GuardianActionResult =
   | { success: true; id: string }
@@ -51,6 +52,17 @@ export async function createGuardianOmluvenka(
     return { success: false, error: 'Datum konce nemůže být před datem začátku.' }
   }
 
+  const okno = parseAbsenceWindow(
+    formData.get('je_castecna'),
+    formData.get('time_from'),
+    formData.get('time_to'),
+    dateFrom,
+    dateTo,
+  )
+  if (!okno.ok) {
+    return { success: false, error: okno.error }
+  }
+
   // Ověřit, že student patří k tomuto guardianovi
   // (RLS by to zajistilo na DB úrovni, ale explicitní check dá lepší error hlášku)
   const { data: linkRaw } = await supabase
@@ -73,6 +85,9 @@ export async function createGuardianOmluvenka(
       entered_by_staff_id:      null,   // guardian zadává sám (019: nullable)
       date_from:                dateFrom,
       date_to:                  dateTo,
+      je_castecna:              okno.jeCastecna,
+      time_from:                okno.timeFrom,
+      time_to:                  okno.timeTo,
       reason,
       status: 'pending',
     })

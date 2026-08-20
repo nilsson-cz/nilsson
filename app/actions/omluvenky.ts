@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { notifyDiscord, embedOmluvenkaRejected } from '@/lib/discord'
 import { CURRENT_SCHOOL_YEAR } from '@/lib/config'
+import { fetchDayBlocks, computeHodiny, parseAbsenceWindow } from '@/lib/omluvenky-hodiny'
 
 // ---------------------------------------------------------------------------
 // Typy výsledků (vzor z BOZP: bez redirect() v akci — ARCH-NOTES sekce 20)
@@ -15,7 +16,9 @@ export type OmluvenkaResult =
 
 export type ApprovalResult =
   | { success: true }
-  | { success: false; error: string }
+  // needsManualHours: pro daný den chybí rozvrh → částečnou nelze spočítat,
+  // UI musí vyžádat ruční počet zameškaných hodin (R6).
+  | { success: false; error: string; needsManualHours?: boolean }
 
 // ---------------------------------------------------------------------------
 // Pomocné funkce
@@ -83,6 +86,17 @@ export async function createOmluvenka(formData: FormData): Promise<OmluvenkaResu
     return { success: false, error: 'Datum konce nemůže být před datem začátku.' }
   }
 
+  const okno = parseAbsenceWindow(
+    formData.get('je_castecna'),
+    formData.get('time_from'),
+    formData.get('time_to'),
+    dateFrom,
+    dateTo,
+  )
+  if (!okno.ok) {
+    return { success: false, error: okno.error }
+  }
+
   const { data, error } = await supabase
     .from('absence_requests')
     .insert({
@@ -91,6 +105,9 @@ export async function createOmluvenka(formData: FormData): Promise<OmluvenkaResu
       entered_by_staff_id:      staff.id,
       date_from:                dateFrom,
       date_to:                  dateTo,
+      je_castecna:              okno.jeCastecna,
+      time_from:                okno.timeFrom,
+      time_to:                  okno.timeTo,
       reason,
       status: 'pending',
     })
@@ -110,7 +127,10 @@ export async function createOmluvenka(formData: FormData): Promise<OmluvenkaResu
 // Akce: Schválení omluvenky + průpis do attendance_records
 // ---------------------------------------------------------------------------
 
-export async function approveOmluvenka(id: string): Promise<ApprovalResult> {
+export async function approveOmluvenka(
+  id: string,
+  manualHodiny?: number,
+): Promise<ApprovalResult> {
   const supabase = await createSupabaseServerClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -127,7 +147,7 @@ export async function approveOmluvenka(id: string): Promise<ApprovalResult> {
   // Načíst omluvenku + jméno žáka
   const { data: reqRaw, error: fetchErr } = await supabase
     .from('absence_requests')
-    .select('id, student_id, date_from, date_to, status, students(first_name, last_name)')
+    .select('id, student_id, date_from, date_to, status, je_castecna, time_from, time_to, students(first_name, last_name)')
     .eq('id', id)
     .single()
 
@@ -153,7 +173,78 @@ export async function approveOmluvenka(id: string): Promise<ApprovalResult> {
     return { success: false, error: 'Žák nemá přiřazenou skupinu pro aktuální školní rok.' }
   }
 
-  // 1. Aktualizovat stav omluvenky
+  // 1. Sestavit záznamy docházky (PŘED změnou stavu — částečná bez rozvrhu
+  //    může vyžádat ruční počet hodin, pak stav omluvenky necháváme 'pending').
+  type AttendanceRow = {
+    student_id: string
+    staff_id: string
+    group_id: string
+    date: string
+    status: 'absent_excused' | 'partially_excused'
+    hodiny: number
+    absence_request_id: string
+    note: string
+  }
+  const attendanceRows: AttendanceRow[] = []
+
+  if (req.je_castecna) {
+    // --- Částečná absence: jeden den, časové okno → zameškané hodiny z rozvrhu ---
+    const blocks = await fetchDayBlocks(supabase, groupId, req.date_from)
+    const vyp = computeHodiny(blocks, { from: req.time_from, to: req.time_to })
+
+    let zameskane: number
+    if (vyp.hasRozvrh) {
+      zameskane = vyp.zameskaneHodin
+    } else if (manualHodiny != null && manualHodiny > 0) {
+      zameskane = Math.round(manualHodiny)
+    } else {
+      // R6: rozvrh pro ten den chybí → vyžádat ruční počet, stav neměnit.
+      return {
+        success: false,
+        needsManualHours: true,
+        error: 'Pro tento den zatím není rozvrh — zadejte počet zameškaných hodin ručně.',
+      }
+    }
+
+    // Nulové překrytí s výukou (okno mimo bloky) → žádný docházkový záznam,
+    // omluvenka zůstává jako doklad. Jinak jeden řádek 'partially_excused'.
+    if (zameskane > 0) {
+      attendanceRows.push({
+        student_id:         req.student_id,
+        staff_id:           staff.id,
+        group_id:           groupId,
+        date:               req.date_from,
+        status:             'partially_excused',
+        hodiny:             zameskane,
+        absence_request_id: id,
+        note:               'Automaticky vygenerováno ze schválené částečné omluvenky.',
+      })
+    }
+  } else {
+    // --- Celodenní (i vícedenní): za každý pracovní den délka dne z rozvrhu ---
+    const weekdays = getWeekdays(new Date(req.date_from), new Date(req.date_to))
+    for (const day of weekdays) {
+      const dateStr = toDateString(day)
+      const blocks = await fetchDayBlocks(supabase, groupId, dateStr)
+      const vyp = computeHodiny(blocks)
+      // Fallback bez rozvrhu: dosavadní konstanta (čt 6 / jinak 4).
+      const hodiny = vyp.hasRozvrh ? vyp.celkoveHodin : getHodiny(day)
+      if (hodiny > 0) {
+        attendanceRows.push({
+          student_id:         req.student_id,
+          staff_id:           staff.id,
+          group_id:           groupId,
+          date:               dateStr,
+          status:             'absent_excused',
+          hodiny,
+          absence_request_id: id,
+          note:               'Automaticky vygenerováno ze schválené omluvenky.',
+        })
+      }
+    }
+  }
+
+  // 2. Aktualizovat stav omluvenky
   const now = new Date().toISOString()
   const { error: updateErr } = await supabase
     .from('absence_requests')
@@ -169,27 +260,15 @@ export async function approveOmluvenka(id: string): Promise<ApprovalResult> {
     return { success: false, error: 'Nepodařilo se aktualizovat stav omluvenky.' }
   }
 
-  // 2. Vygenerovat záznamy docházky pro každý pracovní den v rozsahu
-  const weekdays = getWeekdays(new Date(req.date_from), new Date(req.date_to))
-
-  if (weekdays.length > 0) {
-    const attendanceRows = weekdays.map((day) => ({
-      student_id:          req.student_id,
-      staff_id:            staff.id,
-      group_id:            groupId,
-      date:                toDateString(day),
-      status:              'absent_excused',
-      hodiny:              getHodiny(day),
-      absence_request_id:  id,
-      note:                'Automaticky vygenerováno ze schválené omluvenky.',
-    }))
-
-    const { error: insertErr } = await supabase
+  // 3. Propsat docházku — upsert kvůli UNIQUE(student_id, date):
+  //    částečná absence typicky padne na den, kdy už existuje záznam docházky.
+  if (attendanceRows.length > 0) {
+    const { error: upsertErr } = await supabase
       .from('attendance_records')
-      .insert(attendanceRows)
+      .upsert(attendanceRows, { onConflict: 'student_id,date' })
 
-    if (insertErr) {
-      console.error('[approveOmluvenka] insert attendance', insertErr)
+    if (upsertErr) {
+      console.error('[approveOmluvenka] upsert attendance', upsertErr)
       return {
         success: false,
         error:   'Omluvenka schválena, ale záznamy docházky se nepodařilo vložit. Zkontrolujte docházku ručně.',
@@ -197,15 +276,18 @@ export async function approveOmluvenka(id: string): Promise<ApprovalResult> {
     }
   }
 
-  // 2b. Družina: žádný propis do druzina_dochazka.
+  // 3b. Družina: žádný propis do druzina_dochazka.
   // Auto-odhlášení z družiny při celodenní omluvence se od migrace 079 POČÍTÁ
   // PŘI ČTENÍ (druzina_den_stav → druzina_month / druzina_den_ocekavani), takže
   // se omluvený den v družině nečeká i bez materializace. Vychovatel realitu
   // potvrdí/přepíše na /dashboard/druzina/dochazka (předvyplněno „Omluven").
+  // Migrace 086 zajišťuje, že částečná (je_castecna=true) NEspouští auto-odhlášení
+  // družiny ani auto-zrušení oběda (druzina_den_stav + 3 lunch funkce filtrují
+  // je_castecna=false). Jen celodenní omluvenka odhlašuje.
   // Výkaz KÚ i dashboard počítají jen status='present', takže absence tady nikdy
   // nefigurovaly. Dřívější materializace odstraněna (dvojí zdroj pravdy).
 
-  // 3. Discord notifikace byla přesunuta na moment zadání omluvenky rodičem
+  // 4. Discord notifikace byla přesunuta na moment zadání omluvenky rodičem
   //    (portal-omluvenky.ts → createGuardianOmluvenka → embedNovaOmluvenka)
 
   revalidatePath('/dashboard/omluvenky')

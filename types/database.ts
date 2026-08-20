@@ -21,6 +21,7 @@ export type Database = {
           date_to: string
           entered_by_staff_id: string | null
           id: string
+          je_castecna: boolean
           note_internal: string | null
           reason: string
           requested_by_guardian_id: string
@@ -28,6 +29,8 @@ export type Database = {
           reviewed_by: string | null
           status: string
           student_id: string
+          time_from: string | null
+          time_to: string | null
         }
         Insert: {
           created_at?: string
@@ -35,6 +38,7 @@ export type Database = {
           date_to: string
           entered_by_staff_id?: string | null
           id?: string
+          je_castecna?: boolean
           note_internal?: string | null
           reason: string
           requested_by_guardian_id: string
@@ -42,6 +46,8 @@ export type Database = {
           reviewed_by?: string | null
           status?: string
           student_id: string
+          time_from?: string | null
+          time_to?: string | null
         }
         Update: {
           created_at?: string
@@ -49,6 +55,7 @@ export type Database = {
           date_to?: string
           entered_by_staff_id?: string | null
           id?: string
+          je_castecna?: boolean
           note_internal?: string | null
           reason?: string
           requested_by_guardian_id?: string
@@ -56,6 +63,8 @@ export type Database = {
           reviewed_by?: string | null
           status?: string
           student_id?: string
+          time_from?: string | null
+          time_to?: string | null
         }
         Relationships: [
           {

@@ -5,19 +5,21 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 // Read-only; RLS zajistí, že guardian vidí jen svá dítka
 
 const STATUS_LABEL: Record<string, string> = {
-  present:          'Přítomen/a',
-  absent_excused:   'Omluven/a',
-  absent_unexcused: 'Neomluven/a',
-  late:             'Pozdní příchod',
-  remote:           'Distančně',
+  present:           'Přítomen/a',
+  absent_excused:    'Omluven/a',
+  partially_excused: 'Částečně omluven/a',
+  absent_unexcused:  'Neomluven/a',
+  late:              'Pozdní příchod',
+  remote:            'Distančně',
 }
 
 const STATUS_CLASS: Record<string, string> = {
-  present:          'text-green-700',
-  absent_excused:   'text-blue-700',
-  absent_unexcused: 'text-red-700',
-  late:             'text-amber-700',
-  remote:           'text-purple-700',
+  present:           'text-green-700',
+  absent_excused:    'text-blue-700',
+  partially_excused: 'text-blue-600',
+  absent_unexcused:  'text-red-700',
+  late:              'text-amber-700',
+  remote:            'text-purple-700',
 }
 
 export default async function PortalDochazkaPage() {
@@ -75,7 +77,8 @@ export default async function PortalDochazkaPage() {
     if (!summaryByChild[rec.student_id]) {
       summaryByChild[rec.student_id] = { excused: 0, unexcused: 0 }
     }
-    if (rec.status === 'absent_excused')   summaryByChild[rec.student_id].excused   += (rec.hodiny ?? 0)
+    if (rec.status === 'absent_excused' || rec.status === 'partially_excused')
+      summaryByChild[rec.student_id].excused += (rec.hodiny ?? 0)
     if (rec.status === 'absent_unexcused') summaryByChild[rec.student_id].unexcused += (rec.hodiny ?? 0)
   }
 

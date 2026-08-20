@@ -206,17 +206,54 @@ order by 1, 2;
 
 
 -- -----------------------------------------------------------------------------
--- 9) BONUS: funkce SECURITY DEFINER — přehled (audit oprávnění/EXECUTE grantů)
---    U kritických RPC ověř, že PUBLIC nemá zbytečný EXECUTE (viz migrace 053).
+-- 9) BEZPEČNOST: SECURITY DEFINER funkce spustitelné rolí `anon`
+--    SECDEF běží pod ownerem → OBCHÁZÍ RLS. Guardless SECDEF + anon = kdokoli
+--    (i nepřihlášený) čte/mění data. `REVOKE FROM PUBLIC` NESTAČÍ — Supabase
+--    grantuje anon/authenticated EXECUTE přímo. Detail: scripts/secdef-audit.sql.
+--
+--    riziko = VYSOKÉ  → anon + bez guardu (heuristika) → prověřit tělo, hardenit
+--             střední → anon, ale s guardem (obv. fail-closed) → hygiena, nižší prio
+--    POZOR — NEREVOKOVAT od anon RLS predikáty (rozbije RLS):
+--      has_role, enrollment_is_owner_on_application + identity primitivy
+--      (is_guardian, is_director(_or_vp), is_vp, current_staff_id/role,
+--       current_guardian_id, can_read_student, can_read_guardian,
+--       staff_can_access_student, guardian_can_access_student).
+--    Historie: dávka 050 + hardening 077/086/087. Funkce přidané po dávce mají
+--    tendenci propadat (recreate resetuje grant) → tahle kontrola to chytí.
 -- -----------------------------------------------------------------------------
-select n.nspname, p.proname,
-       pg_get_function_identity_arguments(p.oid) as args,
-       p.prosecdef as security_definer
+with secdef as (
+  select
+    p.oid,
+    p.oid::regprocedure as fn,
+    has_function_privilege('anon',          p.oid, 'EXECUTE') as anon_exec,
+    has_function_privilege('authenticated', p.oid, 'EXECUTE') as auth_exec,
+    (pg_get_functiondef(p.oid) ~* '(is_director|is_director_or_vp|is_guardian|is_vp|current_staff_id|current_staff_role|guardian_can_access_student|can_read_student|staff_can_access_student|current_guardian_id|auth\.uid|raise exception)') as ma_guard
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.prosecdef
+)
+select fn, anon_exec, auth_exec, ma_guard,
+       case when anon_exec and not ma_guard then 'VYSOKÉ — anon + bez guardu'
+            when anon_exec and ma_guard     then 'střední — anon, ale s guardem'
+            else 'ok' end as riziko
+from secdef
+where anon_exec                       -- jen problematické; smaž řádek pro plný přehled
+order by (anon_exec and not ma_guard) desc, fn;
+
+
+-- -----------------------------------------------------------------------------
+-- 9b) GENERÁTOR REVOKE příkazů pro anon-spustitelné SECDEF funkce.
+--     NEspouštět naslepo — projít výstup, VYNECHAT RLS predikáty ze seznamu v #9,
+--     zkopírovat zbytek a spustit. (Guardless funkce navíc zvaž doplnit interní
+--     guard, ne jen revoke — samotný revoke anon nechrání před `authenticated`.)
+-- -----------------------------------------------------------------------------
+select format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon;', p.oid::regprocedure) as revoke_stmt
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
   and p.prosecdef
-order by p.proname;
+  and has_function_privilege('anon', p.oid, 'EXECUTE')
+order by p.oid::regprocedure::text;
 
 -- =============================================================================
 --  Konec auditu. Nálezy zapiš do sprintu dle scripts/hygiena-runbook.md.
