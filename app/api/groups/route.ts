@@ -3,11 +3,15 @@
 // Zachována zpětná kompatibilita: ?school_year=2025%2F2026 stále funguje
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { requireStaff } from '@/lib/api-auth';
 import { CURRENT_SCHOOL_YEAR, ACTIVE_SCHOOL_YEARS } from '@/lib/config';
 
 export async function GET(req: NextRequest) {
-  const supabase = await createSupabaseServerClient();
+  // Druhý zámek k RLS: seznam skupin je jen pro personál. (nález 4.4)
+  const guard = await requireStaff();
+  if (guard instanceof NextResponse) return guard;
+  const { supabase } = guard;
+
   const { searchParams } = req.nextUrl;
 
   const schoolYearParam = searchParams.get('school_year');

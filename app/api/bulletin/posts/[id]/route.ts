@@ -4,7 +4,7 @@
 // DELETE /api/bulletin/posts/[id]  – soft delete (valid_until = yesterday)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient }              from '@/lib/supabase-server';
+import { requireStaff }              from '@/lib/api-auth';
 import type { BulletinPostUpdate }   from '@/types/bulletin';
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -17,7 +17,9 @@ export async function GET(
   _req: NextRequest,
   { params }: RouteParams,
 ) {
-  const supabase = await createSupabaseServerClient();
+  const guard = await requireStaff();
+  if (guard instanceof NextResponse) return guard;
+  const { supabase } = guard;
   const { id } = await params;
 
   const { data: post, error } = await supabase
@@ -66,7 +68,9 @@ export async function PATCH(
   req: NextRequest,
   { params }: RouteParams,
 ) {
-  const supabase = await createSupabaseServerClient();
+  const guard = await requireStaff();
+  if (guard instanceof NextResponse) return guard;
+  const { supabase } = guard;
   const { id } = await params;
 
   // Načteme aktuální stav postu
@@ -143,7 +147,9 @@ export async function DELETE(
   _req: NextRequest,
   { params }: RouteParams,
 ) {
-  const supabase = await createSupabaseServerClient();
+  const guard = await requireStaff();
+  if (guard instanceof NextResponse) return guard;
+  const { supabase } = guard;
   const { id } = await params;
 
   // Soft delete: nastavíme valid_until na včerejší datum
