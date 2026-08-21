@@ -126,10 +126,21 @@ export async function untagStudent(formData: FormData) {
 export async function deletePhoto(formData: FormData) {
   const id = String(formData.get('id') ?? '')
   const galleryId = String(formData.get('gallery_id') ?? '')
-  const objectKey = String(formData.get('drive_file_id') ?? '')
   if (!id) throw new Error('Chybí id fotky.')
 
   const web = (await createSupabaseServerClient()).schema('web')
+
+  // Object key NEbrat z formData (client) — deleteStoragePhoto jede přes
+  // service-role klienta, takže podvržený klíč by umazal libovolný objekt
+  // v bucketu. Načíst ho z DB řádku přes RLS: staff smaže jen objekt fotky,
+  // kterou skutečně vidí. (audit 2026-08-20, nález 4.5)
+  const { data: row, error: selErr } = await web
+    .from('photos')
+    .select('drive_file_id')
+    .eq('id', id)
+    .maybeSingle()
+  if (selErr) throw selErr
+  const objectKey = (row as { drive_file_id: string | null } | null)?.drive_file_id ?? ''
 
   // Kdyby byla fotka titulní, uvolnit odkaz, ať smazání neblokuje FK.
   if (galleryId) {

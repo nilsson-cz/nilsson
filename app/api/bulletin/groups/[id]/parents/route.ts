@@ -7,6 +7,7 @@
 //   extra_group_ids?      – čárkami oddělené další group_id (pro multi-select)
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireStaff }              from '@/lib/api-auth';
 import { resolveRecipients }         from '@/lib/bulletin/recipients';
 import { CURRENT_SCHOOL_YEAR }       from '@/lib/config';
 
@@ -16,6 +17,12 @@ export async function GET(
   req: NextRequest,
   { params }: RouteParams,
 ) {
+  // Guard: preview příjemců je jen pro personál. RPC bulletin_resolve_recipients
+  // je SECURITY DEFINER (obchází RLS), takže bez tohoto checku by ji zavolal
+  // kterýkoli přihlášený rodič a dostal jména + e-maily všech ZZ třídy. (nález 4.1)
+  const guard = await requireStaff();
+  if (guard instanceof NextResponse) return guard;
+
   const { searchParams } = req.nextUrl;
 
   const { id: primaryGroupId } = await params;

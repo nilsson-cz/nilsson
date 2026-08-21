@@ -15,7 +15,7 @@ import {
   Row,
   Column,
 } from '@react-email/components';
-import { marked } from 'marked';
+import { renderMarkdown } from '@/app/zivot/_lib/markdown';
 import * as React from 'react';
 
 interface BulletinEmailProps {
@@ -52,8 +52,8 @@ export const BulletinEmail: React.FC<BulletinEmailProps> = ({
   eventLocation,
   schoolName = defaultSchoolName,
 }) => {
-  // Renderujeme Markdown do HTML synchronně (marked.parse vrací string v sync mode)
-  const bodyHtml = marked.parse(body, { async: false }) as string;
+  // Markdown → sanitizované HTML (renderMarkdown = marked + DOMPurify allowlist).
+  const bodyHtml = renderMarkdown(body);
 
   const previewText = type === 'event'
     ? `📅 Akce: ${title}`
