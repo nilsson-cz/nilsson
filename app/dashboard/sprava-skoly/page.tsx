@@ -50,6 +50,7 @@ const TILE_SECTIONS: { title: string; hrefs: string[] }[] = [
       '/dashboard/rocniky',
       '/dashboard/kontakty-rodicu',
       '/dashboard/souhlasy',
+      '/dashboard/dotaznik-prehled',
       '/dashboard/zivot',
       '/dashboard/druzina',
     ],

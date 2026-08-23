@@ -2134,6 +2134,50 @@ export type Database = {
         }
         Relationships: []
       }
+      guardian_questionnaire: {
+        Row: {
+          created_at: string
+          guardian_id: string
+          nabidka_exkurze: boolean
+          nabidka_profese: boolean
+          nabidka_upresneni: string | null
+          nabidka_workshop: boolean
+          sourozenci_mimo_skolu: Json
+          updated_at: string
+          zavazne_sdeleni: string | null
+        }
+        Insert: {
+          created_at?: string
+          guardian_id: string
+          nabidka_exkurze?: boolean
+          nabidka_profese?: boolean
+          nabidka_upresneni?: string | null
+          nabidka_workshop?: boolean
+          sourozenci_mimo_skolu?: Json
+          updated_at?: string
+          zavazne_sdeleni?: string | null
+        }
+        Update: {
+          created_at?: string
+          guardian_id?: string
+          nabidka_exkurze?: boolean
+          nabidka_profese?: boolean
+          nabidka_upresneni?: string | null
+          nabidka_workshop?: boolean
+          sourozenci_mimo_skolu?: Json
+          updated_at?: string
+          zavazne_sdeleni?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guardian_questionnaire_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: true
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guardians: {
         Row: {
           address_city: string | null
@@ -4260,6 +4304,96 @@ export type Database = {
           },
         ]
       }
+      student_questionnaire: {
+        Row: {
+          created_at: string
+          jine_sdeleni: string | null
+          leky_davkovani: string | null
+          leky_podavat_povoleno: boolean
+          leky_potvrzeno_lekarem: boolean
+          obavy: string | null
+          osloveni: string | null
+          plavec: boolean | null
+          potreby_navyky: string | null
+          problemy_reseni: string | null
+          rodinne_zazemi: string | null
+          student_id: string
+          updated_at: string
+          updated_by_guardian_id: string | null
+          vliv_na_chovani: string | null
+          zdr_alergie: string | null
+          zdr_dietni_omezeni: string | null
+          zdr_jine: string | null
+          zdr_leky: string | null
+          zdr_onemocneni_urazy: string | null
+          zdr_pohybova_omezeni: string | null
+          zdr_seed_ze_zapisu: boolean
+        }
+        Insert: {
+          created_at?: string
+          jine_sdeleni?: string | null
+          leky_davkovani?: string | null
+          leky_podavat_povoleno?: boolean
+          leky_potvrzeno_lekarem?: boolean
+          obavy?: string | null
+          osloveni?: string | null
+          plavec?: boolean | null
+          potreby_navyky?: string | null
+          problemy_reseni?: string | null
+          rodinne_zazemi?: string | null
+          student_id: string
+          updated_at?: string
+          updated_by_guardian_id?: string | null
+          vliv_na_chovani?: string | null
+          zdr_alergie?: string | null
+          zdr_dietni_omezeni?: string | null
+          zdr_jine?: string | null
+          zdr_leky?: string | null
+          zdr_onemocneni_urazy?: string | null
+          zdr_pohybova_omezeni?: string | null
+          zdr_seed_ze_zapisu?: boolean
+        }
+        Update: {
+          created_at?: string
+          jine_sdeleni?: string | null
+          leky_davkovani?: string | null
+          leky_podavat_povoleno?: boolean
+          leky_potvrzeno_lekarem?: boolean
+          obavy?: string | null
+          osloveni?: string | null
+          plavec?: boolean | null
+          potreby_navyky?: string | null
+          problemy_reseni?: string | null
+          rodinne_zazemi?: string | null
+          student_id?: string
+          updated_at?: string
+          updated_by_guardian_id?: string | null
+          vliv_na_chovani?: string | null
+          zdr_alergie?: string | null
+          zdr_dietni_omezeni?: string | null
+          zdr_jine?: string | null
+          zdr_leky?: string | null
+          zdr_onemocneni_urazy?: string | null
+          zdr_pohybova_omezeni?: string | null
+          zdr_seed_ze_zapisu?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_questionnaire_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_questionnaire_updated_by_guardian_id_fkey"
+            columns: ["updated_by_guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_school_history: {
         Row: {
           created_at: string
@@ -5708,6 +5842,13 @@ export type Database = {
           vecna_skupina: string
         }[]
       }
+      get_enrollment_health_seed: {
+        Args: { p_student_id: string }
+        Returns: {
+          lekar: string
+          zdravotni_omezeni: string
+        }[]
+      }
       get_guardian_bulletin_posts: {
         Args: { p_limit?: number }
         Returns: {
@@ -5736,6 +5877,16 @@ export type Database = {
         }
         Returns: {
           cnt: number
+          student_id: string
+        }[]
+      }
+      get_in_school_siblings: {
+        Args: { p_student_id: string }
+        Returns: {
+          birth_date: string
+          first_name: string
+          group_name: string
+          last_name: string
           student_id: string
         }[]
       }
@@ -5772,6 +5923,18 @@ export type Database = {
           first_name: string
           id: string
           last_name: string
+        }[]
+      }
+      get_questionnaire_overview: {
+        Args: { p_school_year: string }
+        Returns: {
+          first_name: string
+          group_name: string
+          guardian_filled: boolean
+          kod_zaka: string
+          last_name: string
+          student_filled: boolean
+          student_id: string
         }[]
       }
       get_spisy_ke_skartaci: {
