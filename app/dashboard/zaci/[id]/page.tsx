@@ -146,6 +146,48 @@ export default async function ZakDetailPage({
     vpAlerts = (data as any[]) ?? []
   }
 
+  // 7. Osobní dotazník — všem zaměstnancům KROMĚ readonly (demo/inspektor)
+  const isReadonly = staff.role === 'readonly'
+  let questionnaire: any | null = null
+  let guardianParts: Array<{ name: string; part: any }> = []
+  let dotSiblings: any[] = []
+
+  if (!isReadonly) {
+    const { data: sq } = await supabase
+      .from('student_questionnaire')
+      .select('*')
+      .eq('student_id', id)
+      .maybeSingle()
+    questionnaire = sq ?? null
+
+    const { data: gLinks } = await supabase
+      .from('student_guardian_links')
+      .select('guardian_id, guardians(first_name, last_name)')
+      .eq('student_id', id)
+      .is('platnost_do', null)
+
+    const guardianIds = ((gLinks as any[]) ?? []).map((l) => l.guardian_id)
+    if (guardianIds.length > 0) {
+      const { data: gqRows } = await supabase
+        .from('guardian_questionnaire')
+        .select('*')
+        .in('guardian_id', guardianIds)
+      const nameById = new Map(
+        ((gLinks as any[]) ?? []).map((l) => [
+          l.guardian_id,
+          `${l.guardians?.last_name ?? ''} ${l.guardians?.first_name ?? ''}`.trim(),
+        ])
+      )
+      guardianParts = ((gqRows as any[]) ?? []).map((part) => ({
+        name: nameById.get(part.guardian_id) ?? 'Zákonný zástupce',
+        part,
+      }))
+    }
+
+    const { data: sib } = await supabase.rpc('get_in_school_siblings', { p_student_id: id })
+    dotSiblings = (sib as any[]) ?? []
+  }
+
   const s = student as any
   const fullName = `${s.first_name} ${s.last_name}`
 
@@ -247,6 +289,102 @@ export default async function ZakDetailPage({
           </div>
         )}
       </Section>
+
+      {/* Osobní dotazník — jen personál mimo readonly */}
+      {!isReadonly && (
+        <Section title="Osobní dotazník">
+          {!questionnaire && guardianParts.length === 0 && dotSiblings.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">Rodič zatím nevyplnil.</p>
+          ) : (
+            <div className="space-y-4">
+              {/* Zdravotní zvýraznění */}
+              {questionnaire && (questionnaire.zdr_alergie || questionnaire.zdr_leky || questionnaire.zdr_dietni_omezeni || questionnaire.leky_podavat_povoleno) && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-1.5">
+                  <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Zdravotní upozornění</p>
+                  {questionnaire.zdr_alergie && <QLine label="Alergie" value={questionnaire.zdr_alergie} />}
+                  {questionnaire.zdr_dietni_omezeni && <QLine label="Dieta" value={questionnaire.zdr_dietni_omezeni} />}
+                  {questionnaire.zdr_leky && <QLine label="Léky" value={questionnaire.zdr_leky} />}
+                  {questionnaire.leky_podavat_povoleno && (
+                    <QLine
+                      label="Podávání léků povoleno"
+                      value={`${questionnaire.leky_davkovani ?? '—'}${questionnaire.leky_potvrzeno_lekarem ? ' · rodič potvrdil pokyn lékaře' : ''}`}
+                    />
+                  )}
+                </div>
+              )}
+
+              {questionnaire && (
+                <div className="space-y-2.5">
+                  {questionnaire.osloveni && <QField label="Oslovení" value={questionnaire.osloveni} />}
+                  {questionnaire.plavec != null && (
+                    <QField label="Plavec" value={questionnaire.plavec ? 'Plavec' : 'Neplavec'} />
+                  )}
+                  {questionnaire.zdr_onemocneni_urazy && <QField label="Onemocnění a úrazy" value={questionnaire.zdr_onemocneni_urazy} />}
+                  {questionnaire.zdr_pohybova_omezeni && <QField label="Pohybová omezení" value={questionnaire.zdr_pohybova_omezeni} />}
+                  {questionnaire.zdr_jine && <QField label="Zdravotní — jiné" value={questionnaire.zdr_jine} />}
+                  {questionnaire.rodinne_zazemi && <QField label="Rodinné zázemí" value={questionnaire.rodinne_zazemi} />}
+                  {questionnaire.potreby_navyky && <QField label="Zvláštní potřeby a návyky" value={questionnaire.potreby_navyky} />}
+                  {questionnaire.obavy && <QField label="Strach / obavy" value={questionnaire.obavy} />}
+                  {questionnaire.problemy_reseni && <QField label="Možné problémy a řešení" value={questionnaire.problemy_reseni} />}
+                  {questionnaire.vliv_na_chovani && <QField label="Vliv na chování" value={questionnaire.vliv_na_chovani} />}
+                  {questionnaire.jine_sdeleni && <QField label="Jiné sdělení" value={questionnaire.jine_sdeleni} />}
+                </div>
+              )}
+
+              {/* Sourozenci */}
+              {(dotSiblings.length > 0 || guardianParts.some((g) => Array.isArray(g.part.sourozenci_mimo_skolu) && g.part.sourozenci_mimo_skolu.length > 0)) && (
+                <div className="pt-3 border-t border-gray-100">
+                  <p className="text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Sourozenci</p>
+                  <ul className="text-sm text-gray-700 space-y-0.5">
+                    {dotSiblings.map((sib) => (
+                      <li key={sib.student_id}>
+                        {sib.last_name} {sib.first_name}
+                        {sib.group_name ? ` · ${sib.group_name}` : ''}
+                        <span className="text-gray-400"> · u nás ve škole</span>
+                      </li>
+                    ))}
+                    {guardianParts.flatMap((g) =>
+                      (Array.isArray(g.part.sourozenci_mimo_skolu) ? g.part.sourozenci_mimo_skolu : []).map((so: any, i: number) => (
+                        <li key={`${g.name}-${i}`} className="text-gray-500">
+                          {so.oznaceni || '—'}
+                          {so.rok_narozeni ? ` · nar. ${so.rok_narozeni}` : ''}
+                          {so.pohlavi === 'z' ? ' · dívka' : so.pohlavi === 'm' ? ' · chlapec' : ''}
+                          <span className="text-gray-400"> · mimo školu</span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </div>
+              )}
+
+              {/* Část o rodině (per rodič) */}
+              {guardianParts.map((g, i) => {
+                const p = g.part
+                const nabidky = [
+                  p.nabidka_exkurze && 'exkurze na pracoviště',
+                  p.nabidka_profese && 'ukázka profese',
+                  p.nabidka_workshop && 'workshop pro žáky',
+                ].filter(Boolean)
+                if (!p.zavazne_sdeleni && nabidky.length === 0 && !p.nabidka_upresneni) return null
+                return (
+                  <div key={i} className="pt-3 border-t border-gray-100">
+                    <p className="text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Od rodiče: {g.name}</p>
+                    {p.zavazne_sdeleni && <QField label="Závažné sdělení" value={p.zavazne_sdeleni} />}
+                    {nabidky.length > 0 && <QField label="Nabídka spolupráce" value={nabidky.join(', ')} />}
+                    {p.nabidka_upresneni && <QField label="Upřesnění nabídky" value={p.nabidka_upresneni} />}
+                  </div>
+                )
+              })}
+
+              {questionnaire?.updated_at && (
+                <p className="text-xs text-gray-400 pt-2 border-t border-gray-100">
+                  Naposledy upraveno {formatDate(questionnaire.updated_at)}
+                </p>
+              )}
+            </div>
+          )}
+        </Section>
+      )}
 
       {/* BOZP */}
       <Section title={`BOZP · ${activeSchoolYear}`}>
@@ -362,6 +500,23 @@ function DefItem({ label, value }: { label: string; value: React.ReactNode }) {
       <dt className="text-xs text-gray-400">{label}</dt>
       <dd className="text-sm font-medium text-gray-900 mt-0.5">{value}</dd>
     </div>
+  )
+}
+
+function QField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs text-gray-400">{label}</dt>
+      <dd className="text-sm text-gray-800 mt-0.5 whitespace-pre-wrap">{value}</dd>
+    </div>
+  )
+}
+
+function QLine({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="text-sm text-amber-900">
+      <span className="font-medium">{label}:</span> <span className="whitespace-pre-wrap">{value}</span>
+    </p>
   )
 }
 

@@ -132,12 +132,22 @@ const NAV_ITEMS: NavItem[] = [
       </svg>
     ),
   },
+  {
+    href: '/portal/dotaznik',
+    label: 'Osobní dotazník',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} className="w-[18px] h-[18px]">
+        <path strokeLinecap="round" strokeLinejoin="round"
+          d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9 2 2 4-4" />
+      </svg>
+    ),
+  },
 ]
 
 // Sekce pro navigaci — odděluje přehledové a detailní položky
 const NAV_SECTIONS = [
   { label: 'Přehled', items: ['/', '/platby', '/zpravy'] },
-  { label: 'Dítě', items: ['/omluvenky', '/dochazka', '/obedy', '/tridnice', '/tripartita', '/souhlasy', '/druzina'] },
+  { label: 'Dítě', items: ['/omluvenky', '/dochazka', '/obedy', '/tridnice', '/tripartita', '/souhlasy', '/druzina', '/dotaznik'] },
 ]
 
 interface PortalSidebarProps {

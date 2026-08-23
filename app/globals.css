@@ -139,6 +139,26 @@ body {
   color: var(--portal-text); /* OPRAVA: bylo šedé/světlé → špatná čitelnost v omluvenkovém formuláři */
 }
 
+/* Vstupní pole (input/textarea/select) — sjednocený vzhled pro portál */
+.portal-input {
+  width: 100%;
+  color: var(--portal-text);
+  background: var(--portal-surface);
+  border: 0.5px solid var(--portal-border);
+  border-radius: var(--portal-radius);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+.portal-input::placeholder {
+  color: var(--portal-text-subtle);
+}
+.portal-input:focus {
+  outline: none;
+  border-color: var(--portal-accent);
+  box-shadow: 0 0 0 2px var(--portal-accent-subtle);
+}
+
 /* Metrika karta */
 .portal-metric {
   background: var(--portal-surface-hover);

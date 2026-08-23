@@ -379,6 +379,15 @@ export const NAV_ITEMS: NavItem[] = [
     tint: T.emerald,
   },
   {
+    href: '/dashboard/dotaznik-prehled',
+    label: 'Osobní dotazník',
+    icon: Icons.clipboard,
+    roles: ['director'],
+    primaryFor: [],
+    desc: 'Přehled vyplněných osobních dotazníků po třídách',
+    tint: T.violet,
+  },
+  {
     href: '/dashboard/muj-profil',
     label: 'Můj profil',
     icon: Icons.students,
