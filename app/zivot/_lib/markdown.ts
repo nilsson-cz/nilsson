@@ -4,14 +4,19 @@
 // nesanitizuje a výstup jde do dangerouslySetInnerHTML — jediný kompromitovaný
 // nebo zlomyslný staff účet by jinak spustil <script>/onerror v prohlížeči
 // každého rodiče (veřejná zeď + portál + e-mail). Proto sanitizace přes
-// DOMPurify s allowlistem tagů, které Markdown reálně produkuje.
+// sanitize-html s allowlistem tagů, které Markdown reálně produkuje.
 // (audit 2026-08-20, nález 4.3)
+//
+// Pozn.: dřív isomorphic-dompurify (DOMPurify + jsdom). jsdom@30 táhne ESM-only
+// @exodus/bytes, který html-encoding-sniffer volá přes require() → ERR_REQUIRE_ESM
+// a pád serverless funkce při renderu e-mailu. sanitize-html je čistě JS (htmlparser2),
+// bez jsdom → v serverless robustní. Allowlist zachován 1:1.
 
 import { marked } from 'marked'
-import DOMPurify from 'isomorphic-dompurify'
+import sanitizeHtml from 'sanitize-html'
 
 // Tagy, které marked z Markdownu generuje. Vše ostatní (script, iframe, style…)
-// a všechny on*-handlery DOMPurify zahodí.
+// a všechny on*-handlery sanitize-html zahodí.
 const ALLOWED_TAGS = [
   'p', 'br', 'hr', 'span', 'div',
   'strong', 'b', 'em', 'i', 'del', 's', 'sub', 'sup', 'mark',
@@ -21,14 +26,23 @@ const ALLOWED_TAGS = [
   'blockquote', 'code', 'pre',
   'table', 'thead', 'tbody', 'tr', 'th', 'td',
 ]
-const ALLOWED_ATTR = ['href', 'title', 'alt', 'src', 'target', 'rel']
 
 export function renderMarkdown(md: string): string {
   const rawHtml = marked.parse(md, { async: false }) as string
-  return DOMPurify.sanitize(rawHtml, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR,
-    // href/src omezit na bezpečná schémata (http/https/mailto/tel) + relativní.
-    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
+  return sanitizeHtml(rawHtml, {
+    allowedTags: ALLOWED_TAGS,
+    // Atributy allowlistu (odpovídá dřívějšímu ALLOWED_ATTR z DOMPurify):
+    // href/target/rel na odkazech, src/alt na obrázcích, title kdekoli.
+    allowedAttributes: {
+      a:   ['href', 'title', 'target', 'rel'],
+      img: ['src', 'alt', 'title'],
+      '*': ['title'],
+    },
+    // href/src jen bezpečná schémata + relativní/protokol-relativní URL.
+    // (ekvivalent původního ALLOWED_URI_REGEXP: http/https/mailto/tel + relativní.)
+    allowedSchemes: ['http', 'https', 'mailto', 'tel'],
+    allowedSchemesAppliedToAttributes: ['href', 'src'],
+    allowProtocolRelative: true,
+    disallowedTagsMode: 'discard',
   })
 }
