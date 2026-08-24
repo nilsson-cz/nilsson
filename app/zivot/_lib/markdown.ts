@@ -12,8 +12,8 @@
 // a pád serverless funkce při renderu e-mailu. sanitize-html je čistě JS (htmlparser2),
 // bez jsdom → v serverless robustní. Allowlist zachován 1:1.
 
-import { marked } from 'marked'
 import sanitizeHtml from 'sanitize-html'
+import { markdownToHtml } from './markdown-to-html'
 
 // Tagy, které marked z Markdownu generuje. Vše ostatní (script, iframe, style…)
 // a všechny on*-handlery sanitize-html zahodí.
@@ -28,7 +28,9 @@ const ALLOWED_TAGS = [
 ]
 
 export function renderMarkdown(md: string): string {
-  const rawHtml = marked.parse(md, { async: false }) as string
+  // Marked config (gfm + breaks) žije v markdown-to-html.ts, ať je náhled
+  // v editoru bulletinu identický s ostrým výstupem.
+  const rawHtml = markdownToHtml(md)
   return sanitizeHtml(rawHtml, {
     allowedTags: ALLOWED_TAGS,
     // Atributy allowlistu (odpovídá dřívějšímu ALLOWED_ATTR z DOMPurify):

@@ -5,7 +5,7 @@
 import React from 'react';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient }              from '@/lib/supabase-server';
-import { resolveRecipients }         from '@/lib/bulletin/recipients';
+import { resolveRecipients, resolveStaffRecipients } from '@/lib/bulletin/recipients';
 import { sendBulletinNotification }  from '@/lib/discord';
 import { Resend }                    from 'resend';
 import { BulletinEmail }             from '@/emails/BulletinEmail';
@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
     send_email:     boolean;
     group_ids:      string[];
     excluded_guardian_ids?: string[];
+    staff_ids?:     string[];
     school_year?:   string;
   };
 
@@ -122,6 +123,26 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // 2a. Materializujeme zaměstnané příjemce (samostatná tabulka, viz migrace 096).
+  const staffRecipients = await resolveStaffRecipients(body.staff_ids ?? []);
+
+  if (staffRecipients.length > 0) {
+    const staffRows = staffRecipients.map(s => ({
+      post_id:       post.id,
+      staff_id:      s.staff_id,
+      email_at_send: s.email ?? null,
+    }));
+
+    const { error: staffError } = await supabase
+      .from('bulletin_post_staff_recipients')
+      .insert(staffRows);
+
+    if (staffError) {
+      console.error('[bulletin/posts POST] Staff recipients insert error:', staffError);
+      // Neblokujeme – post byl vytvořen, logujeme chybu
+    }
+  }
+
   // 2b. Materializujeme cílový roster žáků (přehled otevření po třídách).
   //     Zdroj = group_ids (NE příjemci) → přesné, bez leaku sourozenců.
   //     Vyloučení ZZ se neaplikuje – dítě zůstává cílem i když se jednomu ZZ
@@ -154,25 +175,33 @@ export async function POST(req: NextRequest) {
   let sentCount     = 0;
   const missingEmailCount = recipients.filter(r => !r.hasEmail).length;
 
-  if (body.send_email && recipients.length > 0) {
-    const emailableRecipients = recipients.filter(r => r.hasEmail && r.email);
+  if (body.send_email && (recipients.length > 0 || staffRecipients.length > 0)) {
+    // Sjednocený seznam adresátů: ZZ (nesou guardian_id) + zaměstnanci (guardian_id null).
+    // Deduplikace podle e-mailové adresy napříč OBĚMA skupinami — sdílí-li rodič
+    // a zaměstnanec (nebo dva rodiče) stejnou adresu, zpráva odejde jen jednou.
+    type SendTarget = { email: string; guardian_id: string | null };
+    const targets: SendTarget[] = [
+      ...recipients
+        .filter(r => r.hasEmail && r.email)
+        .map(r => ({ email: r.email!, guardian_id: r.guardian_id })),
+      ...staffRecipients
+        .filter(s => s.hasEmail && s.email)
+        .map(s => ({ email: s.email!, guardian_id: null })),
+    ];
 
-    // Deduplikace podle emailové adresy – oba rodiče mohou sdílet stejný email,
-    // zpráva se odešle pouze jednou na každou unikátní adresu.
-    // Oba guardiani zůstávají v bulletin_post_recipients pro přehled příjemců.
     const seenEmails = new Set<string>();
-    const uniqueEmailRecipients = emailableRecipients.filter(r => {
-      const email = r.email!.toLowerCase();
+    const uniqueTargets = targets.filter(t => {
+      const email = t.email.toLowerCase();
       if (seenEmails.has(email)) return false;
       seenEmails.add(email);
       return true;
     });
 
-    for (const recipient of uniqueEmailRecipients) {
+    for (const target of uniqueTargets) {
       try {
         const { data: sendData, error: sendError } = await resend.emails.send({
           from:    'ZS Vilekula Teplice <nilsson@zsvilekula.cz>',
-          to:      [recipient.email!],
+          to:      [target.email],
           subject: post.title,
           react: React.createElement(BulletinEmail, {
             title:         post.title,
@@ -185,7 +214,7 @@ export async function POST(req: NextRequest) {
         });
 
         if (sendError) {
-          console.error('[bulletin/posts POST] Resend error:', sendError, { guardian_id: recipient.guardian_id });
+          console.error('[bulletin/posts POST] Resend error:', sendError, { guardian_id: target.guardian_id });
           continue;
         }
 
@@ -193,8 +222,8 @@ export async function POST(req: NextRequest) {
         const eventRow: EmailEventInsert = {
           source_type:   'bulletin',
           source_id:     post.id,
-          guardian_id:   recipient.guardian_id,
-          email_address: recipient.email!,
+          guardian_id:   target.guardian_id,
+          email_address: target.email,
           event_type:    'sent',
           resend_id:     sendData?.id ?? null,
           metadata: null as unknown as never,
@@ -219,7 +248,7 @@ export async function POST(req: NextRequest) {
   // 4. Discord notifikace (best-effort)
   await sendBulletinNotification(
     post as BulletinPostRow,
-    recipients.length,
+    recipients.length + staffRecipients.length,
     missingEmailCount,
     `${staffRow.first_name} ${staffRow.last_name}`,
   );
@@ -227,9 +256,11 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(
     {
       ...post,
-      recipient_count:    recipients.length,
-      sent_count:         sentCount,
-      missing_email_count: missingEmailCount,
+      recipient_count:       recipients.length + staffRecipients.length,
+      guardian_count:        recipients.length,
+      staff_recipient_count: staffRecipients.length,
+      sent_count:            sentCount,
+      missing_email_count:   missingEmailCount,
     },
     { status: 201 },
   );

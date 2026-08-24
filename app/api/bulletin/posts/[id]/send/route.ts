@@ -51,32 +51,56 @@ export async function POST(
 
   const recipients = recipientRows ?? [];
 
-  if (recipients.length === 0) {
+  // Zaměstnaní příjemci (samostatná tabulka, viz migrace 096).
+  const { data: staffRows, error: staffError } = await supabase
+    .from('bulletin_post_staff_recipients')
+    .select('staff_id, email_at_send')
+    .eq('post_id', id);
+
+  if (staffError) {
+    console.error('[bulletin/send] Staff recipients fetch error:', staffError);
+    return NextResponse.json({ error: 'Nepodařilo se načíst příjemce' }, { status: 500 });
+  }
+
+  const staffRecipients = (staffRows ?? []) as { staff_id: string; email_at_send: string | null }[];
+
+  if (recipients.length === 0 && staffRecipients.length === 0) {
     return NextResponse.json({ error: 'Příspěvek nemá žádné příjemce' }, { status: 422 });
   }
 
   // Odeslání emailů
   let sentCount   = 0;
   let failedCount = 0;
-  const missingEmailCount = recipients.filter(r => !r.email_at_send).length;
+  const missingEmailCount =
+    recipients.filter(r => !r.email_at_send).length +
+    staffRecipients.filter(s => !s.email_at_send).length;
 
-  // Deduplikace podle emailové adresy – oba rodiče mohou sdílet stejný email,
-  // zpráva se odešle pouze jednou na každou unikátní adresu.
-  // Oba guardiani zůstávají v bulletin_post_recipients pro přehled příjemců.
+  // Sjednocený seznam adresátů: ZZ (nesou guardian_id) + zaměstnanci (guardian_id null).
+  // Deduplikace podle e-mailové adresy napříč OBĚMA skupinami — každá unikátní
+  // adresa dostane zprávu jen jednou.
+  type SendTarget = { email: string; guardian_id: string | null };
+  const targets: SendTarget[] = [
+    ...recipients
+      .filter(r => r.email_at_send)
+      .map(r => ({ email: r.email_at_send!, guardian_id: r.guardian_id })),
+    ...staffRecipients
+      .filter(s => s.email_at_send)
+      .map(s => ({ email: s.email_at_send!, guardian_id: null })),
+  ];
+
   const seenEmails = new Set<string>();
-  const uniqueEmailRecipients = recipients.filter(r => {
-    if (!r.email_at_send) return false;
-    const email = r.email_at_send.toLowerCase();
+  const uniqueTargets = targets.filter(t => {
+    const email = t.email.toLowerCase();
     if (seenEmails.has(email)) return false;
     seenEmails.add(email);
     return true;
   });
 
-  for (const recipient of uniqueEmailRecipients) {
+  for (const target of uniqueTargets) {
     try {
       const { data: sendData, error: sendError } = await resend.emails.send({
         from:    'ZS Vilekula Teplice <nilsson@zsvilekula.cz>',
-        to:      [recipient.email_at_send!],
+        to:      [target.email],
         subject: post.title,
         react: React.createElement(BulletinEmail, {
           title:         post.title,
@@ -89,7 +113,7 @@ export async function POST(
       });
 
       if (sendError) {
-        console.error('[bulletin/send] Resend error:', sendError, { guardian_id: recipient.guardian_id });
+        console.error('[bulletin/send] Resend error:', sendError, { guardian_id: target.guardian_id });
         failedCount++;
         continue;
       }
@@ -98,8 +122,8 @@ export async function POST(
       const eventRow: EmailEventInsert = {
         source_type:   'bulletin',
         source_id:     post.id,
-        guardian_id:   recipient.guardian_id,
-        email_address: recipient.email_at_send!,
+        guardian_id:   target.guardian_id,
+        email_address: target.email,
         event_type:    'sent',
         resend_id:     sendData?.id ?? null,
         metadata: null as unknown as never,
@@ -122,6 +146,6 @@ export async function POST(
     sent:          sentCount,
     failed:        failedCount,
     missing_email: missingEmailCount,
-    total:         recipients.length,
+    total:         recipients.length + staffRecipients.length,
   });
 }

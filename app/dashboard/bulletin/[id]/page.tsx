@@ -5,6 +5,7 @@ import DeleteButton from './_DeleteButton';
 import Link             from 'next/link';
 import { notFound }     from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { renderMarkdown } from '@/app/zivot/_lib/markdown';
 import type { BulletinPostRow } from '@/types/bulletin';
 
 // ─────────────────────────────────────────────────────────────
@@ -156,9 +157,14 @@ export default async function BulletinDetailPage({ params }: PageProps) {
   const isEvent  = p.type === 'event';
   const isLocked = p.email_sent_at !== null;
 
-  // Počet příjemců
+  // Počet příjemců (ZZ + zaměstnanci)
   const { count: recipientCount } = await supabase
     .from('bulletin_post_recipients')
+    .select('*', { count: 'exact', head: true })
+    .eq('post_id', p.id);
+
+  const { count: staffRecipientCount } = await supabase
+    .from('bulletin_post_staff_recipients')
     .select('*', { count: 'exact', head: true })
     .eq('post_id', p.id);
 
@@ -250,12 +256,12 @@ export default async function BulletinDetailPage({ params }: PageProps) {
 
       {/* ── Obsah ── */}
       <div className="bg-white rounded-xl border border-stone-200 p-6 mb-6">
-        {/* Jednoduchý Markdown render – pro produkci použij next-mdx-remote nebo remark */}
-        <div className="prose prose-stone prose-sm max-w-none">
-          <pre className="whitespace-pre-wrap text-sm text-stone-700 font-sans leading-relaxed">
-            {p.body}
-          </pre>
-        </div>
+        {/* Markdown render přes renderMarkdown (marked + sanitize-html) — stejný
+            výstup jako odeslaný e-mail. */}
+        <div
+          className="prose prose-stone prose-sm max-w-none"
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(p.body) }}
+        />
       </div>
 
       {/* ── Statistika ── */}
@@ -266,7 +272,10 @@ export default async function BulletinDetailPage({ params }: PageProps) {
 
         <div className="flex items-center gap-3 text-sm text-stone-600">
           <span className="font-medium">Příjemci:</span>
-          <span>{recipientCount ?? 0} zákonných zástupců</span>
+          <span>
+            {recipientCount ?? 0} zákonných zástupců
+            {(staffRecipientCount ?? 0) > 0 && ` · ${staffRecipientCount} zaměstnanců`}
+          </span>
         </div>
 
         {p.email_sent_at ? (

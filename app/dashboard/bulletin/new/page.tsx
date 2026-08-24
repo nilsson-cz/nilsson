@@ -6,7 +6,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter }    from 'next/navigation';
-import type { RecipientPreview } from '@/lib/bulletin/recipients';
+import type { RecipientPreview, StaffRecipientPreview } from '@/lib/bulletin/recipients';
+import { markdownToHtml } from '@/app/zivot/_lib/markdown-to-html';
 
 // ─────────────────────────────────────────────────────────────
 // Typy
@@ -60,11 +61,14 @@ export default function BulletinNewPage() {
   const [groups,         setGroups]         = useState<Group[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
 
+  // ── Zaměstnanci ──
+  const [staff,         setStaff]         = useState<StaffRecipientPreview[]>([]);
+  const [selectedStaff, setSelectedStaff] = useState<Set<string>>(new Set());
+
   // ── Příjemci ──
   const [recipients,         setRecipients]         = useState<RecipientPreview[]>([]);
   const [excludedGuardians,  setExcludedGuardians]  = useState<Set<string>>(new Set());
   const [loadingRecipients,  setLoadingRecipients]  = useState(false);
-  const [missingEmailCount,  setMissingEmailCount]  = useState(0);
 
   // ── Submit ──
   const [submitting, setSubmitting] = useState(false);
@@ -81,11 +85,18 @@ export default function BulletinNewPage() {
       .catch(err => console.error('Skupiny:', err));
   }, []);
 
+  // Načteme aktivní zaměstnance
+  useEffect(() => {
+    fetch('/api/bulletin/staff')
+      .then(r => r.json())
+      .then(data => setStaff(Array.isArray(data?.staff) ? data.staff : []))
+      .catch(err => console.error('Zaměstnanci:', err));
+  }, []);
+
   // Načteme příjemce při změně vybraných skupin
   const fetchRecipients = useCallback(async () => {
     if (selectedGroups.size === 0) {
       setRecipients([]);
-      setMissingEmailCount(0);
       return;
     }
 
@@ -94,25 +105,25 @@ export default function BulletinNewPage() {
       const groupIds  = Array.from(selectedGroups);
       const primary   = groupIds[0];
       const extra     = groupIds.slice(1).join(',');
-      const excluded  = Array.from(excludedGuardians).join(',');
 
+      // Náhled vždy tahá CELÝ roster tříd — vyloučení neřešíme na serveru, jinak
+      // by odznačený rodič ze seznamu zmizel a nešlo by ho znovu zaškrtnout.
+      // Vyloučení je čistě klientské (excludedGuardians) a promítne se až v submitu.
       const url = new URL(
         `/api/bulletin/groups/${primary}/parents`,
         window.location.origin,
       );
-      if (extra)    url.searchParams.set('extra_group_ids', extra);
-      if (excluded) url.searchParams.set('excluded', excluded);
+      if (extra) url.searchParams.set('extra_group_ids', extra);
 
       const res:  RecipientResponse = await fetch(url.toString()).then(r => r.json());
 
       setRecipients(res.recipients ?? []);
-      setMissingEmailCount(res.missing_email_count ?? 0);
     } catch (err) {
       console.error('Příjemci:', err);
     } finally {
       setLoadingRecipients(false);
     }
-  }, [selectedGroups, excludedGuardians]);
+  }, [selectedGroups]);
 
   useEffect(() => {
     fetchRecipients();
@@ -135,6 +146,32 @@ export default function BulletinNewPage() {
       next.has(guardianId) ? next.delete(guardianId) : next.add(guardianId);
       return next;
     });
+  }
+
+  function toggleStaff(staffId: string) {
+    setSelectedStaff(prev => {
+      const next = new Set(prev);
+      next.has(staffId) ? next.delete(staffId) : next.add(staffId);
+      return next;
+    });
+  }
+
+  const allStaffSelected = staff.length > 0 && selectedStaff.size === staff.length;
+
+  function toggleAllStaff() {
+    setSelectedStaff(allStaffSelected ? new Set() : new Set(staff.map(s => s.staff_id)));
+  }
+
+  // Hromadné odznačení / označení RODIČŮ v načteném rosteru.
+  // Umožní „odznačit všechny → zaškrtnout jen pár" bez proklikávání desítek lidí
+  // a bez vyklikávání celé třídy (ta zůstane vybraná, seznam rodičů viditelný).
+  const noneRecipientsSelected =
+    recipients.length > 0 && recipients.every(r => excludedGuardians.has(r.guardian_id));
+
+  function toggleAllRecipients() {
+    setExcludedGuardians(
+      noneRecipientsSelected ? new Set() : new Set(recipients.map(r => r.guardian_id)),
+    );
   }
 
   // ── Submit ──
@@ -165,6 +202,7 @@ export default function BulletinNewPage() {
           send_email:            sendEmail,
           group_ids:             Array.from(selectedGroups),
           excluded_guardian_ids: Array.from(excludedGuardians),
+          staff_ids:             Array.from(selectedStaff),
         }),
       });
 
@@ -183,6 +221,8 @@ export default function BulletinNewPage() {
   }
 
   const effectiveRecipients = recipients.filter(r => !excludedGuardians.has(r.guardian_id));
+  // Chybějící e-maily počítáme jen z reálně vybraných (vyloučení je klientské).
+  const effectiveMissingEmailCount = effectiveRecipients.filter(r => !r.hasEmail).length;
 
   // ─────────────────────────────────────────────────────────────
   // Render
@@ -260,14 +300,11 @@ export default function BulletinNewPage() {
             <div
               className="min-h-[140px] rounded-lg border border-stone-200 px-4 py-3 prose prose-sm
                          prose-stone max-w-none bg-stone-50"
+              // Stejný renderer jako ostrý e-mail/zeď (marked, gfm + breaks),
+              // ať náhled 1:1 odpovídá odeslané zprávě. Obsah je autorův vlastní.
               dangerouslySetInnerHTML={{
-                __html: body
-                  ? body
-                      .replace(/&/g, '&amp;')
-                      .replace(/</g, '&lt;')
-                      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                      .replace(/\n/g, '<br>')
+                __html: body.trim()
+                  ? markdownToHtml(body)
                   : '<span class="text-stone-400">Žádný obsah.</span>',
               }}
             />
@@ -383,6 +420,61 @@ export default function BulletinNewPage() {
           )}
         </div>
 
+        {/* ── Zaměstnanci ── */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-stone-700">
+              Zaměstnanci
+              {staff.length > 0 && (
+                <span className="text-stone-400 font-normal ml-1">
+                  ({selectedStaff.size} z {staff.length})
+                </span>
+              )}
+            </label>
+            {staff.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleAllStaff}
+                className="text-xs text-emerald-600 hover:text-emerald-700 transition-colors"
+              >
+                {allStaffSelected ? 'Odznačit všechny' : 'Všichni zaměstnanci'}
+              </button>
+            )}
+          </div>
+
+          {staff.length === 0 ? (
+            <p className="text-sm text-stone-400">Načítání zaměstnanců…</p>
+          ) : (
+            <div className="space-y-1 max-h-56 overflow-y-auto rounded-lg border border-stone-200 p-2">
+              {staff.map(s => {
+                const checked = selectedStaff.has(s.staff_id);
+                return (
+                  <label
+                    key={s.staff_id}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors
+                      ${checked ? 'bg-emerald-50' : 'hover:bg-stone-50'}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleStaff(s.staff_id)}
+                      className="rounded text-emerald-600"
+                    />
+                    <span className="text-sm text-stone-700 flex-1">
+                      {s.first_name} {s.last_name}
+                    </span>
+                    {s.hasEmail ? (
+                      <span className="text-xs text-stone-400">{s.email}</span>
+                    ) : (
+                      <span className="text-xs text-amber-600">bez e-mailu</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* ── Příjemci ── */}
         {selectedGroups.size > 0 && (
           <div>
@@ -395,18 +487,26 @@ export default function BulletinNewPage() {
                   </span>
                 )}
               </label>
-              {loadingRecipients && (
+              {loadingRecipients ? (
                 <span className="text-xs text-stone-400 animate-pulse">Načítám…</span>
+              ) : recipients.length > 0 && (
+                <button
+                  type="button"
+                  onClick={toggleAllRecipients}
+                  className="text-xs text-emerald-600 hover:text-emerald-700 transition-colors"
+                >
+                  {noneRecipientsSelected ? 'Vybrat všechny' : 'Odznačit všechny'}
+                </button>
               )}
             </div>
 
             {/* ⚠️ Upozornění na chybějící emaily */}
-            {missingEmailCount > 0 && (
+            {effectiveMissingEmailCount > 0 && (
               <div className="mb-3 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
                 <span className="text-base">⚠️</span>
                 <span>
-                  <strong>{missingEmailCount}</strong>{' '}
-                  {missingEmailCount === 1
+                  <strong>{effectiveMissingEmailCount}</strong>{' '}
+                  {effectiveMissingEmailCount === 1
                     ? 'zákonný zástupce nemá'
                     : 'zákonní zástupci nemají'}{' '}
                   zadaný e-mail a neobdrží e-mailovou notifikaci.

@@ -14,6 +14,250 @@ export type Database = {
   }
   public: {
     Tables: {
+      _attic_comm_campaign_recipients: {
+        Row: {
+          campaign_id: string
+          guardian_id: string
+        }
+        Insert: {
+          campaign_id: string
+          guardian_id: string
+        }
+        Update: {
+          campaign_id?: string
+          guardian_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_campaign_recipients_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "_attic_comm_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_campaign_recipients_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      _attic_comm_campaigns: {
+        Row: {
+          body_html: string | null
+          body_text: string | null
+          created_at: string
+          created_by: string
+          id: string
+          sent_at: string | null
+          status: string
+          subject: string
+          target_ref: string | null
+          target_type: string
+          title: string
+        }
+        Insert: {
+          body_html?: string | null
+          body_text?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          sent_at?: string | null
+          status?: string
+          subject: string
+          target_ref?: string | null
+          target_type: string
+          title: string
+        }
+        Update: {
+          body_html?: string | null
+          body_text?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          target_ref?: string | null
+          target_type?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      _attic_comm_log: {
+        Row: {
+          campaign_id: string
+          email_address: string
+          error_detail: string | null
+          guardian_id: string
+          id: string
+          resend_message_id: string | null
+          sent_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          campaign_id: string
+          email_address: string
+          error_detail?: string | null
+          guardian_id: string
+          id?: string
+          resend_message_id?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          email_address?: string
+          error_detail?: string | null
+          guardian_id?: string
+          id?: string
+          resend_message_id?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comm_log_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "_attic_comm_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comm_log_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      _attic_hospitace: {
+        Row: {
+          created_at: string
+          datum: string
+          hospitant_inst: string | null
+          hospitant_jmeno: string
+          id: string
+          poznamka: string | null
+          typ: string
+          zaznam_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          datum: string
+          hospitant_inst?: string | null
+          hospitant_jmeno: string
+          id?: string
+          poznamka?: string | null
+          typ: string
+          zaznam_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          datum?: string
+          hospitant_inst?: string | null
+          hospitant_jmeno?: string
+          id?: string
+          poznamka?: string | null
+          typ?: string
+          zaznam_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hospitace_zaznam_id_fkey"
+            columns: ["zaznam_id"]
+            isOneToOne: false
+            referencedRelation: "tridni_kniha_zaznamy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      _attic_lunch_allergens: {
+        Row: {
+          code: number
+          name_cs: string
+        }
+        Insert: {
+          code: number
+          name_cs: string
+        }
+        Update: {
+          code?: number
+          name_cs?: string
+        }
+        Relationships: []
+      }
+      _attic_student_notes: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          is_safety_relevant: boolean
+          note_text: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          is_safety_relevant?: boolean
+          note_text: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_safety_relevant?: boolean
+          note_text?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_notes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_notes_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      _attic_v_staff_id: {
+        Row: {
+          id: string | null
+        }
+        Insert: {
+          id?: string | null
+        }
+        Update: {
+          id?: string | null
+        }
+        Relationships: []
+      }
       absence_requests: {
         Row: {
           created_at: string
@@ -272,6 +516,39 @@ export type Database = {
           },
         ]
       }
+      bulletin_post_staff_recipients: {
+        Row: {
+          email_at_send: string | null
+          post_id: string
+          staff_id: string
+        }
+        Insert: {
+          email_at_send?: string | null
+          post_id: string
+          staff_id: string
+        }
+        Update: {
+          email_at_send?: string | null
+          post_id?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulletin_post_staff_recipients_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "bulletin_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulletin_post_staff_recipients_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bulletin_post_students: {
         Row: {
           group_id: string
@@ -367,137 +644,6 @@ export type Database = {
             columns: ["author_id"]
             isOneToOne: false
             referencedRelation: "staff"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      comm_campaign_recipients: {
-        Row: {
-          campaign_id: string
-          guardian_id: string
-        }
-        Insert: {
-          campaign_id: string
-          guardian_id: string
-        }
-        Update: {
-          campaign_id?: string
-          guardian_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "comm_campaign_recipients_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "comm_campaigns"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "comm_campaign_recipients_guardian_id_fkey"
-            columns: ["guardian_id"]
-            isOneToOne: false
-            referencedRelation: "guardians"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      comm_campaigns: {
-        Row: {
-          body_html: string | null
-          body_text: string | null
-          created_at: string
-          created_by: string
-          id: string
-          sent_at: string | null
-          status: string
-          subject: string
-          target_ref: string | null
-          target_type: string
-          title: string
-        }
-        Insert: {
-          body_html?: string | null
-          body_text?: string | null
-          created_at?: string
-          created_by: string
-          id?: string
-          sent_at?: string | null
-          status?: string
-          subject: string
-          target_ref?: string | null
-          target_type: string
-          title: string
-        }
-        Update: {
-          body_html?: string | null
-          body_text?: string | null
-          created_at?: string
-          created_by?: string
-          id?: string
-          sent_at?: string | null
-          status?: string
-          subject?: string
-          target_ref?: string | null
-          target_type?: string
-          title?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "comm_campaigns_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "staff"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      comm_log: {
-        Row: {
-          campaign_id: string
-          email_address: string
-          error_detail: string | null
-          guardian_id: string
-          id: string
-          resend_message_id: string | null
-          sent_at: string | null
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          campaign_id: string
-          email_address: string
-          error_detail?: string | null
-          guardian_id: string
-          id?: string
-          resend_message_id?: string | null
-          sent_at?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          campaign_id?: string
-          email_address?: string
-          error_detail?: string | null
-          guardian_id?: string
-          id?: string
-          resend_message_id?: string | null
-          sent_at?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "comm_log_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "comm_campaigns"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "comm_log_guardian_id_fkey"
-            columns: ["guardian_id"]
-            isOneToOne: false
-            referencedRelation: "guardians"
             referencedColumns: ["id"]
           },
         ]
@@ -2271,47 +2417,6 @@ export type Database = {
         }
         Relationships: []
       }
-      hospitace: {
-        Row: {
-          created_at: string
-          datum: string
-          hospitant_inst: string | null
-          hospitant_jmeno: string
-          id: string
-          poznamka: string | null
-          typ: string
-          zaznam_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          datum: string
-          hospitant_inst?: string | null
-          hospitant_jmeno: string
-          id?: string
-          poznamka?: string | null
-          typ: string
-          zaznam_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          datum?: string
-          hospitant_inst?: string | null
-          hospitant_jmeno?: string
-          id?: string
-          poznamka?: string | null
-          typ?: string
-          zaznam_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hospitace_zaznam_id_fkey"
-            columns: ["zaznam_id"]
-            isOneToOne: false
-            referencedRelation: "tridni_kniha_zaznamy"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       jmenny_rejstrik: {
         Row: {
           adresa: string | null
@@ -2416,21 +2521,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      lunch_allergens: {
-        Row: {
-          code: number
-          name_cs: string
-        }
-        Insert: {
-          code: number
-          name_cs: string
-        }
-        Update: {
-          code?: number
-          name_cs?: string
-        }
-        Relationships: []
       }
       lunch_menu_days: {
         Row: {
@@ -4259,51 +4349,6 @@ export type Database = {
           },
         ]
       }
-      student_notes: {
-        Row: {
-          created_at: string
-          created_by: string
-          id: string
-          is_safety_relevant: boolean
-          note_text: string
-          student_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by: string
-          id?: string
-          is_safety_relevant?: boolean
-          note_text: string
-          student_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string
-          id?: string
-          is_safety_relevant?: boolean
-          note_text?: string
-          student_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "student_notes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "staff"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "student_notes_student_id_fkey"
-            columns: ["student_id"]
-            isOneToOne: false
-            referencedRelation: "students"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       student_questionnaire: {
         Row: {
           created_at: string
@@ -5127,18 +5172,6 @@ export type Database = {
         }
         Relationships: []
       }
-      v_staff_id: {
-        Row: {
-          id: string | null
-        }
-        Insert: {
-          id?: string | null
-        }
-        Update: {
-          id?: string | null
-        }
-        Relationships: []
-      }
       vecne_skupiny: {
         Row: {
           aktivni: boolean
@@ -5559,6 +5592,15 @@ export type Database = {
       admin_unlock_semester_record: {
         Args: { p_id: string }
         Returns: undefined
+      }
+      bulletin_active_staff: {
+        Args: never
+        Returns: {
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+        }[]
       }
       bulletin_resolve_recipients: {
         Args: {
