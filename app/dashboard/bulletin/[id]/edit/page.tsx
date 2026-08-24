@@ -77,6 +77,14 @@ type Guardian = {
   hasEmail:    boolean;
 };
 
+type Staff = {
+  staff_id:   string;
+  first_name: string;
+  last_name:  string;
+  email:      string | null;
+  hasEmail:   boolean;
+};
+
 type GroupWithParents = {
   groupId:    string;
   groupName:  string;   // formát: "Beta (2026/2027)"
@@ -93,6 +101,8 @@ export default function BulletinEditPage() {
   const [groups, setGroups]               = useState<GroupWithParents[]>([]);
   const [currentRecipients, setCurrentRecipients] = useState<Set<string>>(new Set());
   const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set());
+  const [staff, setStaff]                 = useState<Staff[]>([]);
+  const [selectedStaff, setSelectedStaff] = useState<Set<string>>(new Set());
 
   const [title, setTitle]                 = useState('');
   const [body, setBody]                   = useState('');
@@ -132,10 +142,21 @@ export default function BulletinEditPage() {
         const recipRes = await fetch(`/api/bulletin/posts/${id}/recipients`);
         let savedIds = new Set<string>();
         if (recipRes.ok) {
-          const recipData: { guardian_id: string }[] = await recipRes.json();
-          savedIds = new Set(recipData.map(r => r.guardian_id));
+          const recipData: {
+            guardians: { guardian_id: string }[];
+            staff_ids: string[];
+          } = await recipRes.json();
+          savedIds = new Set((recipData.guardians ?? []).map(r => r.guardian_id));
           setCurrentRecipients(savedIds);
           setSelectedRecipients(new Set(savedIds));
+          setSelectedStaff(new Set(recipData.staff_ids ?? []));
+        }
+
+        // Aktivní zaměstnanci pro picker
+        const staffRes = await fetch('/api/bulletin/staff');
+        if (staffRes.ok) {
+          const staffData = await staffRes.json();
+          setStaff(Array.isArray(staffData?.staff) ? staffData.staff : []);
         }
 
         // ZMĚNA: /api/groups bez parametru → ACTIVE_SCHOOL_YEARS (I. + Beta + Gamma)
@@ -214,6 +235,29 @@ export default function BulletinEditPage() {
     });
   }
 
+  function toggleStaff(staffId: string) {
+    if (isLocked) return;
+    setSelectedStaff(prev => {
+      const next = new Set(prev);
+      next.has(staffId) ? next.delete(staffId) : next.add(staffId);
+      return next;
+    });
+  }
+
+  const allStaffSelected = staff.length > 0 && selectedStaff.size === staff.length;
+
+  function toggleAllStaff() {
+    if (isLocked) return;
+    setSelectedStaff(allStaffSelected ? new Set() : new Set(staff.map(s => s.staff_id)));
+  }
+
+  // Zrušit výběr: vyprázdní celý výběr adresátů (ZZ i zaměstnanci).
+  function clearSelection() {
+    if (isLocked) return;
+    setSelectedRecipients(new Set());
+    setSelectedStaff(new Set());
+  }
+
   function handleSave() {
     if (isLocked) return;
     setSaveError(null);
@@ -241,7 +285,10 @@ export default function BulletinEditPage() {
         const recipRes = await fetch(`/api/bulletin/posts/${id}/recipients`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ guardian_ids: Array.from(selectedRecipients) }),
+          body: JSON.stringify({
+            guardian_ids: Array.from(selectedRecipients),
+            staff_ids:    Array.from(selectedStaff),
+          }),
         });
 
         if (!recipRes.ok) {
@@ -454,9 +501,19 @@ export default function BulletinEditPage() {
       <section className="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-800">Příjemci</h2>
-          <span className="text-sm text-gray-400">
-            {selectedRecipients.size} z {uniqueGuardians.length}
-          </span>
+          <div className="flex items-center gap-3">
+            {!isLocked && (selectedRecipients.size > 0 || selectedStaff.size > 0) && (
+              <button
+                onClick={clearSelection}
+                className="text-xs text-gray-400 hover:text-red-600 transition-colors"
+              >
+                Zrušit výběr
+              </button>
+            )}
+            <span className="text-sm text-gray-400">
+              {selectedRecipients.size + selectedStaff.size} vybráno
+            </span>
+          </div>
         </div>
 
         {groups.length === 0 && (
@@ -538,6 +595,61 @@ export default function BulletinEditPage() {
             </div>
           );
         })}
+
+        {/* ── Zaměstnanci ── */}
+        <div className="border border-gray-100 rounded-lg overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 bg-gray-50">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-800">Zaměstnanci</span>
+              <span className="text-xs text-gray-400">
+                ({selectedStaff.size}/{staff.length})
+              </span>
+            </div>
+            {!isLocked && staff.length > 0 && (
+              <button
+                onClick={toggleAllStaff}
+                className="text-xs text-orange-500 hover:text-orange-700 transition-colors"
+              >
+                {allStaffSelected ? 'odznačit vše' : 'vybrat všechny'}
+              </button>
+            )}
+          </div>
+
+          {staff.length === 0 ? (
+            <p className="px-4 py-3 text-sm text-gray-400">Načítám zaměstnance…</p>
+          ) : (
+            <ul className="divide-y divide-gray-50 max-h-56 overflow-y-auto">
+              {staff.map(s => {
+                const checked = selectedStaff.has(s.staff_id);
+                return (
+                  <li
+                    key={s.staff_id}
+                    onClick={() => toggleStaff(s.staff_id)}
+                    className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                      isLocked ? 'cursor-default' : 'cursor-pointer hover:bg-orange-50'
+                    }`}
+                  >
+                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                      checked ? 'bg-orange-500 border-orange-500' : 'border-gray-300 bg-white'
+                    }`}>
+                      {checked && (
+                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 8">
+                          <path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </div>
+                    <span className={checked ? 'text-gray-900' : 'text-gray-400'}>
+                      {s.first_name} {s.last_name}
+                    </span>
+                    {!s.hasEmail && (
+                      <span className="ml-auto text-xs text-amber-500">bez emailu</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 space-y-3">

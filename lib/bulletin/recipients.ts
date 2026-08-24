@@ -11,6 +11,63 @@ export interface RecipientPreview {
   hasEmail:    boolean;
 }
 
+export interface StaffRecipientPreview {
+  staff_id:   string;
+  first_name: string;
+  last_name:  string;
+  email:      string | null;
+  hasEmail:   boolean;
+}
+
+interface ActiveStaffRow {
+  id:         string;
+  first_name: string;
+  last_name:  string;
+  email:      string | null;
+}
+
+/**
+ * Vrátí aktivní zaměstnance pro picker příjemců bulletinu.
+ * Zdroj: SECDEF RPC bulletin_active_staff() (guard: jen personál).
+ */
+export async function listActiveStaff(): Promise<StaffRecipientPreview[]> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase.rpc('bulletin_active_staff');
+
+  if (error) {
+    console.error('[bulletin/recipients] active staff RPC error:', error);
+    throw new Error(`Nepodařilo se načíst zaměstnance: ${error.message}`);
+  }
+
+  return ((data ?? []) as ActiveStaffRow[]).map(toStaffPreview);
+}
+
+/**
+ * Vrátí zvolené aktivní zaměstnance (průnik staffIds × aktivní zaměstnanci).
+ * Neaktivní / neexistující ID se tiše zahodí — zpráva nikdy neodejde bývalému
+ * zaměstnanci, i kdyby jeho ID přišlo v požadavku.
+ */
+export async function resolveStaffRecipients(
+  staffIds: string[],
+): Promise<StaffRecipientPreview[]> {
+  if (staffIds.length === 0) return [];
+
+  const wanted = new Set(staffIds);
+  const active = await listActiveStaff();
+  return active.filter(s => wanted.has(s.staff_id));
+}
+
+function toStaffPreview(row: ActiveStaffRow): StaffRecipientPreview {
+  return {
+    staff_id:   row.id,
+    first_name: row.first_name,
+    last_name:  row.last_name,
+    email:      row.email,
+    hasEmail:   row.email !== null && row.email.trim() !== '',
+  };
+}
+
 /**
  * Vrátí deduplikovaný seznam zákonných zástupců aktivních žáků
  * v zadaných skupinách pro daný školní rok.

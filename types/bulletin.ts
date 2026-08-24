@@ -39,6 +39,14 @@ export interface BulletinPostRecipientRow {
 
 export type BulletinPostRecipientInsert = BulletinPostRecipientRow;
 
+export interface BulletinPostStaffRecipientRow {
+  post_id:       string;
+  staff_id:      string;
+  email_at_send: string | null;
+}
+
+export type BulletinPostStaffRecipientInsert = BulletinPostStaffRecipientRow;
+
 export interface EmailEventRow {
   id:            string;
   source_type:   EmailSourceType;

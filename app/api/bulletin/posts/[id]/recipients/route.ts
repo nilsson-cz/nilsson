@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { resolveStaffRecipients }     from '@/lib/bulletin/recipients';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -27,7 +28,21 @@ export async function GET(
     return NextResponse.json({ error: 'Nepodařilo se načíst příjemce' }, { status: 500 });
   }
 
-  return NextResponse.json(data ?? []);
+  // Zaměstnaní příjemci (samostatná tabulka, viz migrace 096).
+  const { data: staffData, error: staffError } = await supabase
+    .from('bulletin_post_staff_recipients')
+    .select('staff_id')
+    .eq('post_id', id);
+
+  if (staffError) {
+    return NextResponse.json({ error: 'Nepodařilo se načíst příjemce' }, { status: 500 });
+  }
+
+  // Odpověď: { guardians: [{guardian_id, email_at_send}], staff_ids: string[] }
+  return NextResponse.json({
+    guardians: data ?? [],
+    staff_ids: ((staffData ?? []) as { staff_id: string }[]).map(s => s.staff_id),
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -65,8 +80,8 @@ export async function PUT(
     );
   }
 
-  // Body: { guardian_ids: string[] }
-  let body: { guardian_ids: string[] };
+  // Body: { guardian_ids: string[], staff_ids?: string[] }
+  let body: { guardian_ids: string[]; staff_ids?: string[] };
   try {
     body = await req.json();
   } catch {
@@ -76,6 +91,8 @@ export async function PUT(
   if (!Array.isArray(body.guardian_ids)) {
     return NextResponse.json({ error: 'guardian_ids musí být pole' }, { status: 422 });
   }
+
+  const staffIds = Array.isArray(body.staff_ids) ? body.staff_ids : [];
 
   // Načteme aktuální emaily guardianů pro email_at_send
   const { data: guardians, error: guardianError } = await supabase
@@ -118,5 +135,37 @@ export async function PUT(
     }
   }
 
-  return NextResponse.json({ updated: body.guardian_ids.length });
+  // ── Zaměstnaní příjemci (samostatná tabulka) — stejné delete + insert ──
+  const { error: staffDeleteError } = await supabase
+    .from('bulletin_post_staff_recipients')
+    .delete()
+    .eq('post_id', id);
+
+  if (staffDeleteError) {
+    console.error('[recipients PUT] Staff delete error:', staffDeleteError);
+    return NextResponse.json({ error: 'Smazání starých zaměstnanců selhalo' }, { status: 500 });
+  }
+
+  if (staffIds.length > 0) {
+    // Aktuální e-maily zvolených aktivních zaměstnanců (neaktivní ID se zahodí).
+    const staffRecipients = await resolveStaffRecipients(staffIds);
+    if (staffRecipients.length > 0) {
+      const staffRows = staffRecipients.map(s => ({
+        post_id:       id,
+        staff_id:      s.staff_id,
+        email_at_send: s.email ?? null,
+      }));
+
+      const { error: staffInsertError } = await supabase
+        .from('bulletin_post_staff_recipients')
+        .insert(staffRows);
+
+      if (staffInsertError) {
+        console.error('[recipients PUT] Staff insert error:', staffInsertError);
+        return NextResponse.json({ error: 'Vložení zaměstnanců selhalo' }, { status: 500 });
+      }
+    }
+  }
+
+  return NextResponse.json({ updated: body.guardian_ids.length, staff_updated: staffIds.length });
 }
