@@ -25,6 +25,7 @@ type StudentObligation = {
   ssKod: string | null
   notifiedAt: string | null
   matchedTotal: number
+  donationTotal: number   // dar = platba navíc nad pohledávku
   status: ObligationStatus
   vs: string       // variabilní symbol = číslo z kod_zaka
   qrUrl: string | null
@@ -94,16 +95,18 @@ async function fetchGuardianData(): Promise<{
 
   // Načíst matches
   const obligationIds = (obligationsRaw as any[] ?? []).map((o: any) => o.id)
-  let matchMap: Record<string, number> = {}
+  const matchMap: Record<string, number> = {}
+  const donationMap: Record<string, number> = {}
 
   if (obligationIds.length > 0) {
     const { data: matchesRaw } = await supabase
       .from('payment_matches')
-      .select('obligation_id, matched_amount')
+      .select('obligation_id, matched_amount, donation_amount')
       .in('obligation_id', obligationIds)
 
     ;(matchesRaw as any[] ?? []).forEach((m: any) => {
       matchMap[m.obligation_id] = (matchMap[m.obligation_id] ?? 0) + Number(m.matched_amount)
+      donationMap[m.obligation_id] = (donationMap[m.obligation_id] ?? 0) + Number(m.donation_amount ?? 0)
     })
   }
 
@@ -144,6 +147,7 @@ async function fetchGuardianData(): Promise<{
             ssKod:        o.ss_kod,
             notifiedAt:   o.notified_at,
             matchedTotal,
+            donationTotal: donationMap[o.id] ?? 0,
             status,
             vs,
             qrUrl,
@@ -233,6 +237,12 @@ function ObligationCard({ obligation }: { obligation: StudentObligation }) {
                 </p>
               )}
             </>
+          )}
+
+          {obligation.donationTotal > 0 && (
+            <p className="text-xs text-violet-600 mt-1">
+              Děkujeme za dar {obligation.donationTotal.toLocaleString('cs-CZ')} {obligation.currency}
+            </p>
           )}
 
           {/* Platební údaje pro případ nefunkčního QR */}

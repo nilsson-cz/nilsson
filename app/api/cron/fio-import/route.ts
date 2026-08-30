@@ -81,17 +81,38 @@ export async function GET(req: NextRequest) {
     // 2b. Pokusit se matchovat pohledávku přes SS + VS (obě podmínky musí sedět)
     // -------------------------------------------------------------------------
     let obligationId: string | null = null
+    let matchedAmount = 0
+    let donationAmount = 0
 
     if (tx.specificSymbol && studentId) {
       const { data: obligationRaw } = await supabase
         .from('payment_obligations')
-        .select('id')
+        .select('id, amount')
         .eq('ss_kod' as any, tx.specificSymbol)
         .eq('student_id', studentId)
         .maybeSingle()
 
       if (obligationRaw) {
-        obligationId = (obligationRaw as any).id
+        const obId = (obligationRaw as any).id as string
+        const obAmount = Number((obligationRaw as any).amount)
+
+        // Kolik už je na pohledávce spárováno (dluhová část, dar se nepočítá)
+        const { data: existing } = await supabase
+          .from('payment_matches')
+          .select('matched_amount')
+          .eq('obligation_id', obId)
+        const already = ((existing as { matched_amount: number }[]) ?? [])
+          .reduce((s, m) => s + Number(m.matched_amount), 0)
+        const remaining = obAmount - already
+
+        // Jednotná formule (case 1/2/6): dluh = min(platba, zbytek), dar = přebytek.
+        // Když už je pohledávka plně uhrazená (remaining ≤ 0), nepárujeme
+        // automaticky — necháme na ředitele (nespárováno + alert).
+        if (remaining > 0) {
+          obligationId   = obId
+          matchedAmount  = Math.min(tx.amount, remaining)
+          donationAmount = Math.round((tx.amount - matchedAmount) * 100) / 100
+        }
       }
     }
 
@@ -144,12 +165,14 @@ export async function GET(req: NextRequest) {
     // -------------------------------------------------------------------------
 
     if (matchStatus === 'matched' && obligationId) {
-      const { error: matchErr } = await supabase
-        .from('payment_matches')
+      // donation_amount = přebytek nad pohledávku (dar). Cast: nový sloupec
+      // (migrace 097), typy se dorovnají po db:types.
+      const { error: matchErr } = await (supabase.from('payment_matches') as any)
         .insert({
           transaction_id:  transactionUuid,
           obligation_id:   obligationId,
-          matched_amount:  tx.amount,
+          matched_amount:  matchedAmount,
+          donation_amount: donationAmount,
           matched_at:      new Date().toISOString(),
           matched_by:      null,   // automatické párování, ne ruční
         })

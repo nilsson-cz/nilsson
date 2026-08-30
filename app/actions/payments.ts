@@ -46,6 +46,8 @@ export interface ManualMatchInput {
   transactionId: string
   obligationId: string
   matchedAmount: number
+  /** Dar = přebytek platby nad pohledávku (case 4 „zbytek je dar"). Default 0. */
+  donationAmount?: number
 }
 
 export interface ManualMatchResult {
@@ -272,6 +274,12 @@ export async function sendNotifications(
 // 3. manualMatch
 // ---------------------------------------------------------------------------
 
+/** Odstraní technický prefix „payments_guard: " z hlášky DB triggeru. */
+function cleanGuard(msg: string | undefined): string {
+  if (!msg) return 'Párování se nezdařilo.'
+  return msg.replace(/^payments_guard:\s*/i, '')
+}
+
 export async function manualMatch(
   input: ManualMatchInput,
 ): Promise<ManualMatchResult> {
@@ -283,47 +291,120 @@ export async function manualMatch(
   const { data: isDir } = await supabase.rpc('is_director')
   if (!isDir) return { success: false, error: 'Nedostatečná oprávnění' }
 
-  const { error: matchErr } = await supabase
-    .from('payment_matches')
-    .insert({
-      transaction_id:  input.transactionId,
-      obligation_id:   input.obligationId,
-      matched_amount:  input.matchedAmount,
-      matched_at:      new Date().toISOString(),
-      matched_by:      user.id,
-    })
+  const matched  = Number(input.matchedAmount)
+  const donation = Number(input.donationAmount ?? 0)
+  if (!(matched > 0))  return { success: false, error: 'Zadejte platnou párovanou částku.' }
+  if (donation < 0)    return { success: false, error: 'Dar nemůže být záporný.' }
+
+  // Vložení matche. Invarianty (nejde přealokovat pohledávku ani přečerpat platbu)
+  // i přepočet odvozeného match_status řeší DB trigger z migrace 097 — tady je
+  // nedublujeme. donation_amount = dar (přebytek nad pohledávku).
+  const { error: matchErr } = await (supabase.from('payment_matches') as any).insert({
+    transaction_id:  input.transactionId,
+    obligation_id:   input.obligationId,
+    matched_amount:  matched,
+    donation_amount: donation,
+    matched_at:      new Date().toISOString(),
+    matched_by:      user.id,
+  })
 
   if (matchErr) {
     console.error('[manualMatch] INSERT chyba:', matchErr)
-    return { success: false, error: matchErr.message }
+    if (matchErr.code === '23505')
+      return { success: false, error: 'Tato transakce už je s touto pohledávkou spárována.' }
+    return { success: false, error: cleanGuard(matchErr.message) }
   }
 
-  const { error: txErr } = await supabase
+  // Alert „nespárovaná transakce" vyřeš jen když je platba po spárování plně
+  // spotřebovaná (matched). U částečné (partial) zůstává zbytek k řešení.
+  const { data: txAfter } = await supabase
     .from('payment_transactions')
-    .update({ match_status: 'manual_override' })
+    .select('match_status')
     .eq('id', input.transactionId)
+    .single()
 
-  if (txErr) {
-    console.error('[manualMatch] UPDATE match_status chyba:', txErr)
-    return { success: false, error: txErr.message }
-  }
-
-  const supabaseAdmin = createSupabaseAdmin()
-  const { error: alertErr } = await supabaseAdmin
-    .from('system_alerts')
-    .update({ resolved_at: new Date().toISOString(), resolved_by: user.id })
-    .eq('entity_id', input.transactionId)
-    .eq('alert_type', 'unmatched_transaction')
-    .is('resolved_at', null)
-
-  if (alertErr) {
-    console.error('[manualMatch] Alert resolve chyba:', alertErr)
-    // Nekritická chyba — match proběhl, jen alert se nevyřešil
+  if ((txAfter as { match_status: string } | null)?.match_status === 'matched') {
+    const supabaseAdmin = createSupabaseAdmin()
+    const { error: alertErr } = await supabaseAdmin
+      .from('system_alerts')
+      .update({ resolved_at: new Date().toISOString(), resolved_by: user.id })
+      .eq('entity_id', input.transactionId)
+      .eq('alert_type', 'unmatched_transaction')
+      .is('resolved_at', null)
+    if (alertErr) console.error('[manualMatch] Alert resolve chyba:', alertErr)
   }
 
   revalidatePath('/dashboard/platby')
   revalidatePath('/dashboard/platby/transakce')
   revalidatePath(`/dashboard/platby/transakce/${input.transactionId}`)
+  revalidatePath(`/dashboard/platby/pohledavky/${input.obligationId}`)
+
+  return { success: true }
+}
+
+/**
+ * Zruší jedno párování (řádek payment_matches). Trigger přepočítá match_status.
+ * Když transakce klesne na unmatched a není ignorovaná, znovu založí alert.
+ */
+export async function unmatch(
+  transactionId: string,
+  obligationId: string,
+): Promise<ManualMatchResult> {
+  const supabase = await createSupabaseServerClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Nepřihlášen' }
+
+  const { data: isDir } = await supabase.rpc('is_director')
+  if (!isDir) return { success: false, error: 'Nedostatečná oprávnění' }
+
+  const { error: delErr } = await supabase
+    .from('payment_matches')
+    .delete()
+    .eq('transaction_id', transactionId)
+    .eq('obligation_id', obligationId)
+
+  if (delErr) {
+    console.error('[unmatch] DELETE chyba:', delErr)
+    return { success: false, error: delErr.message }
+  }
+
+  const { data: txRaw } = await supabase
+    .from('payment_transactions')
+    .select('amount, match_status, ignored, variable_symbol, specific_symbol, counterparty_name, currency, fio_transaction_id')
+    .eq('id', transactionId)
+    .single()
+  const tx = txRaw as {
+    amount: number; match_status: string; ignored: boolean
+    variable_symbol: string | null; specific_symbol: string | null
+    counterparty_name: string | null; currency: string; fio_transaction_id: string
+  } | null
+
+  if (tx && tx.match_status === 'unmatched' && !tx.ignored && Number(tx.amount) > 0) {
+    const supabaseAdmin = createSupabaseAdmin()
+    const { data: openAlert } = await supabaseAdmin
+      .from('system_alerts')
+      .select('id')
+      .eq('entity_id', transactionId)
+      .eq('alert_type', 'unmatched_transaction')
+      .is('resolved_at', null)
+      .maybeSingle()
+    if (!openAlert) {
+      await supabaseAdmin.from('system_alerts').insert({
+        module:      'payments',
+        alert_type:  'unmatched_transaction',
+        severity:    'warning',
+        entity_type: 'transaction',
+        entity_id:   transactionId,
+        message:     `Nespárovaná transakce ${tx.amount} ${tx.currency} od "${tx.counterparty_name ?? 'neznámý'}" (VS: ${tx.variable_symbol ?? 'chybí'}, SS: ${tx.specific_symbol ?? 'chybí'}, Fio ID: ${tx.fio_transaction_id})`,
+      })
+    }
+  }
+
+  revalidatePath('/dashboard/platby')
+  revalidatePath('/dashboard/platby/transakce')
+  revalidatePath(`/dashboard/platby/transakce/${transactionId}`)
+  revalidatePath(`/dashboard/platby/pohledavky/${obligationId}`)
 
   return { success: true }
 }
@@ -354,7 +435,7 @@ export async function ignoreTransaction(
 
   if (fetchErr || !tx) return { success: false, error: 'Transakce nenalezena.' }
 
-  if (tx.match_status === 'matched' || tx.match_status === 'manual_override') {
+  if (tx.match_status !== 'unmatched') {
     return { success: false, error: 'Spárovanou transakci nelze ignorovat. Nejprve zrušte párování.' }
   }
 
@@ -419,6 +500,8 @@ export interface TransactionSearchResult {
   id: string
   transaction_date: string
   amount: number
+  /** Kolik z platby ještě zbývá k alokaci (amount − Σ matched − Σ dar). */
+  remaining: number
   variable_symbol: string | null
   counterparty_name: string | null
 }
@@ -434,10 +517,11 @@ export async function searchUnmatchedTransactions(
   const { data: isDir } = await supabase.rpc('is_director')
   if (!isDir) return { transactions: [], error: 'Nedostatečná oprávnění' }
 
+  // Nespárované i částečně spárované (partial) — obojí má volný zbytek k alokaci.
   let q = supabase
     .from('payment_transactions')
     .select('id, transaction_date, amount, variable_symbol, counterparty_name')
-    .eq('match_status', 'unmatched')
+    .neq('match_status', 'matched')
     .eq('ignored', false)
     .order('transaction_date', { ascending: false })
     .limit(20)
@@ -457,7 +541,29 @@ export async function searchUnmatchedTransactions(
     return { transactions: [], error: error.message }
   }
 
-  return { transactions: data ?? [] }
+  const rows = (data as {
+    id: string; transaction_date: string; amount: number
+    variable_symbol: string | null; counterparty_name: string | null
+  }[]) ?? []
+  if (rows.length === 0) return { transactions: [] }
+
+  // Dopočítat zbytek k alokaci ze součtu matchů (matched + dar).
+  const ids = rows.map((r) => r.id)
+  // donation_amount je nový sloupec (migrace 097) — cast dokud neproběhne db:types.
+  const { data: matchesRaw } = await (supabase.from('payment_matches') as any)
+    .select('transaction_id, matched_amount, donation_amount')
+    .in('transaction_id', ids)
+
+  const consumed: Record<string, number> = {}
+  ;((matchesRaw as { transaction_id: string; matched_amount: number; donation_amount: number }[]) ?? []).forEach((m) => {
+    consumed[m.transaction_id] = (consumed[m.transaction_id] ?? 0) + Number(m.matched_amount) + Number(m.donation_amount ?? 0)
+  })
+
+  const transactions = rows
+    .map((r) => ({ ...r, remaining: Number(r.amount) - (consumed[r.id] ?? 0) }))
+    .filter((r) => r.remaining > 0)
+
+  return { transactions }
 }
 
 // ---------------------------------------------------------------------------

@@ -2,7 +2,11 @@
  * app/dashboard/platby/transakce/[id]/_components/ManualMatchForm.tsx
  *
  * Client Component — ruční párování transakce s pohledávkou.
- * Ředitel vybere pohledávku, upraví částku, potvrdí.
+ * Podporuje ČÁSTEČNÉ párování a DARY (přebytek nad pohledávku):
+ *  - párovaná částka default = min(zbytek platby, zbytek pohledávky),
+ *  - párovaná částka nesmí přesáhnout zbytek pohledávky (invariant I1),
+ *  - „zbytek je dar" → přebytek platby se eviduje jako dar u pohledávky/akce,
+ *  - jinak zbytek platby zůstává nespárován (transakce partial).
  */
 
 'use client'
@@ -14,7 +18,8 @@ import type { ObligationOption } from '../page'
 
 type Props = {
   transactionId: string
-  transactionAmount: number
+  /** Kolik z platby ještě zbývá k alokaci (amount − Σ matched − Σ dar). */
+  transactionRemaining: number
   currency: string
   obligations: ObligationOption[]
   preselectedStudentId: string | null
@@ -22,7 +27,7 @@ type Props = {
 
 export default function ManualMatchForm({
   transactionId,
-  transactionAmount,
+  transactionRemaining,
   currency,
   obligations,
   preselectedStudentId,
@@ -31,13 +36,11 @@ export default function ManualMatchForm({
   const [isPending, startTransition] = useTransition()
 
   const [selectedId, setSelectedId]       = useState<string>('')
-  const [matchedAmount, setMatchedAmount] = useState<string>(
-    transactionAmount > 0 ? String(transactionAmount) : '',
-  )
+  const [matchedAmount, setMatchedAmount] = useState<string>('')
+  const [asDonation, setAsDonation]       = useState(false)
   const [error, setError]   = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
-  // Filtrování pohledávek dle vyhledávání
   const filtered = useMemo(() => {
     if (!search.trim()) return obligations
     const q = search.toLowerCase()
@@ -50,11 +53,27 @@ export default function ManualMatchForm({
   }, [obligations, search])
 
   const selected = obligations.find((o) => o.id === selectedId) ?? null
+  const matched = parseFloat(matchedAmount || '0')
+
+  // Přebytek platby nad párovanou částku — buď dar, nebo zůstane nespárován.
+  const leftover = Math.round((transactionRemaining - matched) * 100) / 100
+  const donation = asDonation && leftover > 0 ? leftover : 0
+
+  function selectObligation(o: ObligationOption) {
+    setSelectedId(o.id)
+    setAsDonation(false)
+    // Default = kolik lze rozumně spárovat: min(zbytek platby, zbytek pohledávky)
+    const def = Math.min(transactionRemaining, o.remaining)
+    setMatchedAmount(def > 0 ? String(def) : '')
+  }
 
   function validate(): string | null {
-    if (!selectedId)                   return 'Vyberte pohledávku'
-    const amount = parseFloat(matchedAmount)
-    if (isNaN(amount) || amount <= 0)  return 'Zadejte platnou částku'
+    if (!selectedId) return 'Vyberte pohledávku'
+    if (isNaN(matched) || matched <= 0) return 'Zadejte platnou párovanou částku'
+    if (selected && matched > selected.remaining + 1e-9)
+      return `Párovaná částka přesahuje zbytek pohledávky (${selected.remaining.toLocaleString('cs-CZ')} ${currency})`
+    if (matched + donation > transactionRemaining + 1e-9)
+      return `Součet (párování + dar) přesahuje zbytek platby (${transactionRemaining.toLocaleString('cs-CZ')} ${currency})`
     return null
   }
 
@@ -66,26 +85,30 @@ export default function ManualMatchForm({
     startTransition(async () => {
       const result = await manualMatch({
         transactionId,
-        obligationId:  selectedId,
-        matchedAmount: parseFloat(matchedAmount),
+        obligationId:   selectedId,
+        matchedAmount:  matched,
+        donationAmount: donation,
       })
-
       if (!result.success) {
         setError(result.error ?? 'Neznámá chyba')
         return
       }
-
-      router.push('/dashboard/platby/transakce')
+      router.refresh()
     })
   }
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-stone-500">
+        Zbývá k alokaci:{' '}
+        <span className="font-semibold text-stone-800">
+          {transactionRemaining.toLocaleString('cs-CZ')} {currency}
+        </span>
+      </p>
+
       {/* Vyhledávání pohledávky */}
       <div>
-        <label className="block text-sm font-medium text-stone-700 mb-1">
-          Pohledávka
-        </label>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Pohledávka</label>
         <input
           type="text"
           value={search}
@@ -96,38 +119,25 @@ export default function ManualMatchForm({
             focus:border-transparent transition-all mb-2"
         />
 
-        {/* Seznam pohledávek */}
         <div className="rounded-xl border border-stone-200 overflow-hidden max-h-64 overflow-y-auto">
           {filtered.length === 0 ? (
-            <p className="text-sm text-stone-400 text-center py-6">
-              Žádné pohledávky
-            </p>
+            <p className="text-sm text-stone-400 text-center py-6">Žádné pohledávky</p>
           ) : (
             filtered.map((o) => (
               <button
                 key={o.id}
                 type="button"
-                onClick={() => {
-                  setSelectedId(o.id)
-                  // Předvyplnit částku = min(transakce, pohledávka)
-                  setMatchedAmount(String(transactionAmount))
-                }}
+                onClick={() => selectObligation(o)}
                 className={`w-full text-left px-3 py-2.5 border-b border-stone-100 last:border-0
                   transition-colors ${
-                    selectedId === o.id
-                      ? 'bg-stone-800 text-white'
-                      : 'hover:bg-stone-50 bg-white'
+                    selectedId === o.id ? 'bg-stone-800 text-white' : 'hover:bg-stone-50 bg-white'
                   }`}
               >
-                <p className={`text-sm font-medium truncate ${
-                  selectedId === o.id ? 'text-white' : 'text-stone-900'
-                }`}>
+                <p className={`text-sm font-medium truncate ${selectedId === o.id ? 'text-white' : 'text-stone-900'}`}>
                   {o.studentName}
                 </p>
-                <p className={`text-xs truncate mt-0.5 ${
-                  selectedId === o.id ? 'text-stone-300' : 'text-stone-400'
-                }`}>
-                  {o.popis ?? '—'} · {o.amount.toLocaleString('cs-CZ')} {currency}
+                <p className={`text-xs truncate mt-0.5 ${selectedId === o.id ? 'text-stone-300' : 'text-stone-400'}`}>
+                  {o.popis ?? '—'} · zbývá {o.remaining.toLocaleString('cs-CZ')} {currency}
                   {o.ssKod && ` · SS: ${o.ssKod}`}
                 </p>
               </button>
@@ -136,22 +146,21 @@ export default function ManualMatchForm({
         </div>
       </div>
 
-      {/* Vybraná pohledávka — shrnutí */}
+      {/* Vybraná pohledávka */}
       {selected && (
         <div className="rounded-xl bg-stone-50 border border-stone-200 px-3 py-2.5 space-y-1">
-          <p className="text-xs font-medium text-stone-600 uppercase tracking-wide">
-            Vybraná pohledávka
-          </p>
+          <p className="text-xs font-medium text-stone-600 uppercase tracking-wide">Vybraná pohledávka</p>
           <p className="text-sm font-medium text-stone-900">{selected.studentName}</p>
           <p className="text-xs text-stone-500">{selected.popis ?? '—'}</p>
           <p className="text-xs text-stone-400">
-            Celkem: {selected.amount.toLocaleString('cs-CZ')} {currency}
-            {' · '}Splatnost: {new Date(selected.dueDate).toLocaleDateString('cs-CZ')}
+            Celkem {selected.amount.toLocaleString('cs-CZ')} {currency}
+            {' · '}zbývá {selected.remaining.toLocaleString('cs-CZ')} {currency}
+            {' · '}splatnost {new Date(selected.dueDate).toLocaleDateString('cs-CZ')}
           </p>
         </div>
       )}
 
-      {/* Částka */}
+      {/* Párovaná částka */}
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">
           Párovaná částka ({currency})
@@ -165,33 +174,46 @@ export default function ManualMatchForm({
             text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-400
             focus:border-transparent transition-all"
         />
-        {parseFloat(matchedAmount || '0') > 0 && (
-          <>
-            {transactionAmount !== parseFloat(matchedAmount || '0') && (
-              <p className="mt-1 text-xs text-amber-600">
-                Částka transakce: {transactionAmount.toLocaleString('cs-CZ')} {currency}
-                {parseFloat(matchedAmount) < transactionAmount
-                  ? ` · zbytek ${(transactionAmount - parseFloat(matchedAmount)).toLocaleString('cs-CZ')} Kč zůstane nespárován`
-                  : ''}
+
+        {/* Přebytek platby — dar / zůstane nespárováno */}
+        {selected && matched > 0 && leftover > 0 && (
+          <div className="mt-2 space-y-1.5">
+            <label className="flex items-center gap-2 text-xs text-stone-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={asDonation}
+                onChange={(e) => setAsDonation(e.target.checked)}
+                className="rounded border-stone-300"
+              />
+              Zbytek platby ({leftover.toLocaleString('cs-CZ')} {currency}) evidovat jako <strong>dar</strong> u této pohledávky/akce
+            </label>
+            {!asDonation && (
+              <p className="text-xs text-amber-600">
+                Zbytek {leftover.toLocaleString('cs-CZ')} {currency} zůstane jako nespárovaná platba.
               </p>
             )}
-            {selected && parseFloat(matchedAmount) > selected.amount && (
-              <p className="mt-1 text-xs text-blue-600">
-                Přeplatek {(parseFloat(matchedAmount) - selected.amount).toLocaleString('cs-CZ')} Kč nad pohledávku — sponzorský příplatek bude evidován v transakci.
+            {asDonation && (
+              <p className="text-xs text-blue-600">
+                Dar {leftover.toLocaleString('cs-CZ')} {currency} — platba bude celá spotřebována.
               </p>
             )}
-          </>
+          </div>
+        )}
+
+        {/* Částečná splátka pohledávky */}
+        {selected && matched > 0 && matched < selected.remaining && (
+          <p className="mt-2 text-xs text-stone-500">
+            Pohledávka zůstane částečně splacena — zbyde {(selected.remaining - matched).toLocaleString('cs-CZ')} {currency}.
+          </p>
         )}
       </div>
 
-      {/* Chyba */}
       {error && (
         <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2.5">
           <p className="text-sm text-red-700">{error}</p>
         </div>
       )}
 
-      {/* Submit */}
       <button
         type="button"
         onClick={handleSubmit}
@@ -200,21 +222,11 @@ export default function ManualMatchForm({
           disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2.5 rounded-xl
           transition-colors flex items-center justify-center gap-2"
       >
-        {isPending ? (
-          <>
-            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-            </svg>
-            Párování…
-          </>
-        ) : (
-          'Potvrdit ruční párování'
-        )}
+        {isPending ? 'Párování…' : 'Potvrdit párování'}
       </button>
 
       <p className="text-xs text-stone-400 text-center">
-        Párování nelze vrátit zpět — zkontrolujte výběr před potvrzením
+        Párování lze později zrušit tlačítkem „Odpárovat".
       </p>
     </div>
   )

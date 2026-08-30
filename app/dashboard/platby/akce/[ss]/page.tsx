@@ -18,7 +18,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 // ---------------------------------------------------------------------------
 
 type ObligationType = 'lunch' | 'event' | 'tuition' | 'druzina'
-type LineStatus     = 'pending' | 'partial' | 'paid' | 'overpaid'
+type LineStatus     = 'pending' | 'partial' | 'paid'
 
 type StudentLine = {
   obligationId: string
@@ -27,6 +27,7 @@ type StudentLine = {
   vs: string
   amount: number
   matchedTotal: number
+  donationTotal: number    // dar = platba navíc nad pohledávku (přeplatek)
   status: LineStatus
 }
 
@@ -38,8 +39,9 @@ type EventBalance = {
   schoolYear: string
   lines: StudentLine[]
   totalPrescribed: number
-  totalPaid: number
-  balance: number          // totalPaid - totalPrescribed (kladné = přeplatek, záporné = nedoplatek)
+  totalPaid: number        // Σ matched (dluh), díky I1 ≤ totalPrescribed
+  totalDonations: number   // Σ dar (platby navíc u akce)
+  totalUnderpaid: number   // totalPrescribed − totalPaid (kolik ještě chybí)
 }
 
 // ---------------------------------------------------------------------------
@@ -49,8 +51,7 @@ type EventBalance = {
 function deriveLineStatus(amount: number, matchedTotal: number): LineStatus {
   if (matchedTotal <= 0)      return 'pending'
   if (matchedTotal < amount)  return 'partial'
-  if (matchedTotal > amount)  return 'overpaid'
-  return 'paid'
+  return 'paid'   // díky invariantu I1 nemůže matched přesáhnout pohledávku
 }
 
 function formatCurrency(amount: number) {
@@ -82,18 +83,21 @@ async function fetchEventBalance(ss: string): Promise<EventBalance | null> {
   const rows = (obsRaw as any[]) ?? []
   if (rows.length === 0) return null
 
-  // Součty párování pro pohledávky akce
+  // Součty párování + darů pro pohledávky akce
   const ids = rows.map((o: any) => o.id)
   const matchMap: Record<string, number> = {}
+  const donationMap: Record<string, number> = {}
   if (ids.length > 0) {
     const { data: matchesRaw } = await supabase
       .from('payment_matches')
-      .select('obligation_id, matched_amount')
+      .select('obligation_id, matched_amount, donation_amount')
       .in('obligation_id', ids)
 
     ;(matchesRaw as any[] ?? []).forEach((m: any) => {
       matchMap[m.obligation_id] =
         (matchMap[m.obligation_id] ?? 0) + Number(m.matched_amount)
+      donationMap[m.obligation_id] =
+        (donationMap[m.obligation_id] ?? 0) + Number(m.donation_amount ?? 0)
     })
   }
 
@@ -109,12 +113,13 @@ async function fetchEventBalance(ss: string): Promise<EventBalance | null> {
       vs:           o.students?.kod_zaka?.split('-').pop() ?? '',
       amount,
       matchedTotal,
+      donationTotal: donationMap[o.id] ?? 0,
       status:       deriveLineStatus(amount, matchedTotal),
     }
   })
 
-  // Seřadit: nedoplatky nahoru, pak částečné, splacené, přeplatky
-  const order: Record<LineStatus, number> = { pending: 0, partial: 1, paid: 2, overpaid: 3 }
+  // Seřadit: nedoplatky nahoru, pak částečné, splacené
+  const order: Record<LineStatus, number> = { pending: 0, partial: 1, paid: 2 }
   lines.sort((a, b) =>
     order[a.status] - order[b.status] || a.studentName.localeCompare(b.studentName, 'cs'),
   )
@@ -122,6 +127,7 @@ async function fetchEventBalance(ss: string): Promise<EventBalance | null> {
   const first = rows[0]
   const totalPrescribed = lines.reduce((s, l) => s + l.amount, 0)
   const totalPaid       = lines.reduce((s, l) => s + l.matchedTotal, 0)
+  const totalDonations  = lines.reduce((s, l) => s + l.donationTotal, 0)
 
   return {
     ssKod:           ss,
@@ -132,7 +138,8 @@ async function fetchEventBalance(ss: string): Promise<EventBalance | null> {
     lines,
     totalPrescribed,
     totalPaid,
-    balance:         totalPaid - totalPrescribed,
+    totalDonations,
+    totalUnderpaid:  Math.max(0, totalPrescribed - totalPaid),
   }
 }
 
@@ -160,7 +167,6 @@ function LineStatusBadge({ status }: { status: LineStatus }) {
     pending:  { label: 'Nesplaceno', className: 'bg-amber-50 text-amber-700' },
     partial:  { label: 'Částečně',   className: 'bg-blue-50 text-blue-700' },
     paid:     { label: 'Splaceno',   className: 'bg-emerald-50 text-emerald-700' },
-    overpaid: { label: 'Přeplatek',  className: 'bg-violet-50 text-violet-700' },
   }[status]
   return (
     <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${map.className}`}>
@@ -215,7 +221,7 @@ export default async function AkceBilancePage({
 
   const paidCount     = event.lines.filter((l) => l.status === 'paid').length
   const unpaidCount   = event.lines.filter((l) => l.status === 'pending' || l.status === 'partial').length
-  const overpaidCount = event.lines.filter((l) => l.status === 'overpaid').length
+  const donationCount = event.lines.filter((l) => l.donationTotal > 0).length
 
   return (
     <div className="px-4 py-6 lg:px-8 lg:py-8 max-w-4xl mx-auto space-y-4">
@@ -247,13 +253,18 @@ export default async function AkceBilancePage({
       </div>
 
       {/* Souhrnná bilance */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatTile label="Předepsáno" value={formatCurrency(event.totalPrescribed)} />
         <StatTile label="Uhrazeno" value={formatCurrency(event.totalPaid)} tone="positive" />
         <StatTile
-          label={event.balance >= 0 ? 'Přeplatek celkem' : 'Nedoplatek celkem'}
-          value={formatCurrency(Math.abs(event.balance))}
-          tone={event.balance > 0 ? 'info' : event.balance < 0 ? 'warning' : 'neutral'}
+          label="Nedoplatek celkem"
+          value={formatCurrency(event.totalUnderpaid)}
+          tone={event.totalUnderpaid > 0 ? 'warning' : 'neutral'}
+        />
+        <StatTile
+          label="Dary / platby navíc"
+          value={formatCurrency(event.totalDonations)}
+          tone={event.totalDonations > 0 ? 'info' : 'neutral'}
         />
         <StatTile label="Žáků v akci" value={String(event.lines.length)} />
       </div>
@@ -266,8 +277,8 @@ export default async function AkceBilancePage({
         {paidCount > 0 && (
           <span className="text-emerald-600">{paidCount} splaceno</span>
         )}
-        {overpaidCount > 0 && (
-          <span className="text-violet-600">{overpaidCount} přeplatek</span>
+        {donationCount > 0 && (
+          <span className="text-violet-600">{donationCount}× dar</span>
         )}
       </div>
 
@@ -275,7 +286,6 @@ export default async function AkceBilancePage({
       <div className="bg-white rounded-2xl border border-stone-200 p-2 sm:p-3">
         <div className="space-y-1">
           {event.lines.map((l) => {
-            const diff = l.matchedTotal - l.amount
             return (
               <Link
                 key={l.obligationId}
@@ -304,10 +314,10 @@ export default async function AkceBilancePage({
                     <span className="text-stone-400 font-normal"> / {formatCurrency(l.amount)}</span>
                   </p>
                   {l.status === 'partial' && (
-                    <p className="text-xs text-amber-600">zbývá {formatCurrency(-diff)}</p>
+                    <p className="text-xs text-amber-600">zbývá {formatCurrency(l.amount - l.matchedTotal)}</p>
                   )}
-                  {l.status === 'overpaid' && (
-                    <p className="text-xs text-violet-600">+{formatCurrency(diff)}</p>
+                  {l.donationTotal > 0 && (
+                    <p className="text-xs text-violet-600">+ dar {formatCurrency(l.donationTotal)}</p>
                   )}
                 </div>
 

@@ -85,8 +85,8 @@ export default async function TransakcePage({
 
   const matchStatusLabels: Record<string, string> = {
     matched: 'Spárováno',
+    partial: 'Částečně',
     unmatched: 'Nespárováno',
-    manual_override: 'Ruční párování',
   }
 
   return (
@@ -104,7 +104,7 @@ export default async function TransakcePage({
       {/* Filtry */}
       <div className="flex flex-wrap gap-2 text-sm">
         <span className="text-gray-500">Stav:</span>
-        {['', 'unmatched', 'matched', 'manual_override'].map((status) => (
+        {['', 'unmatched', 'partial', 'matched'].map((status) => (
           <Link
             key={status || 'vše'}
             href={buildUrl({ match_status: status || undefined })}
@@ -179,8 +179,10 @@ export default async function TransakcePage({
                     ) : (
                       <span
                         className={`text-xs px-1.5 py-0.5 rounded-full ${
-                          tx.match_status === 'matched' || tx.match_status === 'manual_override'
+                          tx.match_status === 'matched'
                             ? 'bg-green-100 text-green-700'
+                            : tx.match_status === 'partial'
+                            ? 'bg-blue-100 text-blue-700'
                             : 'bg-yellow-100 text-yellow-700'
                         }`}
                       >

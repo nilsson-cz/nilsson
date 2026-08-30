@@ -5,6 +5,7 @@
 // Nabízí pouze nespárované transakce (match_status = 'unmatched', ignored = false).
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { manualMatch, searchUnmatchedTransactions, type TransactionSearchResult } from '@/app/actions/payments'
 
 export function ManualMatchForm({
@@ -14,14 +15,13 @@ export function ManualMatchForm({
   obligationId: string
   remainingAmount: number
 }) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<TransactionSearchResult[]>([])
   const [searching, setSearching] = useState(false)
   const [selectedTx, setSelectedTx] = useState<TransactionSearchResult | null>(null)
-  const [matchedAmount, setMatchedAmount] = useState(
-    remainingAmount > 0 ? String(remainingAmount) : ''
-  )
+  const [matchedAmount, setMatchedAmount] = useState('')
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -50,7 +50,7 @@ export function ManualMatchForm({
     setResults([])
     setQuery('')
     setError(null)
-    setMatchedAmount(String(Math.min(remainingAmount, tx.amount)))
+    setMatchedAmount(String(Math.min(remainingAmount, tx.remaining)))
   }
 
   function handleSubmit() {
@@ -61,6 +61,14 @@ export function ManualMatchForm({
     const amount = parseFloat(matchedAmount)
     if (!amount || amount <= 0) {
       setError('Zadejte platnou částku.')
+      return
+    }
+    if (amount > remainingAmount + 1e-9) {
+      setError(`Částka přesahuje zbytek pohledávky (${remainingAmount.toLocaleString('cs-CZ')} Kč).`)
+      return
+    }
+    if (amount > selectedTx.remaining + 1e-9) {
+      setError(`Částka přesahuje zbytek platby (${selectedTx.remaining.toLocaleString('cs-CZ')} Kč).`)
       return
     }
     setError(null)
@@ -75,6 +83,7 @@ export function ManualMatchForm({
         setError(result.error)
       } else {
         setSuccess(true)
+        router.refresh()
       }
     })
   }
@@ -128,7 +137,10 @@ export function ManualMatchForm({
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-stone-900">
-                        {tx.amount.toLocaleString('cs-CZ')} Kč
+                        zbývá {tx.remaining.toLocaleString('cs-CZ')} Kč
+                        {tx.remaining !== tx.amount && (
+                          <span className="ml-1 text-xs text-stone-400">z {tx.amount.toLocaleString('cs-CZ')}</span>
+                        )}
                       </p>
                       <p className="text-xs text-stone-400 truncate">
                         {tx.counterparty_name ?? '—'}

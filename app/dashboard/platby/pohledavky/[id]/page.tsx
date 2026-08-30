@@ -8,15 +8,17 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { payliboUrl } from '@/lib/paylibo'
 import { NotifyButton } from './_components/NotifyButton'
 import { ManualMatchForm } from './_components/ManualMatchForm'
+import UnmatchButton from '../../_components/UnmatchButton'
 
 type ObligationStatus = 'pending' | 'partial' | 'paid'
 type ObligationType   = 'lunch' | 'event' | 'tuition' | 'druzina'
 
 type MatchRow = {
-  id: string
+  transactionId: string
   matched_amount: number
+  donation_amount: number
   matched_at: string
-  match_type: string
+  isManual: boolean
   transaction_date: string | null
   variable_symbol: string | null
   counterparty_name: string | null
@@ -73,10 +75,11 @@ async function fetchObligation(id: string): Promise<ObligationDetail | null> {
 
   if (stErr || !student) return null
 
-  // 3. Párování
+  // 3. Párování (PK je (transaction_id, obligation_id) — žádné id ani match_type;
+  //    ruční vs. auto se pozná podle matched_by).
   const { data: matchesRaw } = await supabase
     .from('payment_matches')
-    .select('id, matched_amount, matched_at, match_type, transaction_id')
+    .select('transaction_id, matched_amount, donation_amount, matched_at, matched_by')
     .eq('obligation_id', id)
     .order('matched_at', { ascending: false })
 
@@ -96,16 +99,18 @@ async function fetchObligation(id: string): Promise<ObligationDetail | null> {
   const matches: MatchRow[] = (matchesRaw ?? []).map((m: any) => {
     const tx = txMap[m.transaction_id] ?? null
     return {
-      id:               m.id,
+      transactionId:    m.transaction_id,
       matched_amount:   Number(m.matched_amount),
+      donation_amount:  Number(m.donation_amount ?? 0),
       matched_at:       m.matched_at,
-      match_type:       m.match_type ?? 'auto',
+      isManual:         !!m.matched_by,
       transaction_date: tx?.transaction_date ?? null,
       variable_symbol:  tx?.variable_symbol ?? null,
       counterparty_name: tx?.counterparty_name ?? null,
     }
   })
 
+  // Uhrazeno = Σ matched_amount (dar se do dluhu nepočítá).
   const matched_total = matches.reduce((sum, m) => sum + m.matched_amount, 0)
   const vs = (student as any).kod_zaka?.split('-').pop() ?? ''
 
@@ -304,12 +309,17 @@ export default async function PohledavkaDetailPage({
           <div className="space-y-2">
             {obligation.matches.map((m) => (
               <div
-                key={m.id}
+                key={m.transactionId}
                 className="flex items-center justify-between gap-3 rounded-xl bg-stone-50 px-3 py-2.5"
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-stone-900">
                     {formatCurrency(m.matched_amount)}
+                    {m.donation_amount > 0 && (
+                      <span className="ml-2 text-xs font-medium text-blue-600">
+                        + dar {formatCurrency(m.donation_amount)}
+                      </span>
+                    )}
                   </p>
                   <p className="text-xs text-stone-400 truncate mt-0.5">
                     {m.counterparty_name ?? '—'}
@@ -317,10 +327,19 @@ export default async function PohledavkaDetailPage({
                       <span className="ml-2">{formatDate(m.transaction_date)}</span>
                     )}
                   </p>
+                  <div className="mt-1.5">
+                    <UnmatchButton transactionId={m.transactionId} obligationId={obligation.id} />
+                  </div>
                 </div>
-                <span className="text-xs text-stone-400 shrink-0">
-                  {m.match_type === 'manual_override' ? 'ručně' : 'auto'}
-                </span>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <span className="text-xs text-stone-400">{m.isManual ? 'ručně' : 'auto'}</span>
+                  <Link
+                    href={`/dashboard/platby/transakce/${m.transactionId}`}
+                    className="text-xs text-stone-400 hover:text-stone-600 transition-colors"
+                  >
+                    Detail →
+                  </Link>
+                </div>
               </div>
             ))}
           </div>
