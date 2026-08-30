@@ -113,6 +113,38 @@ eq('St polévka bez alergenů', r.days[2].soup_allergens, []);
 eq('Čt volba 1 řada alergenů', r.days[3].items[0].allergens, [1, 3, 7, 9, 10]);
 eq('každý den 3 volby', r.days.map((d) => d.items.length), [3, 3, 3, 3, 3]);
 
+// První školní týden: záhlaví nezačíná pondělím (1.9. je úterý), dny Út–Pá.
+// Datumy se musí kotvit na pondělí (31.8.), ne na doslovný week_start ze záhlaví,
+// jinak by byly posunuté o +1 den (reálný bug ze září 2026).
+console.log('parseMenuText — první školní týden (start != pondělí):');
+const FIRST_WEEK = `
+Jídelní lístek 1.9. - 4.9.
+Úterý
+- polévka květáková 7
+1. svíčková na smetaně, knedlík 1,3,7
+2. těstoviny se sýrem 1,7
+Středa
+- polévka hráškový krém 1
+1. kuřecí řízek, brambory 1,3,7
+2. rizoto 7
+Čtvrtek
+- polévka hovězí vývar 9
+1. vepřo-knedlo-zelo 1,3
+2. luštěninový guláš 1
+Pátek
+- polévka krupicová 1,3
+1. rybí filé, brambory 4,7
+2. špagety 1
+Nepřehlédněte
+`;
+const fw = parseMenuText(FIRST_WEEK, new Date(2026, 8, 2)); // 2. 9. 2026
+eq('4 dny (Út–Pá)', fw.days.length, 4);
+eq('Út datum = 1. 9.', fw.days[0].menu_date, '2026-09-01');
+eq('Út weekday = 2', fw.days[0].weekday, 2);
+eq('Pá datum = 4. 9.', fw.days[3].menu_date, '2026-09-04');
+eq('week_start kotveno na pondělí 31. 8.', fw.days[0].week_start, '2026-08-31');
+eq('week_end = pátek 4. 9.', fw.days[0].week_end, '2026-09-04');
+
 console.log('');
 if (failures) {
   console.error(`❌ ${failures} test(ů) selhalo`);

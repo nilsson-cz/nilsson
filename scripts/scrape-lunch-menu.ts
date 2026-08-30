@@ -53,6 +53,13 @@ function addDays(d: Date, n: number): Date {
   return r;
 }
 
+/** Pondělí ISO týdne, který obsahuje dané datum (ne=0 → předchozí pondělí). */
+function mondayOfWeek(d: Date): Date {
+  const day = d.getDay(); // 0=ne .. 6=so
+  const diff = day === 0 ? -6 : 1 - day;
+  return addDays(d, diff);
+}
+
 // ─── alergeny ────────────────────────────────────────────────────────────────
 
 /**
@@ -162,12 +169,13 @@ export function parseMenuText(text: string, now: Date = new Date()): ParseResult
 
   const hm = lines[anchorIdx].match(WEEK_RE)!;
   const week = inferWeek(+hm[1], +hm[2], +hm[3], +hm[4], now);
-  const weekStartDate = new Date(week.weekStart + 'T00:00:00');
-  if (weekStartDate.getDay() !== 1) {
-    warnings.push(
-      `Začátek týdne ${week.weekStart} není pondělí (getDay=${weekStartDate.getDay()}).`,
-    );
-  }
+  // Dny jsou vždy indexované Po=0..Pá=4, ale záhlaví („1.9. – 4.9.") nemusí
+  // začínat pondělím (první školní týden, týden po svátku…). Kotvíme proto na
+  // PONDĚLÍ ISO týdne obsahujícího začátek ze záhlaví — jinak by se všechny
+  // datumy posunuly o rozdíl (bug: week_start=úterý 1.9. → menu_date o den napřed).
+  const monday = mondayOfWeek(new Date(week.weekStart + 'T00:00:00'));
+  const weekStartIso = fmtDate(monday);
+  const weekEndIso = fmtDate(addDays(monday, 4)); // pátek téhož týdne
 
   const byIndex = new Map<
     number,
@@ -214,15 +222,15 @@ export function parseMenuText(text: string, now: Date = new Date()): ParseResult
   const days: MenuDay[] = [];
   for (const [idx, data] of [...byIndex.entries()].sort((a, b) => a[0] - b[0])) {
     if (data.items.length === 0) continue; // přeskoč prázdné/šablonové dny
-    const date = addDays(weekStartDate, idx);
+    const date = addDays(monday, idx);
     days.push({
       menu_date: fmtDate(date),
       weekday: idx + 1,
       soup: data.soup,
       soup_allergens: data.soup_allergens,
       items: data.items.sort((a, b) => a.option_no - b.option_no),
-      week_start: week.weekStart,
-      week_end: week.weekEnd,
+      week_start: weekStartIso,
+      week_end: weekEndIso,
     });
     if (!data.soup) warnings.push(`Den ${fmtDate(date)} nemá polévku.`);
   }
