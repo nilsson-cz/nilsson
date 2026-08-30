@@ -2781,6 +2781,7 @@ export type Database = {
       }
       payment_matches: {
         Row: {
+          donation_amount: number
           matched_amount: number
           matched_at: string
           matched_by: string | null
@@ -2788,6 +2789,7 @@ export type Database = {
           transaction_id: string
         }
         Insert: {
+          donation_amount?: number
           matched_amount: number
           matched_at?: string
           matched_by?: string | null
@@ -2795,6 +2797,7 @@ export type Database = {
           transaction_id: string
         }
         Update: {
+          donation_amount?: number
           matched_amount?: number
           matched_at?: string
           matched_by?: string | null

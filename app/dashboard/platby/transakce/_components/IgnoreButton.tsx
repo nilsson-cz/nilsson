@@ -16,8 +16,8 @@ interface IgnoreButtonProps {
 export function IgnoreButton({ transactionId, ignored, matchStatus }: IgnoreButtonProps) {
   const [isPending, startTransition] = useTransition()
 
-  // Spárované transakce nelze ignorovat — tlačítko skryjeme
-  const isMatched = matchStatus === 'matched' || matchStatus === 'manual_override'
+  // Spárované i částečně spárované transakce nelze ignorovat — tlačítko skryjeme
+  const isMatched = matchStatus !== 'unmatched'
   if (isMatched && !ignored) return null
 
   const handleClick = () => {

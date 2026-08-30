@@ -61,11 +61,11 @@ async function fetchPaymentsDashboard(): Promise<DashboardData> {
       .eq('school_year', CURRENT_SCHOOL_YEAR)
       .order('due_date', { ascending: true }),
 
-    // Nespárované transakce (ignorované se nezobrazují)
+    // Transakce s nespárovaným zbytkem (unmatched i partial; ignorované ne)
     supabase
       .from('payment_transactions')
       .select('id, amount, currency, transaction_date, counterparty_name, variable_symbol, specific_symbol')
-      .eq('match_status', 'unmatched')
+      .neq('match_status', 'matched')
       .eq('ignored', false)
       .order('transaction_date', { ascending: false }),
 

@@ -25,7 +25,7 @@ type EventGroup = {
   studentCount: number
   totalPrescribed: number
   totalPaid: number
-  balance: number          // kladné = přeplatek, záporné = nedoplatek
+  totalDonations: number   // Σ dar (platby navíc u akce)
   unpaidCount: number
 }
 
@@ -49,23 +49,27 @@ async function fetchEventGroups(): Promise<EventGroup[]> {
   // Součty párování pro všechny pohledávky
   const ids = rows.map((o: any) => o.id)
   const matchMap: Record<string, number> = {}
+  const donationMap: Record<string, number> = {}
   const { data: matchesRaw } = await supabase
     .from('payment_matches')
-    .select('obligation_id, matched_amount')
+    .select('obligation_id, matched_amount, donation_amount')
     .in('obligation_id', ids)
 
   ;(matchesRaw as any[] ?? []).forEach((m: any) => {
     matchMap[m.obligation_id] =
       (matchMap[m.obligation_id] ?? 0) + Number(m.matched_amount)
+    donationMap[m.obligation_id] =
+      (donationMap[m.obligation_id] ?? 0) + Number(m.donation_amount ?? 0)
   })
 
   // Seskupit podle SS kódu
   const groups = new Map<string, EventGroup>()
   for (const o of rows) {
     const ss = o.ss_kod as string
-    const amount       = Number(o.amount)
-    const matchedTotal = matchMap[o.id] ?? 0
-    const isUnpaid     = matchedTotal < amount
+    const amount        = Number(o.amount)
+    const matchedTotal  = matchMap[o.id] ?? 0
+    const donationTotal = donationMap[o.id] ?? 0
+    const isUnpaid      = matchedTotal < amount
 
     const g = groups.get(ss)
     if (!g) {
@@ -77,14 +81,14 @@ async function fetchEventGroups(): Promise<EventGroup[]> {
         studentCount:    1,
         totalPrescribed: amount,
         totalPaid:       matchedTotal,
-        balance:         matchedTotal - amount,
+        totalDonations:  donationTotal,
         unpaidCount:     isUnpaid ? 1 : 0,
       })
     } else {
       g.studentCount    += 1
       g.totalPrescribed += amount
       g.totalPaid       += matchedTotal
-      g.balance          = g.totalPaid - g.totalPrescribed
+      g.totalDonations  += donationTotal
       g.unpaidCount     += isUnpaid ? 1 : 0
     }
   }
@@ -185,10 +189,11 @@ export default async function AkcePage() {
                 </p>
                 {g.unpaidCount > 0 ? (
                   <p className="text-xs text-amber-600">{g.unpaidCount} nedoplaceno</p>
-                ) : g.balance > 0 ? (
-                  <p className="text-xs text-violet-600">přeplatek {formatCurrency(g.balance)}</p>
                 ) : (
                   <p className="text-xs text-emerald-600">vyrovnáno</p>
+                )}
+                {g.totalDonations > 0 && (
+                  <p className="text-xs text-violet-600">+ dar {formatCurrency(g.totalDonations)}</p>
                 )}
               </div>
 

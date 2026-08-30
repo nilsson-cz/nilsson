@@ -9,12 +9,13 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { CURRENT_SCHOOL_YEAR } from '@/lib/config'
 import ManualMatchForm from './_components/ManualMatchForm'
+import UnmatchButton from '../../_components/UnmatchButton'
 
 // ---------------------------------------------------------------------------
 // Typy
 // ---------------------------------------------------------------------------
 
-type MatchStatus = 'matched' | 'unmatched' | 'manual_override'
+type MatchStatus = 'matched' | 'unmatched' | 'partial'
 
 type TransactionDetail = {
   id: string
@@ -29,6 +30,9 @@ type TransactionDetail = {
   note: string | null
   matchStatus: MatchStatus
   importedAt: string
+  /** Spotřebováno = Σ (matched + dar); zbývá = amount − spotřebováno. */
+  consumed: number
+  remaining: number
   student: {
     id: string
     firstName: string
@@ -36,9 +40,9 @@ type TransactionDetail = {
     kodZaka: string
   } | null
   matches: {
-    id: string
     obligationId: string
     matchedAmount: number
+    donationAmount: number
     matchedAt: string
     isManual: boolean
     obligationPopis: string | null
@@ -49,6 +53,8 @@ export type ObligationOption = {
   id: string
   popis: string | null
   amount: number
+  /** Zbývá doplatit = amount − Σ matched. */
+  remaining: number
   dueDate: string
   ssKod: string | null
   studentName: string
@@ -74,26 +80,32 @@ async function fetchTransaction(id: string): Promise<TransactionDetail | null> {
 
   if (error || !raw) return null
 
-  // Načíst existující matches
+  // Načíst existující matches (PK je (transaction_id, obligation_id) — žádné id).
   const { data: matchesRaw } = await supabase
     .from('payment_matches')
     .select(`
-      id, obligation_id, matched_amount, matched_at, matched_by,
+      obligation_id, matched_amount, donation_amount, matched_at, matched_by,
       payment_obligations ( popis )
     `)
     .eq('transaction_id', id)
     .order('matched_at', { ascending: false })
 
   const matches = (matchesRaw as any[] ?? []).map((m: any) => ({
-    id:              m.id,
     obligationId:    m.obligation_id,
     matchedAmount:   Number(m.matched_amount),
+    donationAmount:  Number(m.donation_amount ?? 0),
     matchedAt:       m.matched_at,
     isManual:        !!m.matched_by,
     obligationPopis: m.payment_obligations?.popis ?? null,
   }))
 
+  const amount   = Number(raw.amount)
+  const consumed = matches.reduce((s, m) => s + m.matchedAmount + m.donationAmount, 0)
+  const remaining = Math.round((amount - consumed) * 100) / 100
+
   return {
+    consumed,
+    remaining,
     id:                  raw.id,
     fioTransactionId:    raw.fio_transaction_id,
     amount:              Number(raw.amount),
@@ -161,6 +173,7 @@ async function fetchObligationsForMatch(
       id:          o.id,
       popis:       o.popis,
       amount:      Number(o.amount),
+      remaining:   Math.round((Number(o.amount) - (matchedTotal[o.id] ?? 0)) * 100) / 100,
       dueDate:     o.due_date,
       ssKod:       o.ss_kod,
       studentName: o.students
@@ -175,9 +188,9 @@ async function fetchObligationsForMatch(
 
 function MatchStatusBadge({ status }: { status: MatchStatus }) {
   const map = {
-    matched:         { label: 'Spárováno',   className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    unmatched:       { label: 'Nespárováno', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-    manual_override: { label: 'Ruční match', className: 'bg-purple-50 text-purple-700 border-purple-200' },
+    matched:   { label: 'Spárováno',           className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    partial:   { label: 'Částečně spárováno',  className: 'bg-blue-50 text-blue-700 border-blue-200' },
+    unmatched: { label: 'Nespárováno',         className: 'bg-amber-50 text-amber-700 border-amber-200' },
   }[status]
   return (
     <span className={`text-sm font-medium px-3 py-1 rounded-full border ${map.className}`}>
@@ -312,7 +325,7 @@ export default async function TransakceDetailPage({
             <Section title="Párování">
               <div className="space-y-2">
                 {tx.matches.map((m) => (
-                  <div key={m.id} className="flex items-center justify-between rounded-xl px-3 py-2.5 bg-stone-50">
+                  <div key={m.obligationId} className="flex items-center justify-between rounded-xl px-3 py-2.5 bg-stone-50">
                     <div>
                       <p className="text-sm font-medium text-stone-900">
                         {m.obligationPopis ?? 'Pohledávka'}
@@ -321,11 +334,19 @@ export default async function TransakceDetailPage({
                         {new Date(m.matchedAt).toLocaleDateString('cs-CZ')}
                         {m.isManual && <span className="ml-2 text-purple-500">ruční</span>}
                       </p>
+                      <div className="mt-1.5">
+                        <UnmatchButton transactionId={tx.id} obligationId={m.obligationId} />
+                      </div>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-semibold text-emerald-600">
                         {m.matchedAmount.toLocaleString('cs-CZ')} {tx.currency}
                       </p>
+                      {m.donationAmount > 0 && (
+                        <p className="text-xs font-medium text-blue-600">
+                          + dar {m.donationAmount.toLocaleString('cs-CZ')} {tx.currency}
+                        </p>
+                      )}
                       <Link
                         href={`/dashboard/platby/pohledavky/${m.obligationId}`}
                         className="text-xs text-stone-400 hover:text-stone-600 transition-colors"
@@ -336,25 +357,31 @@ export default async function TransakceDetailPage({
                   </div>
                 ))}
               </div>
+              {tx.remaining > 0 && (
+                <p className="mt-3 text-xs text-stone-500">
+                  Zbývá k alokaci{' '}
+                  <span className="font-semibold text-stone-800">
+                    {tx.remaining.toLocaleString('cs-CZ')} {tx.currency}
+                  </span>
+                </p>
+              )}
             </Section>
           )}
         </div>
 
-        {/* Ruční párování */}
+        {/* Ruční párování — dokud zbývá platba k alokaci (jen příchozí platby) */}
         <div>
-          {tx.matchStatus === 'unmatched' && (
+          {tx.amount > 0 && tx.remaining > 0 ? (
             <Section title="Ruční párování">
               <ManualMatchForm
                 transactionId={tx.id}
-                transactionAmount={tx.amount}
+                transactionRemaining={tx.remaining}
                 currency={tx.currency}
                 obligations={obligations}
                 preselectedStudentId={tx.student?.id ?? null}
               />
             </Section>
-          )}
-
-          {tx.matchStatus !== 'unmatched' && (
+          ) : (
             <Section title="Párování">
               <div className="flex flex-col items-center justify-center py-6 text-center">
                 <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center mb-3">
@@ -362,10 +389,7 @@ export default async function TransakceDetailPage({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <p className="text-sm text-stone-500">Transakce je spárována</p>
-                <p className="text-xs text-stone-400 mt-1">
-                  {tx.matchStatus === 'manual_override' ? 'Ruční párování' : 'Automatické párování'}
-                </p>
+                <p className="text-sm text-stone-500">Platba je celá spotřebována</p>
               </div>
             </Section>
           )}
