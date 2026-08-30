@@ -18,6 +18,15 @@ export type LunchActionResult<T> =
   | { success: true; data: T }
   | { success: false; error: string }
 
+export type LunchMenuItem = { option_no: number; description: string; allergens: number[] }
+export type LunchMenuDay = {
+  menu_date: string
+  weekday: number
+  soup: string | null
+  soup_allergens: number[]
+  items: LunchMenuItem[]
+}
+
 /** Odstraní technický prefix „lunch_xxx: " z hlášky RPC RAISE EXCEPTION. */
 function cleanRpcError(msg: string | undefined): string {
   if (!msg) return 'Operace se nezdařila.'
@@ -43,6 +52,24 @@ export async function getLunchMonth(
     return { success: false, error: cleanRpcError(error.message) }
   }
   return { success: true, data: (data as LunchDay[]) ?? [] }
+}
+
+/** Informativní jídelníček zadaného týdne (p_week_start = pondělí ISO týdne). */
+export async function getLunchMenuWeek(
+  weekStart: string,
+): Promise<LunchActionResult<LunchMenuDay[]>> {
+  const supabase = await createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Nejste přihlášeni.' }
+
+  const { data, error } = await supabase.rpc('get_lunch_menu_week', {
+    p_week_start: weekStart,
+  })
+  if (error) {
+    console.error('[getLunchMenuWeek]', error)
+    return { success: false, error: cleanRpcError(error.message) }
+  }
+  return { success: true, data: (data as LunchMenuDay[]) ?? [] }
 }
 
 export async function setLunchOrder(
