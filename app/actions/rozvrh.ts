@@ -241,6 +241,81 @@ export async function addObsazeni(input: {
   return { ok: true }
 }
 
+/**
+ * Přidá ad-hoc blok přímo do vygenerovaného týdne (týdenní realita), tj. mimo
+ * šablonu — `sablona_id = NULL`. Změna se týká jen tohoto dne, šablony se nedotýká.
+ * Atomicky: vytvoří blok, naváže ho na třídu (`rozvrh_blok_skupiny`) a volitelně
+ * rovnou zapíše obsazení. Když selže navázání na třídu, blok se zase smaže
+ * (kompenzace — jinak by vznikl osiřelý blok neviditelný v UI).
+ */
+export async function addKonkretniBlok(input: {
+  group_id: string
+  school_year: string
+  datum: string
+  cas_od: string
+  cas_do: string
+  nazev: string
+  typ_bloku: string
+  obsazeni?: { staff_id: string; pozice_na_bloku: string; supluje_za_staff_id?: string | null }[]
+}): Promise<Result> {
+  const supabase = await createSupabaseServerClient()
+  const staffId = await getCurrentStaffId(supabase)
+  if (!staffId) return { error: 'Nepřihlášený uživatel.' }
+
+  const nazev = input.nazev?.trim()
+  if (!input.group_id || !nazev) return { error: 'Vyplň třídu i název bloku.' }
+  if (!input.datum) return { error: 'Chybí datum.' }
+  if (!input.cas_od || !input.cas_do || input.cas_do <= input.cas_od) return { error: 'Čas „do" musí být po čase „od".' }
+  if (!TYPY_BLOKU.includes(input.typ_bloku)) return { error: 'Neplatný typ bloku.' }
+
+  // 1) Blok (ad hoc = bez vazby na šablonu).
+  const { data: blok, error: eBlok } = await supabase
+    .from('rozvrh_blok')
+    .insert({
+      datum: input.datum,
+      school_year: input.school_year,
+      cas_od: input.cas_od,
+      cas_do: input.cas_do,
+      nazev,
+      typ_bloku: input.typ_bloku,
+      sablona_id: null,
+      stav: 'planovano',
+    })
+    .select('id')
+    .single()
+  if (eBlok || !blok) return { error: eBlok?.message ?? 'Blok se nepodařilo vytvořit.' }
+  const blokId = (blok as { id: string }).id
+
+  // 2) Navázání na třídu. Selže-li, blok zase odeber (kompenzace).
+  const { error: eSkup } = await supabase
+    .from('rozvrh_blok_skupiny')
+    .insert({ blok_id: blokId, group_id: input.group_id })
+  if (eSkup) {
+    await supabase.from('rozvrh_blok').delete().eq('id', blokId)
+    return { error: eSkup.message }
+  }
+
+  // 3) Volitelné obsazení rovnou (deduplikované, jen platné pozice).
+  const seen = new Set<string>()
+  const rows = (input.obsazeni ?? [])
+    .filter((o) => o.staff_id && POZICE.includes(o.pozice_na_bloku))
+    .filter((o) => (seen.has(o.staff_id) ? false : (seen.add(o.staff_id), true)))
+    .map((o) => ({
+      blok_id: blokId,
+      staff_id: o.staff_id,
+      pozice_na_bloku: o.pozice_na_bloku,
+      je_suplovani: Boolean(o.supluje_za_staff_id),
+      supluje_za_staff_id: o.supluje_za_staff_id || null,
+    }))
+  if (rows.length > 0) {
+    const { error: eObs } = await supabase.from('rozvrh_obsazeni').insert(rows)
+    if (eObs) return { error: `Blok byl vytvořen, ale obsazení se nepodařilo uložit: ${eObs.message}` }
+  }
+
+  revalidatePath('/dashboard/rozvrh/tyden')
+  return { ok: true }
+}
+
 /** Odebere obsazení z konkrétního bloku. */
 export async function removeObsazeni(id: string): Promise<Result> {
   if (!id) return { error: 'Chybí ID.' }

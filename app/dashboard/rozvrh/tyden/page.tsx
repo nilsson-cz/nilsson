@@ -15,6 +15,7 @@ import {
 import GenerateWeekButton from '../_components/GenerateWeekButton'
 import PregenerovatPanel from '../_components/PregenerovatPanel'
 import KonkretniBlokRow from '../_components/KonkretniBlokRow'
+import AddKonkretniBlokForm from '../_components/AddKonkretniBlokForm'
 
 export const metadata = { title: 'Rozvrh — týden | IS Nilsson' }
 
@@ -184,6 +185,14 @@ export default async function RozvrhTydenPage({
                     <div className="space-y-2">
                       {bloky.map((b) => <KonkretniBlokRow key={b.id} blok={b} staff={staff} />)}
                     </div>
+                  )}
+                  {selectedGroupId && (
+                    <AddKonkretniBlokForm
+                      groupId={selectedGroupId}
+                      schoolYear={schoolYear}
+                      datum={datum}
+                      staff={staff}
+                    />
                   )}
                 </div>
               )
