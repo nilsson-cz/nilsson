@@ -27,6 +27,22 @@ type DochazkaRow = {
   cas_odchodu: string | null
   status: 'present' | 'absent_excused' | 'absent_unexcused'
   note: string | null
+  odchod_zpusob: 'zz' | 'doprovod' | 'sam' | null
+  vyzvedavajici_id: string | null
+}
+
+type EnrollmentRow = {
+  id: string
+  student_id: string
+  odchod_sam: boolean
+  odchod_sam_cas: string | null
+  odchod_doprovod: boolean
+}
+
+type VyzvedavajiciRow = {
+  id: string
+  enrollment_id: string
+  jmeno: string
 }
 
 export default async function DruzinaDocházkaPage({
@@ -80,7 +96,7 @@ export default async function DruzinaDocházkaPage({
   const { data: dochazkaRaw } = studentIds.length > 0
     ? await supabase
         .from('druzina_dochazka')
-        .select('id, student_id, cas_prichodu, cas_odchodu, status, note')
+        .select('id, student_id, cas_prichodu, cas_odchodu, status, note, odchod_zpusob, vyzvedavajici_id')
         .in('student_id', studentIds)
         .eq('datum', datum)
     : { data: [] }
@@ -88,18 +104,60 @@ export default async function DruzinaDocházkaPage({
     ((dochazkaRaw as DochazkaRow[]) ?? []).map((d) => [d.student_id, d]),
   )
 
-  // Očekávaní žáci (RPC už řadí dle příjmení/jména) + přilepená realita.
-  const students = expected.map((e) => ({
-    id: e.student_id,
-    first_name: e.first_name,
-    last_name: e.last_name,
-    ocekavano: e.ocekavano,
-    omluven: e.omluven,
-    vzor_default: e.vzor_default,
-    override: e.override,
-    poznamka_odchod: e.poznamka_odchod,
-    dochazka: dochazkaMap.get(e.student_id) ?? null,
-  }))
+  // Konfigurace odchodu z přihlášky (aktivní zápis pro daný den) — řídí prefill
+  // časů i způsobu odchodu ve formuláři. Personál čte enrollments (RLS 021/080).
+  const { data: enrollRaw } = studentIds.length > 0
+    ? await supabase
+        .from('druzina_enrollments')
+        .select('id, student_id, odchod_sam, odchod_sam_cas, odchod_doprovod')
+        .eq('oddeleni_id', oddeleniId as string)
+        .in('student_id', studentIds)
+        .lte('date_from', datum)
+        .or(`date_to.is.null,date_to.gte.${datum}`)
+        .order('date_from', { ascending: false })
+    : { data: [] }
+  // Nejnovější aktivní zápis per žák (řazeno date_from DESC → první vyhrává).
+  const enrollMap = new Map<string, EnrollmentRow>()
+  for (const e of (enrollRaw as EnrollmentRow[]) ?? []) {
+    if (!enrollMap.has(e.student_id)) enrollMap.set(e.student_id, e)
+  }
+
+  // Seznam pověřených vyzvedávajících osob per zápis (jen director/vychovatel —
+  // RLS druzina_vyzvedavajici_select_staff; ostatní personál dostane prázdno).
+  const enrollmentIds = Array.from(enrollMap.values()).map((e) => e.id)
+  const { data: vyzvedRaw } = enrollmentIds.length > 0
+    ? await supabase
+        .from('druzina_vyzvedavajici')
+        .select('id, enrollment_id, jmeno')
+        .in('enrollment_id', enrollmentIds)
+        .order('jmeno')
+    : { data: [] }
+  const vyzvedByEnrollment = new Map<string, { id: string; jmeno: string }[]>()
+  for (const v of (vyzvedRaw as VyzvedavajiciRow[]) ?? []) {
+    const arr = vyzvedByEnrollment.get(v.enrollment_id) ?? []
+    arr.push({ id: v.id, jmeno: v.jmeno })
+    vyzvedByEnrollment.set(v.enrollment_id, arr)
+  }
+
+  // Očekávaní žáci (RPC už řadí dle příjmení/jména) + přilepená realita + odchod.
+  const students = expected.map((e) => {
+    const enr = enrollMap.get(e.student_id) ?? null
+    return {
+      id: e.student_id,
+      first_name: e.first_name,
+      last_name: e.last_name,
+      ocekavano: e.ocekavano,
+      omluven: e.omluven,
+      vzor_default: e.vzor_default,
+      override: e.override,
+      poznamka_odchod: e.poznamka_odchod,
+      dochazka: dochazkaMap.get(e.student_id) ?? null,
+      odchod_sam: enr?.odchod_sam ?? false,
+      odchod_sam_cas: enr?.odchod_sam_cas ?? null,
+      odchod_doprovod: enr?.odchod_doprovod ?? false,
+      vyzvedavajici: enr ? (vyzvedByEnrollment.get(enr.id) ?? []) : [],
+    }
+  })
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
