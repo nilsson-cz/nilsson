@@ -1061,11 +1061,13 @@ export type Database = {
           datum: string
           id: string
           note: string | null
+          odchod_zpusob: string | null
           oddeleni_id: string
           recorded_by: string | null
           status: string
           student_id: string
           updated_at: string
+          vyzvedavajici_id: string | null
         }
         Insert: {
           cas_odchodu?: string | null
@@ -1074,11 +1076,13 @@ export type Database = {
           datum: string
           id?: string
           note?: string | null
+          odchod_zpusob?: string | null
           oddeleni_id: string
           recorded_by?: string | null
           status?: string
           student_id: string
           updated_at?: string
+          vyzvedavajici_id?: string | null
         }
         Update: {
           cas_odchodu?: string | null
@@ -1087,11 +1091,13 @@ export type Database = {
           datum?: string
           id?: string
           note?: string | null
+          odchod_zpusob?: string | null
           oddeleni_id?: string
           recorded_by?: string | null
           status?: string
           student_id?: string
           updated_at?: string
+          vyzvedavajici_id?: string | null
         }
         Relationships: [
           {
@@ -1113,6 +1119,13 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "druzina_dochazka_vyzvedavajici_id_fkey"
+            columns: ["vyzvedavajici_id"]
+            isOneToOne: false
+            referencedRelation: "druzina_vyzvedavajici"
             referencedColumns: ["id"]
           },
         ]

@@ -321,13 +321,17 @@ export async function deleteDruzinaZaznam(id: string): Promise<ActionResult> {
 // Zaznamenat docházku (upsert — jeden záznam per žák per den)
 // ---------------------------------------------------------------------------
 
+export type OdchodZpusob = 'zz' | 'doprovod' | 'sam'
+
 export async function recordDochazka(input: {
-  studentId:    string
-  datum:        string
-  casPrichodu?: string
-  casOdchodu?:  string
-  status:       'present' | 'absent_excused' | 'absent_unexcused'
-  note?:        string
+  studentId:       string
+  datum:           string
+  casPrichodu?:    string
+  casOdchodu?:     string
+  status:          'present' | 'absent_excused' | 'absent_unexcused'
+  note?:           string
+  odchodZpusob?:   OdchodZpusob
+  vyzvedavajiciId?: string
 }): Promise<ActionResult> {
   const supabase = await createSupabaseServerClient()
   const staff = await getStaff(supabase)
@@ -335,6 +339,11 @@ export async function recordDochazka(input: {
   if (!staff.isDirector && !staff.isVychovatel) {
     return { success: false, error: 'Nemáte oprávnění zapisovat docházku.' }
   }
+
+  // Konkrétní vyzvedávající osoba dává smysl jen u odchodu s doprovodem
+  // (shodně s DB constraintem chk_dd_vyzved_jen_doprovod).
+  const odchodZpusob = input.odchodZpusob ?? null
+  const vyzvedavajiciId = odchodZpusob === 'doprovod' ? (input.vyzvedavajiciId || null) : null
 
   const schoolYear = await getActiveSchoolYear()
   const oddeleniId = await getOddeleniId(supabase, schoolYear)
@@ -344,14 +353,16 @@ export async function recordDochazka(input: {
     .from('druzina_dochazka')
     .upsert(
       {
-        student_id:   input.studentId,
-        oddeleni_id:  oddeleniId,
-        datum:        input.datum,
-        cas_prichodu: input.casPrichodu || null,
-        cas_odchodu:  input.casOdchodu  || null,
-        status:       input.status,
-        note:         input.note?.trim() || null,
-        recorded_by:  staff.id,
+        student_id:       input.studentId,
+        oddeleni_id:      oddeleniId,
+        datum:            input.datum,
+        cas_prichodu:     input.casPrichodu || null,
+        cas_odchodu:      input.casOdchodu  || null,
+        status:           input.status,
+        note:             input.note?.trim() || null,
+        recorded_by:      staff.id,
+        odchod_zpusob:    odchodZpusob,
+        vyzvedavajici_id: vyzvedavajiciId,
       },
       { onConflict: 'student_id,datum' }
     )

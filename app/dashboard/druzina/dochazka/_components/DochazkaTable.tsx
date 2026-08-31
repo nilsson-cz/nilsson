@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { recordDochazka } from '@/app/actions/druzina'
+import { recordDochazka, type OdchodZpusob } from '@/app/actions/druzina'
 
 type Status = 'present' | 'absent_excused' | 'absent_unexcused'
 
@@ -12,7 +12,11 @@ type DochazkaRecord = {
   cas_odchodu: string | null
   status: Status
   note: string | null
+  odchod_zpusob: OdchodZpusob | null
+  vyzvedavajici_id: string | null
 } | null
+
+type Vyzvedavajici = { id: string; jmeno: string }
 
 type Student = {
   id: string
@@ -24,12 +28,27 @@ type Student = {
   override: boolean | null
   poznamka_odchod: string | null
   dochazka: DochazkaRecord
+  // Konfigurace odchodu z přihlášky (řídí prefill).
+  odchod_sam: boolean
+  odchod_sam_cas: string | null
+  odchod_doprovod: boolean
+  vyzvedavajici: Vyzvedavajici[]
 }
+
+// Výchozí čas příchodu do družiny (po vyučování).
+const DEFAULT_PRICHOD = '14:00'
+// Výchozí čas odchodu u dětí bez pevného času (vyzvedává ZZ/doprovod) = konec okna.
+const DEFAULT_ODCHOD = '16:00'
 
 const STATUS_LABELS = {
   present:            { label: 'Přítomen',          bg: 'bg-emerald-50',  text: 'text-emerald-700',  dot: 'bg-emerald-500' },
   absent_excused:     { label: 'Absence omluvená',  bg: 'bg-amber-50',    text: 'text-amber-700',    dot: 'bg-amber-500'   },
   absent_unexcused:   { label: 'Absence neomluvená', bg: 'bg-red-50',     text: 'text-red-700',      dot: 'bg-red-500'     },
+}
+
+/** TIME z DB ('HH:MM:SS') → hodnota pro <input type=time> ('HH:MM'). */
+function hhmm(t: string | null | undefined): string {
+  return t ? t.slice(0, 5) : ''
 }
 
 /** Očekávaný stav (bez zápisu reality) — hint pro vychovatele. */
@@ -52,6 +71,64 @@ function prefillStatus(s: Student): Status {
   return s.ocekavano ? 'present' : 'absent_excused'
 }
 
+/** Předvyplněný čas odchodu: dítě s „odchod sám" má pevný čas, ostatní konec okna. */
+function prefillOdchod(s: Student): string {
+  if (s.odchod_sam && s.odchod_sam_cas) return hhmm(s.odchod_sam_cas)
+  return DEFAULT_ODCHOD
+}
+
+/**
+ * Sériová hodnota výběru způsobu odchodu pro <select>:
+ *   'zz' | 'sam' | 'doprovod' | 'doprovod:<vyzvedavajici_id>'
+ */
+function prefillOdchodSel(s: Student): string {
+  const d = s.dochazka
+  if (d?.odchod_zpusob) {
+    if (d.odchod_zpusob === 'doprovod' && d.vyzvedavajici_id) return `doprovod:${d.vyzvedavajici_id}`
+    return d.odchod_zpusob
+  }
+  // Bez zápisu → odvození z přihlášky.
+  if (s.odchod_sam) return 'sam'
+  if (s.odchod_doprovod) {
+    if (s.vyzvedavajici.length >= 1) return `doprovod:${s.vyzvedavajici[0].id}`
+    return 'doprovod'
+  }
+  return 'zz'
+}
+
+/** Rozklad sériové hodnoty na (zpusob, vyzvedavajiciId) pro server action. */
+function parseOdchodSel(sel: string): { odchodZpusob: OdchodZpusob; vyzvedavajiciId?: string } {
+  if (sel.startsWith('doprovod:')) return { odchodZpusob: 'doprovod', vyzvedavajiciId: sel.slice('doprovod:'.length) }
+  return { odchodZpusob: sel as OdchodZpusob }
+}
+
+/** Popisek reálného odchodu pro režim čtení. */
+function odchodLabel(s: Student): string | null {
+  const d = s.dochazka
+  if (!d?.odchod_zpusob) return null
+  if (d.odchod_zpusob === 'zz')  return 'Vyzvedl zákonný zástupce'
+  if (d.odchod_zpusob === 'sam') return 'Odešlo samo'
+  // doprovod
+  const osoba = s.vyzvedavajici.find((v) => v.id === d.vyzvedavajici_id)
+  return osoba ? `Vyzvedla: ${osoba.jmeno}` : 'Vyzvedla pověřená osoba'
+}
+
+/** Nabídka způsobů odchodu ve formuláři (ZZ / jmenované osoby / samo). */
+function odchodOptions(s: Student): { value: string; label: string }[] {
+  const opts: { value: string; label: string }[] = [
+    { value: 'zz', label: 'Zákonný zástupce (osobně)' },
+  ]
+  for (const v of s.vyzvedavajici) {
+    opts.push({ value: `doprovod:${v.id}`, label: v.jmeno })
+  }
+  // Doprovod povolen přihláškou, ale bez konkrétních jmen — generická volba.
+  if (s.odchod_doprovod && s.vyzvedavajici.length === 0) {
+    opts.push({ value: 'doprovod', label: 'Doprovod (osoba neuvedena)' })
+  }
+  opts.push({ value: 'sam', label: 'Odešlo samo' })
+  return opts
+}
+
 export default function DochazkaTable({
   students,
   datum,
@@ -69,7 +146,8 @@ export default function DochazkaTable({
     casOdchodu: string
     status: Status
     note: string
-  }>({ casPrichodu: '', casOdchodu: '', status: 'present', note: '' })
+    odchodSel: string
+  }>({ casPrichodu: '', casOdchodu: '', status: 'present', note: '', odchodSel: 'zz' })
   const [error, setError] = useState<string | null>(null)
   const [localDatum, setLocalDatum] = useState(datum)
 
@@ -77,24 +155,28 @@ export default function DochazkaTable({
     const d = student.dochazka
     setEditingId(student.id)
     setEditData({
-      casPrichodu: d?.cas_prichodu ?? '',
-      casOdchodu:  d?.cas_odchodu  ?? '',
-      status:      d?.status       ?? prefillStatus(student),
-      note:        d?.note         ?? '',
+      casPrichodu: hhmm(d?.cas_prichodu) || DEFAULT_PRICHOD,
+      casOdchodu:  hhmm(d?.cas_odchodu)  || prefillOdchod(student),
+      status:      d?.status             ?? prefillStatus(student),
+      note:        d?.note               ?? '',
+      odchodSel:   prefillOdchodSel(student),
     })
     setError(null)
   }
 
   function handleSave(studentId: string) {
     setError(null)
+    const { odchodZpusob, vyzvedavajiciId } = parseOdchodSel(editData.odchodSel)
     startTransition(async () => {
       const result = await recordDochazka({
         studentId,
-        datum:        localDatum,
-        casPrichodu:  editData.casPrichodu || undefined,
-        casOdchodu:   editData.casOdchodu  || undefined,
-        status:       editData.status,
-        note:         editData.note || undefined,
+        datum:           localDatum,
+        casPrichodu:     editData.casPrichodu || undefined,
+        casOdchodu:      editData.casOdchodu  || undefined,
+        status:          editData.status,
+        note:            editData.note || undefined,
+        odchodZpusob,
+        vyzvedavajiciId,
       })
       if (result.success) {
         setEditingId(null)
@@ -140,6 +222,7 @@ export default function DochazkaTable({
             const statusInfo = d ? STATUS_LABELS[d.status] : null
             const hint = expectedHint(student)
             const badge = sourceBadge(student)
+            const odchod = odchodLabel(student)
 
             return (
               <li key={student.id} className="px-5 py-3">
@@ -155,9 +238,10 @@ export default function DochazkaTable({
                         )}
                       </div>
                       {d && (
-                        <div className="text-xs text-stone-400 mt-0.5 flex gap-2">
-                          {d.cas_prichodu && <span>↓ {d.cas_prichodu}</span>}
-                          {d.cas_odchodu  && <span>↑ {d.cas_odchodu}</span>}
+                        <div className="text-xs text-stone-400 mt-0.5 flex gap-2 flex-wrap">
+                          {d.cas_prichodu && <span>↓ {hhmm(d.cas_prichodu)}</span>}
+                          {d.cas_odchodu  && <span>↑ {hhmm(d.cas_odchodu)}</span>}
+                          {odchod && <span className="text-stone-500">· {odchod}</span>}
                           {d.note         && <span className="italic">{d.note}</span>}
                         </div>
                       )}
@@ -221,6 +305,19 @@ export default function DochazkaTable({
                           className="w-full border border-stone-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-stone-500 mb-1">Odešlo / vyzvedl(a)</label>
+                      <select
+                        value={editData.odchodSel}
+                        onChange={e => setEditData(d => ({ ...d, odchodSel: e.target.value }))}
+                        className="w-full border border-stone-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      >
+                        {odchodOptions(student).map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
                     </div>
 
                     <div>
