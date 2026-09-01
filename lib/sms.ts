@@ -162,8 +162,15 @@ export async function checkSmsAuth(): Promise<{ ok: boolean; detail: string; env
   }
 }
 
-/** Text denního reportu jídelně: „Vilekula obedy DD.MM.: X obedu". Bez diakritiky (1 SMS segment). */
-export function lunchReportMessage(menuDate: string, count: number): string {
+/**
+ * Text denního reportu jídelně s rozkladem na dvě věkové skupiny dle vyhlášky
+ * o školním stravování:
+ *   „Vilekula obedy DD.MM.: 18+24 = 42 obedu (mladsi+starsi)"
+ * mladsi = do 11 let, starsi = 11+ (věk dosažený ve školním roce). Bez
+ * diakritiky (1 SMS segment).
+ */
+export function lunchReportMessage(menuDate: string, younger: number, older: number): string {
   const [, mm, dd] = menuDate.split('-') // menuDate = YYYY-MM-DD
-  return `Vilekula obedy ${dd}.${mm}.: ${count} obedu`
+  const total = younger + older
+  return `Vilekula obedy ${dd}.${mm}.: ${younger}+${older} = ${total} obedu (mladsi+starsi)`
 }
