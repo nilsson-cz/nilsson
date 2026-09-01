@@ -9,6 +9,11 @@ import {
   SVP_AI_MODEL,
   type SvpKandidat,
 } from '@/lib/svp-ai';
+import {
+  nactiBlokyProZaznam,
+  maObsahDne,
+  slozTextDne,
+} from '@/lib/tridni-kniha-den-text';
 import type { Database } from '@/types/database';
 
 type TKInsert = Database['public']['Tables']['tridni_kniha_zaznamy']['Insert'];
@@ -252,11 +257,17 @@ export async function navrhnoutSvpVystupy(zaznamId: string) {
 
   if (zErr || !zaznam) return { error: 'Záznam se nepodařilo načíst.' };
 
-  const popis = (zaznam.popis ?? '').trim();
-  if (!popis) return { ok: true, count: 0, info: 'Záznam nemá vyplněný popis dne.' };
   if (zaznam.typ_zaznamu === 'prazdniny' || zaznam.typ_zaznamu === 'reditelske_volno') {
     return { ok: true, count: 0, info: 'Pro tento typ dne se výstupy nepárují.' };
   }
+
+  // Text dne se ODVOZUJE z napojených bloků rozvrhu (zdroj pravdy = rozvrh_blok.obsah),
+  // ruční popis kontejneru je volitelný doplněk nad bloky.
+  const bloky = await nactiBlokyProZaznam(sb, zaznamId);
+  if (!maObsahDne(zaznam.popis, bloky)) {
+    return { ok: true, count: 0, info: 'Den nemá zapsaný obsah (popis ani obsah bloků).' };
+  }
+  const popis = slozTextDne(zaznam.popis, bloky);
 
   // 2) Ročníky třídy z reálných dětí (fallback: celý aktivní číselník)
   const rocniky = await odvodRocnikyTridy(supabase, zaznam.group_id ?? null, zaznam.school_year);
