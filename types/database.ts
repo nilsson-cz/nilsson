@@ -2681,26 +2681,32 @@ export type Database = {
         Row: {
           detail: string | null
           meal_count: number
+          older: number | null
           phone: string | null
           report_date: string
           sent_at: string
           sms_ok: boolean
+          younger: number | null
         }
         Insert: {
           detail?: string | null
           meal_count: number
+          older?: number | null
           phone?: string | null
           report_date: string
           sent_at?: string
           sms_ok?: boolean
+          younger?: number | null
         }
         Update: {
           detail?: string | null
           meal_count?: number
+          older?: number | null
           phone?: string | null
           report_date?: string
           sent_at?: string
           sms_ok?: boolean
+          younger?: number | null
         }
         Relationships: []
       }
@@ -6089,6 +6095,10 @@ export type Database = {
         Args: { p_group_id: string; p_school_year: string; p_semester: number }
         Returns: number
       }
+      lunch_age_category: {
+        Args: { p_birth_date: string; p_ref_date: string }
+        Returns: string
+      }
       lunch_cutoff_ts: { Args: { p_date: string }; Returns: string }
       lunch_day_editable: {
         Args: { p_date: string }
@@ -6110,10 +6120,25 @@ export type Database = {
           trida: string
         }[]
       }
+      lunch_effective_order_counts: {
+        Args: { p_date: string }
+        Returns: {
+          younger: number
+          older: number
+        }[]
+      }
       lunch_effective_orders: {
         Args: { p_date: string }
         Returns: {
           student_id: string
+        }[]
+      }
+      lunch_generate_obligations: {
+        Args: { p_year: number; p_month: number; p_due_date?: string | null }
+        Returns: {
+          created: number
+          ss_kod: string | null
+          note: string | null
         }[]
       }
       lunch_is_school_day: { Args: { p_date: string }; Returns: boolean }
@@ -6125,6 +6150,19 @@ export type Database = {
           menu_date: string
           ordered: boolean
           ordering_open: boolean
+        }[]
+      }
+      lunch_month_billing: {
+        Args: { p_month: number; p_year: number }
+        Returns: {
+          student_id: string
+          first_name: string
+          last_name: string
+          trida: string | null
+          age_category: string
+          meals: number
+          unit_price: number | null
+          amount: number | null
         }[]
       }
       lunch_ordering_open: { Args: { p_date: string }; Returns: boolean }

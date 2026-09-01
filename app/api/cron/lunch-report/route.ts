@@ -10,8 +10,9 @@
  *   - odešle až v/po nastavené hodině pražského času (default 6:00) — workflow
  *     střílí na dvou UTC časech kvůli DST, tenhle guard + report log zajistí,
  *     že SMS odejde jednou kolem 6:00 bez ohledu na letní/zimní čas,
- *   - počet = lunch_effective_orders (objednáno, školní den, bez omluvenky do
- *     uzávěrky 22:00 D-1) — číslo je už finální,
+ *   - počet = lunch_effective_order_counts (objednáno, školní den, bez omluvenky
+ *     do uzávěrky 22:00 D-1) rozdělený na 2 věkové skupiny (do 11 / 11+ dle
+ *     vyhlášky) — obě čísla i součet jsou finální,
  *   - idempotence přes lunch_report_log (PK = report_date): 2. spuštění téhož
  *     dne SMS neodešle znovu.
  *
@@ -102,16 +103,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ skipped: true, reason: 'Dnes už odesláno.', date: today })
   }
 
-  // 5) Počet obědů (finální)
-  const { data: eff, error: effErr } = await supabase.rpc('lunch_effective_orders', { p_date: today })
+  // 5) Počet obědů (finální) — rozklad na dvě věkové skupiny dle vyhlášky:
+  //    younger = do 11 let, older = 11+ (věk dosažený ve školním roce).
+  //    RPC vrací 1 řádek {younger, older}; count (do logu) = jejich součet.
+  const { data: eff, error: effErr } = await supabase.rpc('lunch_effective_order_counts', { p_date: today })
   if (effErr) {
-    return NextResponse.json({ error: `effective_orders: ${effErr.message}` }, { status: 500 })
+    return NextResponse.json({ error: `effective_order_counts: ${effErr.message}` }, { status: 500 })
   }
-  const count = (eff as unknown[] | null)?.length ?? 0
+  const row = eff?.[0]
+  const younger = row?.younger ?? 0
+  const older = row?.older ?? 0
+  const count = younger + older
 
   // 6) Odeslání
   const phone = s.report_phone?.trim() || ''
-  const message = lunchReportMessage(today, count)
+  const message = lunchReportMessage(today, younger, older)
   let smsOk = false
   let detail: string
 
@@ -127,7 +133,7 @@ export async function GET(req: NextRequest) {
   const { error: logErr } = await supabase
     .from('lunch_report_log')
     .upsert(
-      { report_date: today, meal_count: count, phone: phone || null, sms_ok: smsOk, detail, sent_at: new Date().toISOString() },
+      { report_date: today, meal_count: count, younger, older, phone: phone || null, sms_ok: smsOk, detail, sent_at: new Date().toISOString() },
       { onConflict: 'report_date' },
     )
   if (logErr) {
