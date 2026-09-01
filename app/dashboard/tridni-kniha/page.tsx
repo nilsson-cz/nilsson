@@ -17,9 +17,12 @@ type TKZaznam = {
   popis: string | null;
   typ_zaznamu: string;
   school_year: string;
+  group_id: string | null;
   created_at: string;
   svp_vazby: { id: string }[];
 };
+
+type Group = { id: string; name: string };
 
 const TYP_LABELS: Record<string, string> = {
   vyuka: 'Výuka',
@@ -79,6 +82,16 @@ export default async function TridniKnihaPage({ searchParams }: PageProps) {
     .single();
 
   const isLocked = (skolniRok as any)?.locked ?? false;
+
+  // Třídy školního roku — pro štítek třídy u záznamu a filtr (fetch zvlášť, bez embedu).
+  const { data: groupsRaw } = await supabase
+    .from('groups')
+    .select('id, name')
+    .eq('school_year', schoolYear)
+    .order('name');
+  const groups = (groupsRaw ?? []) as Group[];
+  const groupName = new Map(groups.map((g) => [g.id, g.name]));
+  const selectedGroupName = group_id ? groupName.get(group_id) : undefined;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -140,6 +153,31 @@ export default async function TridniKnihaPage({ searchParams }: PageProps) {
         </div>
       </div>
 
+      {/* Filtr tříd */}
+      {groups.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          <Link
+            href={`/dashboard/tridni-kniha?rok=${encodeURIComponent(schoolYear)}`}
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+              !group_id ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            Všechny třídy
+          </Link>
+          {groups.map((g) => (
+            <Link
+              key={g.id}
+              href={`/dashboard/tridni-kniha?rok=${encodeURIComponent(schoolYear)}&group_id=${g.id}`}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+                group_id === g.id ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {g.name}
+            </Link>
+          ))}
+        </div>
+      )}
+
       {/* Chyba */}
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -147,10 +185,10 @@ export default async function TridniKnihaPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      {/* Filtr skupiny — banner */}
+      {/* Filtr třídy — banner (viditelný i když se chipy nezobrazí, tj. jedna třída) */}
       {group_id && (
         <div className="mb-4 flex items-center gap-2 text-sm text-gray-500">
-          <span>Filtrováno dle skupiny</span>
+          <span>Filtrováno: třída {selectedGroupName ?? '—'}</span>
           <Link
             href={`/dashboard/tridni-kniha?rok=${encodeURIComponent(schoolYear)}`}
             className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
@@ -196,7 +234,14 @@ export default async function TridniKnihaPage({ searchParams }: PageProps) {
               </div>
 
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-gray-900 group-hover:text-gray-700 truncate">{z.nazev}</div>
+                <div className="flex items-center gap-2">
+                  {z.group_id && groupName.get(z.group_id) && (
+                    <span className="shrink-0 text-xs font-medium text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">
+                      {groupName.get(z.group_id)}
+                    </span>
+                  )}
+                  <div className="font-medium text-gray-900 group-hover:text-gray-700 truncate">{z.nazev}</div>
+                </div>
                 {z.popis && (
                   <div className="text-sm text-gray-400 truncate">{z.popis}</div>
                 )}

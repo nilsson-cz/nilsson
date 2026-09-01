@@ -187,12 +187,19 @@ export default async function PortalTridnicePage({
                       {zaznam.nazev}
                     </p>
                   </div>
-                  <span className={`
-                    shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full
-                    ${TYP_COLOR[zaznam.typ_zaznamu] ?? 'bg-gray-100 text-gray-600 dark:bg-stone-800 dark:text-stone-400'}
-                  `}>
-                    {TYP_LABEL[zaznam.typ_zaznamu] ?? zaznam.typ_zaznamu}
-                  </span>
+                  <div className="shrink-0 flex flex-col items-end gap-1">
+                    <span className={`
+                      text-[11px] font-medium px-2 py-0.5 rounded-full
+                      ${TYP_COLOR[zaznam.typ_zaznamu] ?? 'bg-gray-100 text-gray-600 dark:bg-stone-800 dark:text-stone-400'}
+                    `}>
+                      {TYP_LABEL[zaznam.typ_zaznamu] ?? zaznam.typ_zaznamu}
+                    </span>
+                    {(zaznam.trida || zaznam.group_id == null) && (
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-stone-800 dark:text-stone-400">
+                        {zaznam.trida ? `Třída ${zaznam.trida}` : 'Celá škola'}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {zaznam.popis && (
