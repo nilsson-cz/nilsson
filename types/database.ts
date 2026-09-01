@@ -6077,6 +6077,7 @@ export type Database = {
           popis: string
           school_year: string
           svp_vystupy: Json
+          trida: string
           typ_zaznamu: string
         }[]
       }
@@ -6123,8 +6124,8 @@ export type Database = {
       lunch_effective_order_counts: {
         Args: { p_date: string }
         Returns: {
-          younger: number
           older: number
+          younger: number
         }[]
       }
       lunch_effective_orders: {
@@ -6134,11 +6135,11 @@ export type Database = {
         }[]
       }
       lunch_generate_obligations: {
-        Args: { p_year: number; p_month: number; p_due_date?: string | null }
+        Args: { p_due_date?: string; p_month: number; p_year: number }
         Returns: {
           created: number
-          ss_kod: string | null
-          note: string | null
+          note: string
+          ss_kod: string
         }[]
       }
       lunch_is_school_day: { Args: { p_date: string }; Returns: boolean }
@@ -6155,14 +6156,14 @@ export type Database = {
       lunch_month_billing: {
         Args: { p_month: number; p_year: number }
         Returns: {
-          student_id: string
+          age_category: string
+          amount: number
           first_name: string
           last_name: string
-          trida: string | null
-          age_category: string
           meals: number
-          unit_price: number | null
-          amount: number | null
+          student_id: string
+          trida: string
+          unit_price: number
         }[]
       }
       lunch_ordering_open: { Args: { p_date: string }; Returns: boolean }
