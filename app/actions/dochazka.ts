@@ -16,6 +16,7 @@ import {
   todayString,
 } from '@/lib/dochazka-utils'
 import { listAllHolidays } from '@/lib/school-calendar-server'
+import { getActiveSchoolYear } from '@/lib/school-year'
 
 async function getSupabase() {
   const cookieStore = await cookies()
@@ -63,7 +64,10 @@ export async function getHolidayDates(): Promise<{ datum: string; nazev: string 
 export async function getGroupsForUser(): Promise<Group[]> {
   const supabase = await getSupabase()
   const today = todayString()
-  const staffId = await getCurrentStaffId(supabase)
+  const [staffId, activeYear] = await Promise.all([
+    getCurrentStaffId(supabase),
+    getActiveSchoolYear(),
+  ])
 
   const { data, error } = await supabase
     .from('staff_groups')
@@ -77,6 +81,9 @@ export async function getGroupsForUser(): Promise<Group[]> {
   return (data ?? [])
     .map(d => d.group as unknown as Group)
     .filter(Boolean)
+    // Jen třídy aktivního školního roku — otevřené (valid_to = NULL) členství
+    // v loňské skupině jinak protáhne neaktuální třídu do výběru docházky.
+    .filter(g => g.school_year === activeYear)
     .sort((a, b) => a.name.localeCompare(b.name, 'cs'))
 }
 
