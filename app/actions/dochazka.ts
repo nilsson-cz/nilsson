@@ -63,11 +63,24 @@ export async function getHolidayDates(): Promise<{ datum: string; nazev: string 
 
 export async function getGroupsForUser(): Promise<Group[]> {
   const supabase = await getSupabase()
+  const activeYear = await getActiveSchoolYear()
+
+  // Ředitel má přístup ke všem třídám — stejně jako v třídnici, docházku nescopujeme
+  // na jeho osobní staff_groups (kde může viset jen loňské přiřazení). Vidí všechny
+  // skupiny aktivního školního roku.
+  const { data: isDir } = await supabase.rpc('is_director')
+  if (isDir) {
+    const { data, error } = await supabase
+      .from('groups')
+      .select('id, name, school_year')
+      .eq('school_year', activeYear)
+    if (error) throw new Error(`getGroupsForUser (director): ${error.message}`)
+    return ((data ?? []) as Group[]).sort((a, b) => a.name.localeCompare(b.name, 'cs'))
+  }
+
+  // Běžný pracovník: jen jeho přiřazené skupiny (staff_groups) platné k dnešku.
   const today = todayString()
-  const [staffId, activeYear] = await Promise.all([
-    getCurrentStaffId(supabase),
-    getActiveSchoolYear(),
-  ])
+  const staffId = await getCurrentStaffId(supabase)
 
   const { data, error } = await supabase
     .from('staff_groups')
@@ -78,13 +91,19 @@ export async function getGroupsForUser(): Promise<Group[]> {
 
   if (error) throw new Error(`getGroupsForUser: ${error.message}`)
 
-  return (data ?? [])
+  const all = (data ?? [])
     .map(d => d.group as unknown as Group)
     .filter(Boolean)
-    // Jen třídy aktivního školního roku — otevřené (valid_to = NULL) členství
-    // v loňské skupině jinak protáhne neaktuální třídu do výběru docházky.
-    .filter(g => g.school_year === activeYear)
-    .sort((a, b) => a.name.localeCompare(b.name, 'cs'))
+
+  // Preferuj třídy aktivního školního roku — otevřené (valid_to = NULL) členství
+  // v loňské skupině jinak protáhne neaktuální třídu do výběru docházky.
+  // Fallback: pokud pro aktivní rok žádná skupina není (např. přiřazení pracovníka
+  // do letošní třídy ještě nevzniklo), ukaž vše — ať se pracovník nikdy nedostane
+  // do stavu „nemáte přiřazenu žádnou skupinu".
+  const forActiveYear = all.filter(g => g.school_year === activeYear)
+  const groups = forActiveYear.length > 0 ? forActiveYear : all
+
+  return groups.sort((a, b) => a.name.localeCompare(b.name, 'cs'))
 }
 
 export async function getStudentsInGroup(
