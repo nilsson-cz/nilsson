@@ -65,16 +65,17 @@ export async function getGroupsForUser(): Promise<Group[]> {
   const supabase = await getSupabase()
   const activeYear = await getActiveSchoolYear()
 
-  // Ředitel má přístup ke všem třídám — stejně jako v třídnici, docházku nescopujeme
-  // na jeho osobní staff_groups (kde může viset jen loňské přiřazení). Vidí všechny
-  // skupiny aktivního školního roku.
-  const { data: isDir } = await supabase.rpc('is_director')
-  if (isDir) {
+  // Ředitel i výchovný poradce mají přístup k docházce napříč všemi třídami — RLS na
+  // attendance_records gate na is_director_or_vp() (read/insert/update). UI proto musí
+  // být zrcadlem té RLS: nescopujeme na osobní staff_groups (kde může viset jen loňské
+  // přiřazení), ale ukážeme všechny skupiny aktivního roku (stejně jako třídnice).
+  const { data: isDirOrVp } = await supabase.rpc('is_director_or_vp')
+  if (isDirOrVp) {
     const { data, error } = await supabase
       .from('groups')
       .select('id, name, school_year')
       .eq('school_year', activeYear)
-    if (error) throw new Error(`getGroupsForUser (director): ${error.message}`)
+    if (error) throw new Error(`getGroupsForUser (director/vp): ${error.message}`)
     return ((data ?? []) as Group[]).sort((a, b) => a.name.localeCompare(b.name, 'cs'))
   }
 
