@@ -132,83 +132,46 @@ export async function generateRozvrhTyden(
   return { ok: true, inserted: row?.inserted ?? 0, skipped: row?.skipped ?? 0 }
 }
 
-export type DivergentBlok = { id: string; datum: string; cas_od: string; cas_do: string; nazev: string }
+/** Ponechaný (nesmazaný) blok při přepisu — s důvodem, proč zůstal. */
+export type KeptReason = 'confirmed' | 'locked' | 'shared'
+export type KeptBlok = { datum: string; cas_od: string; cas_do: string; nazev: string; reason: KeptReason }
 
 /**
- * K13 — přegenerování šablony „od tohoto týdne dál" (bezpečná varianta).
- * PŘIDÁ chybějící bloky ze šablony pro rozsah (aditivní generátor, nikdy nepřepíše)
- * a vrátí VÝPIS divergencí k ruční kontrole — nic destruktivního neprovádí:
- *  - retired: budoucí plánované bloky, pro které šablona už neplatí (retirovaná
- *    valid_to / přesunutý den) — kandidáti na ruční smazání;
- *  - orphanCount: plánované bloky bez vazby na šablonu (ad hoc nebo smazaná šablona).
- * Nedotýká se potvrzených/odehraných ani uzamčených měsíců (ty do výpisu nepatří).
+ * Přegenerování „od tohoto týdne dál" = TVRDÝ PŘEPIS na šablonu (destruktivní).
+ * Pro danou třídu v rozsahu od–do smaže naplánované i ručně zrušené NEPOTVRZENÉ
+ * bloky (ze šablony i ad hoc) VČETNĚ obsazení a nahodí je znovu ze šablony.
+ * Celé běží v DB funkci pregenerovat_rozvrh_prepis() (migrace 106) v jedné
+ * transakci; RLS + is_director() vynucují director-only.
+ *
+ * NIKDY nesmaže (vrátí je v `kept` s důvodem):
+ *  - potvrzené / odehrané bloky (visí na nich třídnice + PPČ),
+ *  - bloky v uzamčeném měsíci PPČ,
+ *  - bloky sdílené s jinou třídou (sloučená výuka).
  */
 export async function pregenerovatRozvrh(
   groupId: string,
   from: string,
   to: string,
-): Promise<Result & { inserted?: number; skipped?: number; retired?: DivergentBlok[]; orphanCount?: number }> {
+): Promise<Result & { deleted?: number; inserted?: number; kept?: KeptBlok[] }> {
   if (!groupId || !from || !to) return { error: 'Chybí třída nebo rozsah.' }
   if (to < from) return { error: 'Datum „do" musí být po datu „od".' }
   const supabase = await createSupabaseServerClient()
 
-  // 1. Přidání (aditivní generátor přes rozsah).
-  const { data: genData, error: genErr } = await supabase.rpc('generate_rozvrh', {
-    p_group_id: groupId, p_date_from: from, p_date_to: to,
+  // RPC zatím není v types/database.ts (čeká na db:types po migraci 106) → cast.
+  const { data, error } = await (supabase.rpc as any)('pregenerovat_rozvrh_prepis', {
+    p_group_id: groupId,
+    p_date_from: from,
+    p_date_to: to,
   })
-  if (genErr) return { error: genErr.message }
-  const genRow = Array.isArray(genData) ? genData[0] : genData
+  if (error) return { error: error.message }
 
-  // 2. Výpis divergencí (read-only). Bloky rozsahu → filtr na třídu → plánované/nepotvrzené.
-  const { data: blokyRaw } = await supabase
-    .from('rozvrh_blok')
-    .select('id, datum, cas_od, cas_do, nazev, sablona_id, stav, potvrzeno_at')
-    .gte('datum', from).lte('datum', to)
-  const bloky = (blokyRaw ?? []) as any[]
-  const blokIds = bloky.map((b) => b.id)
-
-  let retired: DivergentBlok[] = []
-  let orphanCount = 0
-  if (blokIds.length > 0) {
-    const { data: skupinyRaw } = await supabase
-      .from('rozvrh_blok_skupiny').select('blok_id').in('blok_id', blokIds).eq('group_id', groupId)
-    const groupBlok = new Set<string>(((skupinyRaw ?? []) as any[]).map((r) => r.blok_id))
-
-    const candidates = bloky.filter(
-      (b) => groupBlok.has(b.id) && b.stav === 'planovano' && !b.potvrzeno_at,
-    )
-    const withSablona = candidates.filter((b) => b.sablona_id)
-    orphanCount = candidates.filter((b) => !b.sablona_id).length
-
-    const sablonaIds = [...new Set(withSablona.map((b) => b.sablona_id))]
-    const sablMap = new Map<string, { den_v_tydnu: number; valid_from: string; valid_to: string | null }>()
-    if (sablonaIds.length > 0) {
-      const { data: sablRaw } = await supabase
-        .from('rozvrh_blok_sablona').select('id, den_v_tydnu, valid_from, valid_to').in('id', sablonaIds)
-      for (const s of (sablRaw ?? []) as any[]) sablMap.set(s.id, s)
-    }
-
-    const isoDow = (d: string) => { const g = new Date(`${d}T12:00:00`).getDay(); return g === 0 ? 7 : g }
-    retired = withSablona
-      .filter((b) => {
-        const t = sablMap.get(b.sablona_id)
-        if (!t) return true
-        const platna = t.den_v_tydnu === isoDow(b.datum)
-          && t.valid_from <= b.datum
-          && (!t.valid_to || t.valid_to >= b.datum)
-        return !platna
-      })
-      .map((b) => ({ id: b.id, datum: b.datum, cas_od: b.cas_od, cas_do: b.cas_do, nazev: b.nazev }))
-      .sort((a, b) => a.datum.localeCompare(b.datum) || a.cas_od.localeCompare(b.cas_od))
-  }
-
+  const row = Array.isArray(data) ? data[0] : data
   revalidatePath('/dashboard/rozvrh/tyden')
   return {
     ok: true,
-    inserted: genRow?.inserted ?? 0,
-    skipped: genRow?.skipped ?? 0,
-    retired,
-    orphanCount,
+    deleted: row?.deleted ?? 0,
+    inserted: row?.inserted ?? 0,
+    kept: (row?.kept ?? []) as KeptBlok[],
   }
 }
 
