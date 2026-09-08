@@ -28,6 +28,12 @@ export function nextSchoolYear(y: string): string {
   return `${a + 1}/${b + 1}`
 }
 
+/** Předchozí školní rok: '2026/2027' → '2025/2026'. */
+export function prevSchoolYear(y: string): string {
+  const [a, b] = y.split('/').map((n) => parseInt(n, 10))
+  return `${a - 1}/${b - 1}`
+}
+
 type ConfigRow = { active_year: string | null; visible_years: string[] | null }
 
 async function readConfig(): Promise<ConfigRow | null> {
