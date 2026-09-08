@@ -204,7 +204,17 @@ export default async function ZakDetailPage({
           <h1 className="text-2xl font-semibold text-gray-900">{fullName}</h1>
           <p className="text-sm text-gray-400 mt-1 font-mono">{s.kod_zaka}</p>
         </div>
-        <StudentStatusBadge status={s.status} />
+        <div className="flex flex-col items-end gap-2">
+          <StudentStatusBadge status={s.status} />
+          {isDirectorOrVp && (
+            <a
+              href={`/dashboard/zaci/${id}/katalogovy-list`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Katalogový list → PDF
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Základní údaje */}
