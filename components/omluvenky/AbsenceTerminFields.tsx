@@ -81,6 +81,17 @@ export default function AbsenceTerminFields({ today }: { today: string }) {
       ) : (
         /* --- Část dne (jeden den + časové okno) --- */
         <>
+          {/* Upozornění: částečná absence neodhlašuje obědy ani družinu automaticky */}
+          <div
+            role="alert"
+            className="rounded-lg border border-red-300 bg-red-50 px-3 py-2.5 text-sm text-red-700"
+          >
+            <p className="font-semibold">Nezapomeňte odhlásit obědy a družinu</p>
+            <p className="mt-0.5 text-red-600">
+              Částečná omluvenka je neodhlašuje automaticky. Pokud dítě v tuto
+              dobu nebude na obědě nebo v družině, odhlaste je prosím ručně.
+            </p>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Datum <span className="text-red-500">*</span>
