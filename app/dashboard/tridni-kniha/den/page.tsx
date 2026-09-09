@@ -177,7 +177,7 @@ export default async function TridniceDenPage({
       ) : bloky.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 py-12 text-center text-sm text-gray-500">
           Pro tento den nejsou naplánované bloky.{' '}
-          <Link href={`/dashboard/tridni-kniha/novy`} className="text-gray-700 underline underline-offset-2 dark:text-stone-200">Zapsat ručně</Link>
+          <Link href={`/dashboard/tridni-kniha/novy?datum=${datum}${selectedGroupId ? `&group_id=${selectedGroupId}` : ''}`} className="text-gray-700 underline underline-offset-2 dark:text-stone-200">Zapsat ručně</Link>
         </div>
       ) : (
         <>
