@@ -39,6 +39,28 @@ export interface CreateZaznamInput {
   group_id?: string;
 }
 
+/**
+ * Najde existující denní kontejner pro (datum, třída) daného školního roku.
+ * group_id === null → školní/celoškolní záznam (prázdniny, ŘV). Vrací id nejstaršího
+ * (shodná logika jako potvrdit_blok: ORDER BY created_at LIMIT 1), nebo null.
+ */
+async function najdiKontejnerDne(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  datum: string,
+  schoolYear: string,
+  groupId: string | null,
+): Promise<string | null> {
+  let q = supabase
+    .from('tridni_kniha_zaznamy')
+    .select('id')
+    .eq('datum', datum)
+    .eq('school_year', schoolYear);
+  q = groupId ? q.eq('group_id', groupId) : q.is('group_id', null);
+
+  const { data } = await q.order('created_at').limit(1).maybeSingle();
+  return (data as { id: string } | null)?.id ?? null;
+}
+
 export async function createZaznam(input: CreateZaznamInput) {
   const supabase = await createSupabaseServerClient();
 
@@ -47,6 +69,15 @@ export async function createZaznam(input: CreateZaznamInput) {
 
   const den = computeDenVTydnu(input.datum);
   if (!den) return { error: 'Záznam lze vytvořit pouze pro pracovní den (pondělí–pátek).' };
+
+  // Model B: 1 denní kontejner / (datum, třída). Když už existuje (typicky založený
+  // „Zápisem dne" přes potvrdit_blok), nezakládej duplicitu — otevři ten stávající.
+  // Invariant vynucuje unikátní index (migrace 108); tady je i UX cesta bez chyby.
+  const existingId = await najdiKontejnerDne(supabase, input.datum, input.school_year, input.group_id ?? null);
+  if (existingId) {
+    revalidatePath('/dashboard/tridni-kniha');
+    redirect(`/dashboard/tridni-kniha/${existingId}`);
+  }
 
   const insertData: TKInsert = {
     datum: input.datum,
@@ -68,7 +99,16 @@ export async function createZaznam(input: CreateZaznamInput) {
 
   if (error) {
     console.error('[createZaznam]', error);
-    if (error.code === '23505') return { error: 'Pro tento den již záznam v třídní knize existuje.' };
+    // 23505 = souběh: mezi find-em a insertem vznikl kontejner (unique index 108).
+    // Otevři ten, který vyhrál závod, místo chybové hlášky.
+    if (error.code === '23505') {
+      const raceId = await najdiKontejnerDne(supabase, input.datum, input.school_year, input.group_id ?? null);
+      if (raceId) {
+        revalidatePath('/dashboard/tridni-kniha');
+        redirect(`/dashboard/tridni-kniha/${raceId}`);
+      }
+      return { error: 'Pro tento den již záznam v třídní knize existuje.' };
+    }
     return { error: `Nepodařilo se uložit záznam: ${error.message}` };
   }
 
