@@ -12,6 +12,7 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import ExportCsvButton from '@/app/dashboard/vykaz-ppc/_components/ExportCsvButton'
 
 // ---------------------------------------------------------------------------
 // Typy
@@ -23,6 +24,7 @@ type LineStatus     = 'pending' | 'partial' | 'paid'
 type StudentLine = {
   obligationId: string
   studentName: string
+  trida: string
   kodZaka: string
   vs: string
   amount: number
@@ -83,6 +85,38 @@ async function fetchEventBalance(ss: string): Promise<EventBalance | null> {
   const rows = (obsRaw as any[]) ?? []
   if (rows.length === 0) return null
 
+  // Třída žáka pro školní rok akce (tabulka groups = třídy; členství valid_to IS NULL)
+  const schoolYear = rows[0].school_year as string
+  const studentIds = rows.map((o: any) => o.students?.id).filter(Boolean) as string[]
+  const classByStudent: Record<string, string> = {}
+  if (studentIds.length > 0) {
+    const { data: gmRaw } = await supabase
+      .from('group_memberships')
+      .select('student_id, group_id')
+      .eq('school_year', schoolYear)
+      .is('valid_to', null)
+      .in('student_id', studentIds)
+    const gm = (gmRaw as any[]) ?? []
+    const groupIds = [...new Set(gm.map((m: any) => m.group_id))]
+    if (groupIds.length > 0) {
+      const { data: grpRaw } = await supabase
+        .from('groups')
+        .select('id, name')
+        .in('id', groupIds)
+      const nameById = new Map(((grpRaw as any[]) ?? []).map((g: any) => [g.id, g.name]))
+      const setByStudent = new Map<string, Set<string>>()
+      for (const m of gm) {
+        const name = nameById.get(m.group_id)
+        if (!name) continue
+        if (!setByStudent.has(m.student_id)) setByStudent.set(m.student_id, new Set())
+        setByStudent.get(m.student_id)!.add(name as string)
+      }
+      for (const [sid, names] of setByStudent) {
+        classByStudent[sid] = [...names].sort((a, b) => a.localeCompare(b, 'cs')).join(', ')
+      }
+    }
+  }
+
   // Součty párování + darů pro pohledávky akce
   const ids = rows.map((o: any) => o.id)
   const matchMap: Record<string, number> = {}
@@ -109,6 +143,7 @@ async function fetchEventBalance(ss: string): Promise<EventBalance | null> {
       studentName:  o.students
         ? `${o.students.last_name} ${o.students.first_name}`
         : '—',
+      trida:        classByStudent[o.students?.id] ?? '',
       kodZaka:      o.students?.kod_zaka ?? '',
       vs:           o.students?.kod_zaka?.split('-').pop() ?? '',
       amount,
@@ -223,6 +258,25 @@ export default async function AkceBilancePage({
   const unpaidCount   = event.lines.filter((l) => l.status === 'pending' || l.status === 'partial').length
   const donationCount = event.lines.filter((l) => l.donationTotal > 0).length
 
+  // Export účastníků akce do CSV (generuje se na klientu z už vykreslených řádků)
+  const statusLabel: Record<LineStatus, string> = {
+    pending: 'Nesplaceno',
+    partial: 'Částečně',
+    paid:    'Splaceno',
+  }
+  const csvHeaders = ['Žák', 'Třída', 'VS', 'Kód žáka', 'Předepsáno', 'Uhrazeno', 'Zbývá', 'Dar', 'Stav']
+  const csvRows: (string | number)[][] = event.lines.map((l) => [
+    l.studentName,
+    l.trida,
+    l.vs,
+    l.kodZaka,
+    l.amount,
+    l.matchedTotal,
+    Math.max(0, l.amount - l.matchedTotal),
+    l.donationTotal,
+    statusLabel[l.status],
+  ])
+
   return (
     <div className="px-4 py-6 lg:px-8 lg:py-8 max-w-4xl mx-auto space-y-4">
 
@@ -244,6 +298,13 @@ export default async function AkceBilancePage({
             {event.popis ?? 'Akce'}
           </h1>
           <TypeBadge type={event.type} />
+          <div className="ml-auto">
+            <ExportCsvButton
+              filename={`akce-${event.ssKod}-ucastnici.csv`}
+              headers={csvHeaders}
+              rows={csvRows}
+            />
+          </div>
         </div>
         <p className="text-sm text-stone-500 mt-0.5">
           SS: <span className="font-mono">{event.ssKod}</span>
