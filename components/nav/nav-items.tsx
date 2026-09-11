@@ -186,6 +186,12 @@ export const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l6.16-3.42a12 12 0 01.34 2.84c0 1.66-.13 3.29-.38 4.87M12 14L5.84 10.58a12 12 0 00-.34 2.84c0 1.66.13 3.29.38 4.87M12 14v7" />
     </svg>
   ),
+  urazy: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 10.5v4m2-2h-4" />
+    </svg>
+  ),
 }
 
 // ── Typ nav položky ────────────────────────────────────────────────────────
@@ -411,8 +417,17 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Icons.lock,
     roles: ['director', 'vp'], // odebráno guide, assistant
     primaryFor: [],
-    desc: 'Úrazy a bezpečnost práce',
+    desc: 'Poučení žáků o bezpečnosti a ochraně zdraví',
     tint: T.amber,
+  },
+  {
+    href: '/dashboard/urazy',
+    label: 'Úrazy',
+    icon: Icons.urazy,
+    roles: ['director'],
+    primaryFor: [],
+    desc: 'Kniha úrazů a záznamy o úrazu žáků (ČŠI / InspIS)',
+    tint: T.rose,
   },
   {
     href: '/dashboard/nastaveni',

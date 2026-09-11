@@ -57,7 +57,7 @@ const TILE_SECTIONS: { title: string; hrefs: string[] }[] = [
   },
   {
     title: 'Výkazy a provoz',
-    hrefs: ['/dashboard/vykaz-ppc', '/dashboard/msmt', '/dashboard/vykaz-ku', '/dashboard/bozp', '/dashboard/provoz-sluzeb', '/dashboard/obedy', '/dashboard/sprava-skoly/obedy'],
+    hrefs: ['/dashboard/vykaz-ppc', '/dashboard/msmt', '/dashboard/vykaz-ku', '/dashboard/bozp', '/dashboard/urazy', '/dashboard/provoz-sluzeb', '/dashboard/obedy', '/dashboard/sprava-skoly/obedy'],
   },
   {
     title: 'Osobní a systém',
