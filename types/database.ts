@@ -5113,6 +5113,232 @@ export type Database = {
           },
         ]
       }
+      urazy_aktualizace: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          csi_payload: Json | null
+          datum_sepsani: string | null
+          dohled_nadrizeny_funkce: string | null
+          dohled_nadrizeny_jmeno: string | null
+          id: string
+          nahrada_bolest: boolean | null
+          nahrada_zsu: boolean | null
+          odeslano_csi_at: string | null
+          odeslano_csi_by: string | null
+          poznamka: string | null
+          smrtelny: boolean | null
+          uraz_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          csi_payload?: Json | null
+          datum_sepsani?: string | null
+          dohled_nadrizeny_funkce?: string | null
+          dohled_nadrizeny_jmeno?: string | null
+          id?: string
+          nahrada_bolest?: boolean | null
+          nahrada_zsu?: boolean | null
+          odeslano_csi_at?: string | null
+          odeslano_csi_by?: string | null
+          poznamka?: string | null
+          smrtelny?: boolean | null
+          uraz_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          csi_payload?: Json | null
+          datum_sepsani?: string | null
+          dohled_nadrizeny_funkce?: string | null
+          dohled_nadrizeny_jmeno?: string | null
+          id?: string
+          nahrada_bolest?: boolean | null
+          nahrada_zsu?: boolean | null
+          odeslano_csi_at?: string | null
+          odeslano_csi_by?: string | null
+          poznamka?: string | null
+          smrtelny?: boolean | null
+          uraz_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "urazy_aktualizace_uraz_id_fkey"
+            columns: ["uraz_id"]
+            isOneToOne: false
+            referencedRelation: "urazy_zaznam"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      urazy_zaznam: {
+        Row: {
+          cast_tela: string | null
+          created_at: string
+          created_by: string | null
+          csi_payload: Json | null
+          csi_stav: string | null
+          csi_zaznam_id: string | null
+          datum_cas: string | null
+          datum_sepsani: string | null
+          dny_nepritomnosti: number | null
+          dohled_funkce: string | null
+          dohled_jmeno: string | null
+          dohled_nadrizeny_funkce: string | null
+          dohled_nadrizeny_jmeno: string | null
+          druh_cinnosti: string | null
+          druh_skoly_izo: string | null
+          id: string
+          je_zaznam: boolean
+          kniha_zapis_at: string | null
+          kniha_zapis_kdo: string | null
+          misto_urazu: string | null
+          narok_nahrada: boolean
+          odeslano_csi_at: string | null
+          odeslano_csi_by: string | null
+          popis_udalosti: string | null
+          poradove_cislo: number
+          poznamka: string | null
+          prevence: string | null
+          pricina: string | null
+          skolni_rok: string
+          smrtelny: boolean
+          stav: string
+          student_id: string | null
+          svedci_dalsi: Json | null
+          svedek1: string | null
+          updated_at: string
+          zavineni: string | null
+          zdravotnicke_zarizeni: string | null
+          zraneny_datum_narozeni: string | null
+          zraneny_jmeno: string
+          zraneny_obec: string | null
+          zraneny_prijmeni: string
+          zraneny_psc: string | null
+          zraneny_rocnik: number | null
+          zraneny_ulice: string | null
+          zz_jmeno: string | null
+          zz_notifikovan_at: string | null
+          zz_obec: string | null
+          zz_psc: string | null
+          zz_ulice: string | null
+          zz_vyrozumen: string | null
+        }
+        Insert: {
+          cast_tela?: string | null
+          created_at?: string
+          created_by?: string | null
+          csi_payload?: Json | null
+          csi_stav?: string | null
+          csi_zaznam_id?: string | null
+          datum_cas?: string | null
+          datum_sepsani?: string | null
+          dny_nepritomnosti?: number | null
+          dohled_funkce?: string | null
+          dohled_jmeno?: string | null
+          dohled_nadrizeny_funkce?: string | null
+          dohled_nadrizeny_jmeno?: string | null
+          druh_cinnosti?: string | null
+          druh_skoly_izo?: string | null
+          id?: string
+          je_zaznam?: boolean
+          kniha_zapis_at?: string | null
+          kniha_zapis_kdo?: string | null
+          misto_urazu?: string | null
+          narok_nahrada?: boolean
+          odeslano_csi_at?: string | null
+          odeslano_csi_by?: string | null
+          popis_udalosti?: string | null
+          poradove_cislo: number
+          poznamka?: string | null
+          prevence?: string | null
+          pricina?: string | null
+          skolni_rok: string
+          smrtelny?: boolean
+          stav?: string
+          student_id?: string | null
+          svedci_dalsi?: Json | null
+          svedek1?: string | null
+          updated_at?: string
+          zavineni?: string | null
+          zdravotnicke_zarizeni?: string | null
+          zraneny_datum_narozeni?: string | null
+          zraneny_jmeno: string
+          zraneny_obec?: string | null
+          zraneny_prijmeni: string
+          zraneny_psc?: string | null
+          zraneny_rocnik?: number | null
+          zraneny_ulice?: string | null
+          zz_jmeno?: string | null
+          zz_notifikovan_at?: string | null
+          zz_obec?: string | null
+          zz_psc?: string | null
+          zz_ulice?: string | null
+          zz_vyrozumen?: string | null
+        }
+        Update: {
+          cast_tela?: string | null
+          created_at?: string
+          created_by?: string | null
+          csi_payload?: Json | null
+          csi_stav?: string | null
+          csi_zaznam_id?: string | null
+          datum_cas?: string | null
+          datum_sepsani?: string | null
+          dny_nepritomnosti?: number | null
+          dohled_funkce?: string | null
+          dohled_jmeno?: string | null
+          dohled_nadrizeny_funkce?: string | null
+          dohled_nadrizeny_jmeno?: string | null
+          druh_cinnosti?: string | null
+          druh_skoly_izo?: string | null
+          id?: string
+          je_zaznam?: boolean
+          kniha_zapis_at?: string | null
+          kniha_zapis_kdo?: string | null
+          misto_urazu?: string | null
+          narok_nahrada?: boolean
+          odeslano_csi_at?: string | null
+          odeslano_csi_by?: string | null
+          popis_udalosti?: string | null
+          poradove_cislo?: number
+          poznamka?: string | null
+          prevence?: string | null
+          pricina?: string | null
+          skolni_rok?: string
+          smrtelny?: boolean
+          stav?: string
+          student_id?: string | null
+          svedci_dalsi?: Json | null
+          svedek1?: string | null
+          updated_at?: string
+          zavineni?: string | null
+          zdravotnicke_zarizeni?: string | null
+          zraneny_datum_narozeni?: string | null
+          zraneny_jmeno?: string
+          zraneny_obec?: string | null
+          zraneny_prijmeni?: string
+          zraneny_psc?: string | null
+          zraneny_rocnik?: number | null
+          zraneny_ulice?: string | null
+          zz_jmeno?: string | null
+          zz_notifikovan_at?: string | null
+          zz_obec?: string | null
+          zz_psc?: string | null
+          zz_ulice?: string | null
+          zz_vyrozumen?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "urazy_zaznam_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usage_snapshots: {
         Row: {
           captured_at: string
