@@ -195,9 +195,13 @@ export async function sendNotifications(
 
   const vs = (student as any).kod_zaka?.split('-').pop() ?? ''
 
-  // Příjemci = všichni AKTIVNÍ zákonní zástupci žáka (ne jen primární kontakt).
-  // Stejné pravidlo jako Bulletin (RPC bulletin_resolve_recipients, migrace 098):
-  // je_zakonny_zastupce = true + aktivní vazba (platnost_do NULL nebo v budoucnu).
+  // Příjemci = všichni AKTIVNÍ příjemci komunikace pro žáka (ne jen primární kontakt).
+  // Stejné pravidlo jako Bulletin (RPC bulletin_resolve_recipients, migrace 110):
+  //   (je_zakonny_zastupce = true NEBO dostava_komunikaci = true)
+  //   + aktivní vazba (platnost_do NULL nebo v budoucnu).
+  // dostava_komunikaci (migrace 110) pokrývá osoby, které nesmějí být zákonnými
+  // zástupci (svěřená péče, kontaktní osoba – constraint chk_sgl_role_zz), ale
+  // komunikaci dostávat mají (typicky prarodiče s dítětem v péči).
   // Filtr platnost_do byl dřív jen v Bulletinu → Platby mohly psát i bývalému ZZ.
   const today = new Date().toISOString().slice(0, 10)
   const { data: guardians, error: gErr } = await supabase
@@ -211,7 +215,7 @@ export async function sendNotifications(
       )
     `)
     .eq('student_id', obligation.student_id)
-    .eq('je_zakonny_zastupce', true)
+    .or('je_zakonny_zastupce.eq.true,dostava_komunikaci.eq.true')
     .or(`platnost_do.is.null,platnost_do.gte.${today}`)
 
   if (gErr || !guardians) {

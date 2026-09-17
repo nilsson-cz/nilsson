@@ -18,19 +18,21 @@ import {
   DRUH_CINNOSTI,
   MISTO_URAZU,
   PREVENCE,
+  ZPUSOB_VYROZUMENI,
+  VEC_ZRANENI,
   type UrazZaznam,
   type UrazAktualizace,
 } from '@/lib/urazy'
 import {
   setKnihaZapis,
   setKOdeslani,
-  confirmOdeslanoCsi,
   deleteUraz,
 } from '@/app/actions/urazy'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import AktualizaceForm from './_components/AktualizaceForm'
 import NotifyZz from './_components/NotifyZz'
+import OdeslatCsi from './_components/OdeslatCsi'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -184,15 +186,7 @@ export default async function UrazDetailPage({ params }: PageProps) {
               }
               action={
                 !z.odeslano_csi_at &&
-                (z.stav === 'k_odeslani' || z.stav === 'rozepsany') && (
-                  <StepButton
-                    action={async () => {
-                      'use server'
-                      await confirmOdeslanoCsi(id)
-                    }}
-                    label="Potvrdit odeslání"
-                  />
-                )
+                (z.stav === 'k_odeslani' || z.stav === 'rozepsany') && <OdeslatCsi id={id} />
               }
             />
           )}
@@ -217,18 +211,27 @@ export default async function UrazDetailPage({ params }: PageProps) {
           <Row label="Jméno a příjmení" value={zranenyCeleJmeno(z)} />
           <Row label="Datum narození" value={fmtDate(z.zraneny_datum_narozeni)} />
           <Row label="Ročník" value={z.zraneny_rocnik != null ? String(z.zraneny_rocnik) : '—'} />
+          {z.trida && <Row label="Třída" value={z.trida} />}
           <Row label="Trvalý pobyt" value={adresa(z.zraneny_ulice, z.zraneny_psc, z.zraneny_obec)} />
         </FieldGroup>
 
         <FieldGroup title="Zákonný zástupce">
           <Row label="Jméno a příjmení" value={z.zz_jmeno ?? '—'} />
+          {z.zz_jina_adresa && <Row label="Jiná adresa než zraněný" value={anoNe(z.zz_jina_adresa)} />}
           <Row label="Adresa" value={adresa(z.zz_ulice, z.zz_psc, z.zz_obec)} />
         </FieldGroup>
 
         <FieldGroup title="Úraz a okolnosti">
           <Row label="Datum a čas" value={fmtDateTime(z.datum_cas)} />
           <Row label="ZZ vyrozuměn" value={anoNe(z.zz_vyrozumen)} />
+          {z.zz_vyrozumen_zpusob && (
+            <Row label="Způsob vyrozumění" value={ciselnikLabel(ZPUSOB_VYROZUMENI, z.zz_vyrozumen_zpusob)} />
+          )}
+          {z.zz_vyrozumen_datum_cas && (
+            <Row label="Datum a čas vyrozumění" value={fmtDateTime(z.zz_vyrozumen_datum_cas)} />
+          )}
           <Row label="Smrtelný úraz" value={z.smrtelny ? 'ano' : 'ne'} />
+          {z.datum_umrti && <Row label="Datum úmrtí" value={fmtDate(z.datum_umrti)} />}
           <Row label="Zdravotnické zařízení" value={z.zdravotnicke_zarizeni ?? '—'} />
           <Row label="Popis události" value={z.popis_udalosti ?? '—'} multiline />
           <Row label="Zraněná část těla" value={ciselnikLabel(CAST_TELA, z.cast_tela) || '—'} />
@@ -236,7 +239,11 @@ export default async function UrazDetailPage({ params }: PageProps) {
           <Row label="Druh činnosti" value={ciselnikLabel(DRUH_CINNOSTI, z.druh_cinnosti) || '—'} />
           <Row label="Místo úrazu" value={ciselnikLabel(MISTO_URAZU, z.misto_urazu) || '—'} />
           <Row label="Preventivní opatření" value={ciselnikLabel(PREVENCE, z.prevence) || '—'} />
+          {z.vec_zraneni && <Row label="Věc způsobivší zranění" value={ciselnikLabel(VEC_ZRANENI, z.vec_zraneni)} />}
           <Row label="Zavinění" value={anoNe(z.zavineni)} />
+          {z.jina_osoba && <Row label="Způsobeno / ovlivněno jinou osobou" value={anoNe(z.jina_osoba)} />}
+          {z.jina_osoba_jmeno && <Row label="Jméno jiné osoby" value={z.jina_osoba_jmeno} />}
+          {z.zivly_zvirata && <Row label="Přírodní živly / zvířata" value={anoNe(z.zivly_zvirata)} />}
         </FieldGroup>
 
         <FieldGroup title="Svědci a dohled">

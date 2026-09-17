@@ -24,6 +24,8 @@ import {
   DRUH_CINNOSTI,
   MISTO_URAZU,
   PREVENCE,
+  ZPUSOB_VYROZUMENI,
+  VEC_ZRANENI,
   type UrazZaznam,
   type UrazAktualizace,
 } from './urazy'
@@ -171,12 +173,14 @@ function ZaznamDocument({ z, aktualizace }: { z: UrazZaznam; aktualizace: UrazAk
           <Radek num="3" label="Jméno a příjmení" value={jmeno} />
           <Radek num="4" label="Datum narození" value={fmtDate(z.zraneny_datum_narozeni)} />
           <Radek num="5" label="Ročník" value={z.zraneny_rocnik != null ? String(z.zraneny_rocnik) : null} />
+          <Radek label="Třída" value={z.trida} />
           <Radek num="6–8" label="Trvalý pobyt" value={adresa(z.zraneny_ulice, z.zraneny_psc, z.zraneny_obec)} />
         </Sekce>
 
         {/* zákonný zástupce */}
         <Sekce title="Zákonný zástupce">
           <Radek num="9" label="Jméno a příjmení" value={z.zz_jmeno} />
+          <Radek label="Jiná adresa než zraněný?" value={anoNe(z.zz_jina_adresa)} />
           <Radek num="10–12" label="Adresa" value={adresa(z.zz_ulice, z.zz_psc, z.zz_obec)} />
         </Sekce>
 
@@ -184,7 +188,10 @@ function ZaznamDocument({ z, aktualizace }: { z: UrazZaznam; aktualizace: UrazAk
         <Sekce title="Úraz a okolnosti">
           <Radek num="13" label="Datum a čas úrazu" value={fmtDateTime(z.datum_cas)} />
           <Radek num="14" label="Zákonný zástupce vyrozuměn" value={anoNe(z.zz_vyrozumen)} />
+          <Radek label="Způsob vyrozumění ZZ" value={ciselnikLabel(ZPUSOB_VYROZUMENI, z.zz_vyrozumen_zpusob) || null} />
+          <Radek label="Datum a čas vyrozumění ZZ" value={z.zz_vyrozumen_datum_cas ? fmtDateTime(z.zz_vyrozumen_datum_cas) : null} />
           <Radek num="15" label="Byl úraz smrtelný?" value={z.smrtelny ? 'ano' : 'ne'} />
+          <Radek label="Datum úmrtí" value={z.datum_umrti ? fmtDate(z.datum_umrti) : null} />
           <Radek num="16" label="Zdravotnické zařízení" value={z.zdravotnicke_zarizeni} />
           <Radek num="17" label="Popis události" value={z.popis_udalosti} />
           <Radek num="18" label="Zraněná část těla" value={ciselnikLabel(CAST_TELA, z.cast_tela) || null} />
@@ -192,7 +199,11 @@ function ZaznamDocument({ z, aktualizace }: { z: UrazZaznam; aktualizace: UrazAk
           <Radek num="20" label="Druh činnosti" value={ciselnikLabel(DRUH_CINNOSTI, z.druh_cinnosti) || null} />
           <Radek num="21" label="Místo úrazu" value={ciselnikLabel(MISTO_URAZU, z.misto_urazu) || null} />
           <Radek num="22" label="Preventivní opatření školy" value={ciselnikLabel(PREVENCE, z.prevence) || null} />
+          <Radek label="Věc, kterou bylo zranění způsobeno" value={ciselnikLabel(VEC_ZRANENI, z.vec_zraneni) || null} />
           <Radek num="23" label="Zavinění zraněného / jiné osoby" value={anoNe(z.zavineni)} />
+          <Radek label="Způsobeno / ovlivněno jinou osobou?" value={anoNe(z.jina_osoba)} />
+          <Radek label="Jméno jiné osoby" value={z.jina_osoba_jmeno} />
+          <Radek label="Spolupůsobení přírodních živlů / zvířat?" value={anoNe(z.zivly_zvirata)} />
         </Sekce>
 
         {/* svědci a dohled */}
@@ -214,6 +225,7 @@ function ZaznamDocument({ z, aktualizace }: { z: UrazZaznam; aktualizace: UrazAk
                 <Radek num="31" label="Náhrada za bolest vyplacena" value={boolText(a.nahrada_bolest)} />
                 <Radek num="32" label="Náhrada za ZSU vyplacena" value={boolText(a.nahrada_zsu)} />
                 <Radek num="33" label="Úmrtí v důsledku úrazu" value={boolText(a.smrtelny)} />
+                <Radek label="Datum úmrtí" value={a.datum_umrti ? fmtDate(a.datum_umrti) : null} />
                 <Radek num="34" label="Přímo nadřízený" value={[a.dohled_nadrizeny_jmeno, a.dohled_nadrizeny_funkce].filter(Boolean).join(' · ') || null} />
               </View>
             ))}

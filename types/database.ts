@@ -4189,6 +4189,7 @@ export type Database = {
       student_guardian_links: {
         Row: {
           created_at: string
+          dostava_komunikaci: boolean
           guardian_id: string
           id: string
           je_primarni_kontakt: boolean
@@ -4202,6 +4203,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          dostava_komunikaci?: boolean
           guardian_id: string
           id?: string
           je_primarni_kontakt?: boolean
@@ -4215,6 +4217,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          dostava_komunikaci?: boolean
           guardian_id?: string
           id?: string
           je_primarni_kontakt?: boolean
@@ -5119,6 +5122,7 @@ export type Database = {
           created_by: string | null
           csi_payload: Json | null
           datum_sepsani: string | null
+          datum_umrti: string | null
           dohled_nadrizeny_funkce: string | null
           dohled_nadrizeny_jmeno: string | null
           id: string
@@ -5135,6 +5139,7 @@ export type Database = {
           created_by?: string | null
           csi_payload?: Json | null
           datum_sepsani?: string | null
+          datum_umrti?: string | null
           dohled_nadrizeny_funkce?: string | null
           dohled_nadrizeny_jmeno?: string | null
           id?: string
@@ -5151,6 +5156,7 @@ export type Database = {
           created_by?: string | null
           csi_payload?: Json | null
           datum_sepsani?: string | null
+          datum_umrti?: string | null
           dohled_nadrizeny_funkce?: string | null
           dohled_nadrizeny_jmeno?: string | null
           id?: string
@@ -5177,11 +5183,15 @@ export type Database = {
           cast_tela: string | null
           created_at: string
           created_by: string | null
+          csi_a01id: number | null
+          csi_a11id: number | null
+          csi_b02id: number | null
           csi_payload: Json | null
           csi_stav: string | null
           csi_zaznam_id: string | null
           datum_cas: string | null
           datum_sepsani: string | null
+          datum_umrti: string | null
           dny_nepritomnosti: number | null
           dohled_funkce: string | null
           dohled_jmeno: string | null
@@ -5191,6 +5201,8 @@ export type Database = {
           druh_skoly_izo: string | null
           id: string
           je_zaznam: boolean
+          jina_osoba: string | null
+          jina_osoba_jmeno: string | null
           kniha_zapis_at: string | null
           kniha_zapis_kdo: string | null
           misto_urazu: string | null
@@ -5208,9 +5220,12 @@ export type Database = {
           student_id: string | null
           svedci_dalsi: Json | null
           svedek1: string | null
+          trida: string | null
           updated_at: string
+          vec_zraneni: string | null
           zavineni: string | null
           zdravotnicke_zarizeni: string | null
+          zivly_zvirata: string | null
           zraneny_datum_narozeni: string | null
           zraneny_jmeno: string
           zraneny_obec: string | null
@@ -5218,22 +5233,29 @@ export type Database = {
           zraneny_psc: string | null
           zraneny_rocnik: number | null
           zraneny_ulice: string | null
+          zz_jina_adresa: string | null
           zz_jmeno: string | null
           zz_notifikovan_at: string | null
           zz_obec: string | null
           zz_psc: string | null
           zz_ulice: string | null
           zz_vyrozumen: string | null
+          zz_vyrozumen_datum_cas: string | null
+          zz_vyrozumen_zpusob: string | null
         }
         Insert: {
           cast_tela?: string | null
           created_at?: string
           created_by?: string | null
+          csi_a01id?: number | null
+          csi_a11id?: number | null
+          csi_b02id?: number | null
           csi_payload?: Json | null
           csi_stav?: string | null
           csi_zaznam_id?: string | null
           datum_cas?: string | null
           datum_sepsani?: string | null
+          datum_umrti?: string | null
           dny_nepritomnosti?: number | null
           dohled_funkce?: string | null
           dohled_jmeno?: string | null
@@ -5243,6 +5265,8 @@ export type Database = {
           druh_skoly_izo?: string | null
           id?: string
           je_zaznam?: boolean
+          jina_osoba?: string | null
+          jina_osoba_jmeno?: string | null
           kniha_zapis_at?: string | null
           kniha_zapis_kdo?: string | null
           misto_urazu?: string | null
@@ -5260,9 +5284,12 @@ export type Database = {
           student_id?: string | null
           svedci_dalsi?: Json | null
           svedek1?: string | null
+          trida?: string | null
           updated_at?: string
+          vec_zraneni?: string | null
           zavineni?: string | null
           zdravotnicke_zarizeni?: string | null
+          zivly_zvirata?: string | null
           zraneny_datum_narozeni?: string | null
           zraneny_jmeno: string
           zraneny_obec?: string | null
@@ -5270,22 +5297,29 @@ export type Database = {
           zraneny_psc?: string | null
           zraneny_rocnik?: number | null
           zraneny_ulice?: string | null
+          zz_jina_adresa?: string | null
           zz_jmeno?: string | null
           zz_notifikovan_at?: string | null
           zz_obec?: string | null
           zz_psc?: string | null
           zz_ulice?: string | null
           zz_vyrozumen?: string | null
+          zz_vyrozumen_datum_cas?: string | null
+          zz_vyrozumen_zpusob?: string | null
         }
         Update: {
           cast_tela?: string | null
           created_at?: string
           created_by?: string | null
+          csi_a01id?: number | null
+          csi_a11id?: number | null
+          csi_b02id?: number | null
           csi_payload?: Json | null
           csi_stav?: string | null
           csi_zaznam_id?: string | null
           datum_cas?: string | null
           datum_sepsani?: string | null
+          datum_umrti?: string | null
           dny_nepritomnosti?: number | null
           dohled_funkce?: string | null
           dohled_jmeno?: string | null
@@ -5295,6 +5329,8 @@ export type Database = {
           druh_skoly_izo?: string | null
           id?: string
           je_zaznam?: boolean
+          jina_osoba?: string | null
+          jina_osoba_jmeno?: string | null
           kniha_zapis_at?: string | null
           kniha_zapis_kdo?: string | null
           misto_urazu?: string | null
@@ -5312,9 +5348,12 @@ export type Database = {
           student_id?: string | null
           svedci_dalsi?: Json | null
           svedek1?: string | null
+          trida?: string | null
           updated_at?: string
+          vec_zraneni?: string | null
           zavineni?: string | null
           zdravotnicke_zarizeni?: string | null
+          zivly_zvirata?: string | null
           zraneny_datum_narozeni?: string | null
           zraneny_jmeno?: string
           zraneny_obec?: string | null
@@ -5322,12 +5361,15 @@ export type Database = {
           zraneny_psc?: string | null
           zraneny_rocnik?: number | null
           zraneny_ulice?: string | null
+          zz_jina_adresa?: string | null
           zz_jmeno?: string | null
           zz_notifikovan_at?: string | null
           zz_obec?: string | null
           zz_psc?: string | null
           zz_ulice?: string | null
           zz_vyrozumen?: string | null
+          zz_vyrozumen_datum_cas?: string | null
+          zz_vyrozumen_zpusob?: string | null
         }
         Relationships: [
           {

@@ -91,7 +91,7 @@ export default async function ZakDetailPage({
   const { data: guardianLinks } = await supabase
     .from('student_guardian_links')
     .select(
-      `role, je_zakonny_zastupce, je_primarni_kontakt,
+      `role, je_zakonny_zastupce, je_primarni_kontakt, dostava_komunikaci,
        guardians(first_name, last_name, email, phone_primary, phone_secondary, address_street, address_city, address_zip)`
     )
     .eq('student_id', id)
@@ -275,6 +275,10 @@ export default async function ZakDetailPage({
           <div className="space-y-4">
             {(guardianLinks as any[]).map((link, i) => {
               const g = link.guardians
+              // Příjemce e-mailů (Platby + Bulletin) = ZZ NEBO opt-in dostava_komunikaci.
+              // Reálné doručení navíc vyžaduje e-mail → bez něj varovný chip.
+              const prijemceKomunikace = link.je_zakonny_zastupce || link.dostava_komunikaci
+              const maEmail = Boolean(g?.email)
               return (
                 <div key={i} className="pb-4 last:pb-0 border-b last:border-0 border-gray-100">
                   <div className="flex flex-wrap items-center gap-1.5 mb-1">
@@ -282,6 +286,9 @@ export default async function ZakDetailPage({
                     <span className="text-xs text-gray-400">{GUARDIAN_ROLE_LABELS[link.role] ?? link.role}</span>
                     {link.je_zakonny_zastupce && <Chip color="green">ZZ</Chip>}
                     {link.je_primarni_kontakt && <Chip color="blue">primární</Chip>}
+                    {prijemceKomunikace && (maEmail
+                      ? <Chip color="green">✓ komunikace</Chip>
+                      : <Chip color="amber">komunikace: chybí e-mail</Chip>)}
                   </div>
                   <div className="space-y-0.5 text-sm">
                     {g?.email && <a href={`mailto:${g.email}`} className="block text-gray-600 hover:text-gray-900">{g.email}</a>}
@@ -530,11 +537,12 @@ function QLine({ label, value }: { label: string; value: string }) {
   )
 }
 
-function Chip({ color, children }: { color: 'green' | 'blue' | 'gray'; children: React.ReactNode }) {
+function Chip({ color, children }: { color: 'green' | 'blue' | 'gray' | 'amber'; children: React.ReactNode }) {
   const classes = {
     green: 'bg-green-50 text-green-700 border-green-200',
     blue: 'bg-blue-50 text-blue-600 border-blue-100',
     gray: 'bg-gray-100 text-gray-600 border-gray-200',
+    amber: 'bg-amber-50 text-amber-700 border-amber-200',
   }
   return (
     <span className={`inline-flex items-center text-xs font-medium px-1.5 py-0.5 rounded border ${classes[color]}`}>
