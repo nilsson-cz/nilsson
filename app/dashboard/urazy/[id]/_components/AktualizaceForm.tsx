@@ -56,6 +56,10 @@ export default function AktualizaceForm({ urazId }: { urazId: string }) {
           <TriSelect label="Náhrada za ZSU vyplacena" name="nahrada_zsu" />
           <TriSelect label="Úmrtí v důsledku úrazu" name="smrtelny" />
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Datum úmrtí</label>
+            <input type="date" name="datum_umrti" className={inputCls} />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Přímo nadřízený — jméno</label>
             <input name="dohled_nadrizeny_jmeno" className={inputCls} />
           </div>

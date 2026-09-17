@@ -20,6 +20,8 @@ import {
   MISTO_URAZU,
   PREVENCE,
   ROCNIKY,
+  ZPUSOB_VYROZUMENI,
+  VEC_ZRANENI,
   type Ciselnik,
   type UrazZaznam,
 } from '@/lib/urazy'
@@ -148,6 +150,9 @@ export default function UrazForm({ students, schoolYear, initial }: UrazFormProp
             <input type="date" name="zraneny_datum_narozeni" value={datumNarozeni ?? ''} onChange={(e) => setDatumNarozeni(e.target.value)} className={inputCls} />
           </Field>
           <SelectField label="Ročník" name="zraneny_rocnik" ciselnik={ROCNIKY} defaultValue={initial?.zraneny_rocnik != null ? String(initial.zraneny_rocnik) : ''} />
+          <Field label="Třída">
+            <input name="trida" defaultValue={initial?.trida ?? ''} className={inputCls} />
+          </Field>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -165,9 +170,12 @@ export default function UrazForm({ students, schoolYear, initial }: UrazFormProp
 
       {/* Zákonný zástupce */}
       <Section title="Zákonný zástupce">
-        <Field label="Jméno a příjmení">
-          <input name="zz_jmeno" value={zzJmeno} onChange={(e) => setZzJmeno(e.target.value)} className={inputCls} />
-        </Field>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Jméno a příjmení">
+            <input name="zz_jmeno" value={zzJmeno} onChange={(e) => setZzJmeno(e.target.value)} className={inputCls} />
+          </Field>
+          <AnoNeField label="Má ZZ jinou adresu než zraněný?" name="zz_jina_adresa" defaultValue={initial?.zz_jina_adresa ?? ''} />
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Field label="Ulice a č.p.">
             <input name="zz_ulice" value={zzUlice} onChange={(e) => setZzUlice(e.target.value)} className={inputCls} />
@@ -188,6 +196,10 @@ export default function UrazForm({ students, schoolYear, initial }: UrazFormProp
             <input type="datetime-local" name="datum_cas" required defaultValue={isoToLocalInput(initial?.datum_cas ?? null)} className={inputCls} />
           </Field>
           <AnoNeField label="Zákonný zástupce vyrozuměn" name="zz_vyrozumen" defaultValue={initial?.zz_vyrozumen ?? ''} />
+          <SelectField label="Způsob vyrozumění ZZ" name="zz_vyrozumen_zpusob" ciselnik={ZPUSOB_VYROZUMENI} defaultValue={initial?.zz_vyrozumen_zpusob ?? ''} />
+          <Field label="Datum a čas vyrozumění ZZ">
+            <input type="datetime-local" name="zz_vyrozumen_datum_cas" defaultValue={isoToLocalInput(initial?.zz_vyrozumen_datum_cas ?? null)} className={inputCls} />
+          </Field>
         </div>
 
         <Field label="Popis události" required>
@@ -200,12 +212,20 @@ export default function UrazForm({ students, schoolYear, initial }: UrazFormProp
           <SelectField label="Druh činnosti" name="druh_cinnosti" ciselnik={DRUH_CINNOSTI} defaultValue={initial?.druh_cinnosti ?? ''} />
           <SelectField label="Místo úrazu" name="misto_urazu" ciselnik={MISTO_URAZU} defaultValue={initial?.misto_urazu ?? ''} />
           <SelectField label="Preventivní opatření školy" name="prevence" ciselnik={PREVENCE} defaultValue={initial?.prevence ?? ''} />
+          <SelectField label="Věc, kterou bylo zranění způsobeno" name="vec_zraneni" ciselnik={VEC_ZRANENI} defaultValue={initial?.vec_zraneni ?? ''} />
           <AnoNeField label="Zavinění zraněného / jiné osoby" name="zavineni" defaultValue={initial?.zavineni ?? ''} />
         </div>
 
-        <Field label="Zdravotnické zařízení (kde byl ošetřen)">
-          <input name="zdravotnicke_zarizeni" defaultValue={initial?.zdravotnicke_zarizeni ?? ''} className={inputCls} />
-        </Field>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <AnoNeField label="Úraz způsoben / ovlivněn jinou osobou?" name="jina_osoba" defaultValue={initial?.jina_osoba ?? ''} />
+          <Field label="Jméno osoby, která úraz způsobila / ovlivnila">
+            <input name="jina_osoba_jmeno" defaultValue={initial?.jina_osoba_jmeno ?? ''} className={inputCls} />
+          </Field>
+          <AnoNeField label="Spolupůsobení přírodních živlů / zvířat?" name="zivly_zvirata" defaultValue={initial?.zivly_zvirata ?? ''} />
+          <Field label="Zdravotnické zařízení (kde byl ošetřen)">
+            <input name="zdravotnicke_zarizeni" defaultValue={initial?.zdravotnicke_zarizeni ?? ''} className={inputCls} />
+          </Field>
+        </div>
       </Section>
 
       {/* Svědci, dohled, sepsání */}
@@ -245,6 +265,9 @@ export default function UrazForm({ students, schoolYear, initial }: UrazFormProp
           <Checkbox name="narok_nahrada" defaultChecked={initial?.narok_nahrada ?? false} label="Pravděpodobný nárok na náhradu za bolest / ztížení společenského uplatnění" />
           <Checkbox name="na_zadost" defaultChecked={false} label="Záznam vyhotoven na žádost (ZZ / zletilý žák / pojišťovna)" />
         </div>
+        <Field label="Datum úmrtí (jen u smrtelného úrazu)">
+          <input type="date" name="datum_umrti" defaultValue={initial?.datum_umrti ?? ''} className={`${inputCls} sm:w-56`} />
+        </Field>
         <Field label="Interní poznámka">
           <textarea name="poznamka" rows={2} defaultValue={initial?.poznamka ?? ''} className={`${inputCls} resize-y`} />
         </Field>

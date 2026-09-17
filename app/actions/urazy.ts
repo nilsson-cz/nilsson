@@ -17,7 +17,10 @@
 
 import { createSupabaseServerClient as createServerClient } from '@/lib/supabase-server'
 import { CURRENT_SCHOOL_YEAR } from '@/lib/config'
-import { shouldBeZaznam, ciselnikLabel, CAST_TELA, type UrazZaznam } from '@/lib/urazy'
+import { shouldBeZaznam, ciselnikLabel, formatPoradove, CAST_TELA, type UrazZaznam } from '@/lib/urazy'
+import { buildZaznamAnswers, CSI_B02_PRIJATO } from '@/lib/urazy-csi'
+import { CsiUrazApiClient } from '@/lib/urazy-csi-client'
+import type { Json } from '@/types/database'
 import { Resend } from 'resend'
 import { revalidatePath } from 'next/cache'
 
@@ -92,12 +95,14 @@ function parseUrazFields(fd: FormData) {
     zraneny_prijmeni: str(fd, 'zraneny_prijmeni') ?? '',
     zraneny_datum_narozeni: str(fd, 'zraneny_datum_narozeni'),
     zraneny_rocnik: int(fd, 'zraneny_rocnik'),
+    trida: str(fd, 'trida'),
     zraneny_ulice: str(fd, 'zraneny_ulice'),
     zraneny_psc: str(fd, 'zraneny_psc'),
     zraneny_obec: str(fd, 'zraneny_obec'),
 
     // Snapshot ZZ
     zz_jmeno: str(fd, 'zz_jmeno'),
+    zz_jina_adresa: str(fd, 'zz_jina_adresa'),
     zz_ulice: str(fd, 'zz_ulice'),
     zz_psc: str(fd, 'zz_psc'),
     zz_obec: str(fd, 'zz_obec'),
@@ -105,7 +110,10 @@ function parseUrazFields(fd: FormData) {
     // Úraz a okolnosti
     datum_cas: ts(fd, 'datum_cas'),
     zz_vyrozumen: str(fd, 'zz_vyrozumen'),
+    zz_vyrozumen_datum_cas: ts(fd, 'zz_vyrozumen_datum_cas'),
+    zz_vyrozumen_zpusob: str(fd, 'zz_vyrozumen_zpusob'),
     smrtelny,
+    datum_umrti: str(fd, 'datum_umrti'),
     zdravotnicke_zarizeni: str(fd, 'zdravotnicke_zarizeni'),
     popis_udalosti: str(fd, 'popis_udalosti'),
     cast_tela: str(fd, 'cast_tela'),
@@ -114,6 +122,10 @@ function parseUrazFields(fd: FormData) {
     misto_urazu: str(fd, 'misto_urazu'),
     prevence: str(fd, 'prevence'),
     zavineni: str(fd, 'zavineni'),
+    vec_zraneni: str(fd, 'vec_zraneni'),
+    jina_osoba: str(fd, 'jina_osoba'),
+    jina_osoba_jmeno: str(fd, 'jina_osoba_jmeno'),
+    zivly_zvirata: str(fd, 'zivly_zvirata'),
 
     // Svědci, dohled, sepsání
     svedek1: str(fd, 'svedek1'),
@@ -357,6 +369,65 @@ export async function confirmOdeslanoCsi(id: string): Promise<SimpleActionResult
   return { success: true }
 }
 
+export type CsiOdeslaniResult =
+  | { success: true; a01id: number }
+  | { success: false; error: string }
+
+/**
+ * Fáze 2: přímé odeslání záznamu do ČŠI / InspIS DATA přes REST API
+ * (CsiUrazApiClient). Sestaví odpovědi z aktuálního záznamu, projede workflow
+ * (CreateInline → SaveAnswers → RunWorkflowStep 359) a uloží identifikátory ČŠI.
+ * Při chybě (vč. chybějícího oprávnění ke kroku) vrací hlášku z ČŠI a stav se
+ * nemění — ruční potvrzení (confirmOdeslanoCsi) zůstává jako záloha.
+ */
+export async function odeslatCsi(id: string): Promise<CsiOdeslaniResult> {
+  const supabase = await createServerClient()
+  const staff = await getCurrentStaff()
+  if (!staff) return { success: false, error: 'Nepřihlášený uživatel.' }
+
+  const { data: z } = await supabase.from('urazy_zaznam').select('*').eq('id', id).single<UrazZaznam>()
+  if (!z) return { success: false, error: 'Záznam nenalezen.' }
+  if (z.odeslano_csi_at) return { success: false, error: 'Záznam už byl odeslán do ČŠI.' }
+
+  const answers = buildZaznamAnswers(z)
+
+  let result: { a01ID: number; a11ID: number }
+  try {
+    const client = new CsiUrazApiClient()
+    result = await client.submitZaznam(answers, `Nilsson IS – ${formatPoradove(z.poradove_cislo, z.skolni_rok)}`)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Neznámá chyba při odeslání do ČŠI.'
+    console.error('[urazy odeslatCsi]', msg)
+    return { success: false, error: msg }
+  }
+
+  const { error } = await supabase
+    .from('urazy_zaznam')
+    .update({
+      stav: 'odeslano_csi',
+      csi_stav: 'prijato',
+      csi_zaznam_id: String(result.a01ID),
+      csi_a01id: result.a01ID,
+      csi_a11id: result.a11ID,
+      csi_b02id: CSI_B02_PRIJATO,
+      csi_payload: answers as unknown as Json,
+      odeslano_csi_at: new Date().toISOString(),
+      odeslano_csi_by: staff.id,
+    })
+    .eq('id', id)
+
+  if (error) {
+    return {
+      success: false,
+      error: `Záznam byl odeslán do ČŠI (č. ${result.a01ID}), ale uložení stavu v IS selhalo: ${error.message}`,
+    }
+  }
+
+  revalidatePath(`/dashboard/urazy/${id}`)
+  revalidatePath('/dashboard/urazy')
+  return { success: true, a01id: result.a01ID }
+}
+
 /** Ruční označení, že ZZ byl informován (např. telefonicky) — bez odeslání e-mailu. */
 export async function setZzNotifikovan(id: string): Promise<SimpleActionResult> {
   const supabase = await createServerClient()
@@ -495,6 +566,7 @@ export async function addAktualizace(
     nahrada_bolest: triBool('nahrada_bolest'),
     nahrada_zsu: triBool('nahrada_zsu'),
     smrtelny: triBool('smrtelny'),
+    datum_umrti: str(formData, 'datum_umrti'),
     dohled_nadrizeny_jmeno: str(formData, 'dohled_nadrizeny_jmeno'),
     dohled_nadrizeny_funkce: str(formData, 'dohled_nadrizeny_funkce'),
     poznamka: str(formData, 'poznamka'),

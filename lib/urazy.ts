@@ -86,6 +86,25 @@ export const ANO_NE: Ciselnik = [
   { key: 'ne', label: 'ne' },
 ] as const
 
+/** Způsob vyrozumění zákonného zástupce (pole 205974, InspIS 2026). */
+export const ZPUSOB_VYROZUMENI: Ciselnik = [
+  { key: 'osobne', label: 'osobně' },
+  { key: 'telefonicky', label: 'telefonicky' },
+  { key: 'dopisem', label: 'dopisem' },
+  { key: 'email', label: 'e-mailem' },
+  { key: 'jinak', label: 'jinak' },
+  { key: 'sis', label: 'prostřednictvím školského informačního systému' },
+] as const
+
+/** Věc, kterou bylo zranění bezprostředně způsobeno (pole 205984, InspIS 2026). */
+export const VEC_ZRANENI: Ciselnik = [
+  { key: 'pracovni_naradi', label: 'pracovní nářadí' },
+  { key: 'sportovni_nacini', label: 'sportovní náčiní' },
+  { key: 'ucebni_pomucka', label: 'učební pomůcka' },
+  { key: 'osobni_vec', label: 'osobní věc' },
+  { key: 'jine', label: 'jiné' },
+] as const
+
 /** Stav workflow záznamu (zrcadlí sloupec urazy_zaznam.stav). */
 export const URAZ_STAV = {
   rozepsany: 'Rozepsaný',
@@ -111,18 +130,23 @@ export interface UrazZaznam {
   zraneny_prijmeni: string
   zraneny_datum_narozeni: string | null
   zraneny_rocnik: number | null
+  trida: string | null
   zraneny_ulice: string | null
   zraneny_psc: string | null
   zraneny_obec: string | null
 
   zz_jmeno: string | null
+  zz_jina_adresa: string | null
   zz_ulice: string | null
   zz_psc: string | null
   zz_obec: string | null
 
   datum_cas: string | null
   zz_vyrozumen: string | null
+  zz_vyrozumen_datum_cas: string | null
+  zz_vyrozumen_zpusob: string | null
   smrtelny: boolean
+  datum_umrti: string | null
   zdravotnicke_zarizeni: string | null
   popis_udalosti: string | null
   cast_tela: string | null
@@ -131,6 +155,10 @@ export interface UrazZaznam {
   misto_urazu: string | null
   prevence: string | null
   zavineni: string | null
+  vec_zraneni: string | null
+  jina_osoba: string | null
+  jina_osoba_jmeno: string | null
+  zivly_zvirata: string | null
 
   svedek1: string | null
   svedci_dalsi: unknown | null
@@ -152,6 +180,9 @@ export interface UrazZaznam {
   csi_zaznam_id: string | null
   csi_stav: string | null
   csi_payload: unknown | null
+  csi_a01id: number | null
+  csi_a11id: number | null
+  csi_b02id: number | null
   odeslano_csi_at: string | null
   odeslano_csi_by: string | null
 
@@ -170,6 +201,7 @@ export interface UrazAktualizace {
   nahrada_bolest: boolean | null
   nahrada_zsu: boolean | null
   smrtelny: boolean | null
+  datum_umrti: string | null
   dohled_nadrizeny_jmeno: string | null
   dohled_nadrizeny_funkce: string | null
   poznamka: string | null
