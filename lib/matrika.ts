@@ -15,3 +15,38 @@ export async function callMatrikaSetRocnik(
   const { error } = await supabase.rpc('matrika_set_rocnik', args)
   return { error: error ? { message: String(error.message ?? 'RPC selhalo') } : null }
 }
+
+// -----------------------------------------------------------------------------
+// Ukončení docházky / přestup ven (migrace 114).
+// -----------------------------------------------------------------------------
+
+export type FuturePaymentObligation = {
+  obligation_id: string
+  popis: string
+  amount: number
+  matched_amount: number
+  paid: boolean
+  due_date: string
+  school_year: string
+}
+
+/** Read-only náhled budoucích předpisů žáka + příznak zaplaceno. */
+export async function fetchFuturePaymentObligations(
+  supabase: ServerClient,
+  args: { p_student_id: string; p_last_day: string }
+): Promise<{ data: FuturePaymentObligation[]; error: { message: string } | null }> {
+  const { data, error } = await supabase.rpc('matrika_future_payment_obligations', args)
+  return {
+    data: (data as FuturePaymentObligation[] | null) ?? [],
+    error: error ? { message: String(error.message ?? 'RPC selhalo') } : null,
+  }
+}
+
+/** Zápisová kaskáda ukončení docházky. Director-only, idempotentní. */
+export async function callMatrikaWithdrawStudent(
+  supabase: ServerClient,
+  args: { p_student_id: string; p_last_day: string; p_reason: string; p_target_izo: string }
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc('matrika_withdraw_student', args)
+  return { error: error ? { message: String(error.message ?? 'RPC selhalo') } : null }
+}
