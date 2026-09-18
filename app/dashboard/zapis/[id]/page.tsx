@@ -10,10 +10,13 @@ import {
   getEnrollmentApplicationDetail,
   getEnrollmentGuardians,
   getEnrollmentDecisions,
+  odvodRokZapisuZDatumu,
 } from '@/lib/enrollment/dashboard-queries'
 import { STAV_LABELS, STAV_VARIANT, VEKOVA_KATEGORIE_LABELS, type EnrollmentVekovaKategorie, type EnrollmentStav } from '@/lib/enrollment/types'
-import { ROZHODNUTI_LABELS, dostupneAkce } from '@/lib/enrollment/rozhodnuti'
+import { ROZHODNUTI_LABELS, dostupneAkce, type EnrollmentRozhodnuti } from '@/lib/enrollment/rozhodnuti'
+import { dostupneDokumenty, predRozhodnutimDokumenty } from '@/lib/enrollment/dokumenty'
 import DecisionForm from './_components/DecisionForm'
+import DokumentyPanel from './_components/DokumentyPanel'
 
 export const metadata = { title: 'Detail žádosti — IS Nilsson' }
 export const dynamic = 'force-dynamic'
@@ -46,7 +49,7 @@ export default async function ZapisDetailPage({
     .select('role')
     .eq('user_id', user!.id)
     .maybeSingle()
-  const isDirector = (staffRaw as any)?.role === 'director'
+  const isDirector = (staffRaw as { role?: string } | null)?.role === 'director'
 
   if (!isDirector) {
     return (
@@ -69,6 +72,24 @@ export default async function ZapisDetailPage({
   const owner = guardians.find((g) => g.role_v_zadosti === 'vlastnik')
   const coGuardians = guardians.filter((g) => g.role_v_zadosti !== 'vlastnik')
   const akce = dostupneAkce(app.stav, app.typ)
+  const posledniRozhodnuti = (decisions[0]?.rozhodnuti as EnrollmentRozhodnuti | undefined) ?? null
+  const dokumenty = [
+    ...dostupneDokumenty(app.typ, posledniRozhodnuti),
+    ...predRozhodnutimDokumenty(app.typ, app.stav as EnrollmentStav),
+  ]
+  // Prefill pro odklad: nástup posunutý o rok proti roku zápisu.
+  const rokZapisu = odvodRokZapisuZDatumu(app.created_at)
+  const dokumentyPrefill = {
+    dosavadniSkola: app.soucasna_skola || app.dosavadni_skola || '',
+    cilovySkolniRok: decisions[0]?.cilovy_school_year || `${rokZapisu + 1}/${rokZapisu + 2}`,
+    datumNastupuText: decisions[0]?.datum_nastupu
+      ? formatDate(decisions[0].datum_nastupu)
+      : `1. září ${rokZapisu + 1}`,
+    skolniRok: decisions[0]?.cilovy_school_year || `${rokZapisu}/${rokZapisu + 1}`,
+    zastaveniDuvod: (posledniRozhodnuti === 'nedostavili_se' ? 'bezpredmetna' : 'zpetvzeti') as
+      | 'zpetvzeti'
+      | 'bezpredmetna',
+  }
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -99,6 +120,9 @@ export default async function ZapisDetailPage({
 
       {/* Rozhodnutí */}
       <DecisionForm applicationId={app.id} dostupneRozhodnuti={akce} />
+
+      {/* Dokumenty ke stažení — dle výsledku rozhodnutí (director-only) */}
+      <DokumentyPanel applicationId={app.id} nabidka={dokumenty} prefill={dokumentyPrefill} />
 
       {/* Nápověda k odkladu — legislativní práh */}
       {(app.melo_odklad || app.vekova_kategorie === 'po_odkladu' || app.vyzaduje_ppp) && (
