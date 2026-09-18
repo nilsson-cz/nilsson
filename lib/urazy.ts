@@ -115,7 +115,7 @@ export const URAZ_STAV = {
 export type UrazStav = keyof typeof URAZ_STAV
 
 // ---------------------------------------------------------------------------
-// Řádkové typy (než doběhne `npm run db:types`, čte se přes (supabase as any))
+// Řádkové typy (než doběhne `npm run db:types`, čte se přes cast supabase→any)
 // ---------------------------------------------------------------------------
 
 export interface UrazZaznam {

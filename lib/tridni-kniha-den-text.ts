@@ -26,7 +26,7 @@ function cas(t: string): string {
 
 /**
  * Načte bloky napojené na daný denní záznam (mimo zrušené), seřazené dle času.
- * `supabase as any` — rozvrh_blok.tridni_zaznam_id není v generovaných typech.
+ * cast `supabase`→`any` — rozvrh_blok.tridni_zaznam_id není v generovaných typech.
  */
 export async function nactiBlokyProZaznam(
   supabase: any,
