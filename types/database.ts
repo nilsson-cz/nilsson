@@ -6458,12 +6458,33 @@ export type Database = {
         Args: { p_menu_date: string; p_ordered: boolean; p_student_id: string }
         Returns: undefined
       }
+      matrika_future_payment_obligations: {
+        Args: { p_last_day: string; p_student_id: string }
+        Returns: {
+          amount: number
+          due_date: string
+          matched_amount: number
+          obligation_id: string
+          paid: boolean
+          popis: string
+          school_year: string
+        }[]
+      }
       matrika_set_rocnik: {
         Args: {
           p_new_rocnik: number
           p_reason: string
           p_student_id: string
           p_valid_from: string
+        }
+        Returns: undefined
+      }
+      matrika_withdraw_student: {
+        Args: {
+          p_last_day: string
+          p_reason: string
+          p_student_id: string
+          p_target_izo: string
         }
         Returns: undefined
       }

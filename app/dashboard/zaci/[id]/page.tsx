@@ -7,6 +7,7 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { NEXT_SCHOOL_YEAR } from '@/lib/config'
 import StudentConsentNotice from '@/app/dashboard/_components/StudentConsentNotice'
+import WithdrawStudentButton from './_components/WithdrawStudentButton'
 
 function formatDate(date: string | null | undefined): string {
   if (!date) return '—'
@@ -60,6 +61,7 @@ export default async function ZakDetailPage({
 
   const staff = staffRaw as any
   const isDirectorOrVp = staff.role === 'director' || staff.role === 'vp'
+  const isDirector = staff.role === 'director'
 
   // 1. Základní data žáka
   const { data: student, error: studentError } = await supabase
@@ -213,6 +215,9 @@ export default async function ZakDetailPage({
             >
               Katalogový list → PDF
             </a>
+          )}
+          {isDirector && s.status === 'active' && (
+            <WithdrawStudentButton studentId={id} studentName={fullName} />
           )}
         </div>
       </div>
