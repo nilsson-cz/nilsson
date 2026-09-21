@@ -145,6 +145,68 @@ eq('Pá datum = 4. 9.', fw.days[3].menu_date, '2026-09-04');
 eq('week_start kotveno na pondělí 31. 8.', fw.days[0].week_start, '2026-08-31');
 eq('week_end = pátek 4. 9.', fw.days[0].week_end, '2026-09-04');
 
+// Dva datované týdny na stránce (reálná podoba ze září 2026): aktuální týden je
+// skoro prázdný (jen pátek), příští týden je plný. Dřív se oba slily do jednoho
+// (posun dat o týden + duplicitní pátek → pád upsertu). Musí vzniknout 6 dní:
+// pátek 18.9. + celý týden 21.–25.9., každý pod SPRÁVNÝM datem.
+console.log('parseMenuText — dva datované týdny (aktuální skoro prázdný + příští plný):');
+const TWO_WEEKS = `
+Jídelní lístek
+Jídelní lístek 14.9. - 18.9.
+Pondělí
+- polévka
+Úterý
+polévka
+Středa
+- polévka
+Čtvrtek
+- polévka
+Pátek
+- polévka cizrnová 1,9
+1. těstoviny ala lasagne 1,3,7
+2. zapečená treska se sýrem a jogurtem, bramborová kaše, salát 4,7
+3. žampiónový bulgur, okurka
+Jídelní lístek 21.9. - 25.9.
+Pondělí
+- polévka kulajda 1,3,7,9
+1. halušky s uzeným masem a zelím 1,3
+2. krůtí játra na cibulce, rýže 1
+3. vločková kaše s jahodami 1,7
+Úterý
+- polévka marocká s červenou čočkou 9
+1. holandský řízek, brambory, salát 1,3,7
+2. kuřecí závitek, rýže 1,10
+3. špagety Frittata 1,3,7
+Středa
+- polévka hov.vývar s tarhoňou 1,9
+1. hov.maso, žampiónová omáčka, houskové knedlíky 1,3,7
+2. mahi-mahi s hořč.omáčkou, opečené brambory, salát 4,7,10
+3. penne s cherry rajčátky a parmazánem 1,3,7
+Čtvrtek
+- polévka bramboračka 1,9
+1. lívanečky se skořicí, kakao 1,3,7
+2. vepřové po sečuánsku, rýže 6
+3. hrachová kaše, opečená uzenina, okurka 1,7
+Pátek
+- polévka pórková 1,3,7,9
+1. hovězí Stroganov, bramborové placky 1,3,7
+2. šunkový závitek se zeleninou, bramborová kaše, salát 3,7
+3. sýrové špecle s restovanou cibulkou 1,3,7
+Nepřehlédněte
+75 let SPŠ Teplice
+`;
+const tw = parseMenuText(TWO_WEEKS, new Date(2026, 8, 20)); // 20. 9. 2026
+eq('6 dní (pátek 18.9. + celý týden 21.–25.9.)', tw.days.length, 6);
+eq('žádné varování (jeden týden je plný, polévky jsou)', tw.warnings, []);
+eq('první den = pátek 18.9. (z prvního bloku)', tw.days[0].menu_date, '2026-09-18');
+eq('pátek 18.9. má 3 volby (ne 6 → týdny se neslily)', tw.days[0].items.length, 3);
+eq('pátek 18.9. kotven na svůj týden', tw.days[0].week_start, '2026-09-14');
+eq('pondělí příštího týdne = 21.9. (ne 14.9.)', tw.days[1].menu_date, '2026-09-21');
+eq('pondělí 21.9. polévka', tw.days[1].soup, 'polévka kulajda');
+eq('pátek příštího týdne = 25.9.', tw.days[5].menu_date, '2026-09-25');
+eq('pátek 25.9. má 3 volby', tw.days[5].items.length, 3);
+eq('každý den právě 3 volby (žádné zdvojení)', tw.days.map((d) => d.items.length), [3, 3, 3, 3, 3, 3]);
+
 console.log('');
 if (failures) {
   console.error(`❌ ${failures} test(ů) selhalo`);

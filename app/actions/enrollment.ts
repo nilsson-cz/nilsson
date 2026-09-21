@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import type { Database } from '@/types/database'
 import { notifyDiscord } from '@/lib/discord'
 import { sendGuardianInvite } from '@/lib/enrollment/send-guardian-invite'
 import type {
@@ -385,6 +386,13 @@ export interface SaveOwnerInput {
     psc: string
     ruian_kod: string
   } | null
+  adresaKontaktni?: {
+    obec: string
+    ulice?: string | null
+    cislo: string
+    psc: string
+    ruian_kod: string
+  } | null
 }
 
 export async function saveEnrollmentOwner(
@@ -403,6 +411,7 @@ export async function saveEnrollmentOwner(
 
   const now = new Date().toISOString()
   const maAdresu = !!input.adresa?.ruian_kod
+  const maKontaktni = !!input.adresaKontaktni?.ruian_kod
 
   const { error } = await supabase
     .from('enrollment_guardians')
@@ -418,6 +427,12 @@ export async function saveEnrollmentOwner(
       address_psc: maAdresu ? input.adresa!.psc : null,
       address_ruian_kod: maAdresu ? input.adresa!.ruian_kod : null,
       address_validated_at: maAdresu ? now : null,
+      address_kontaktni_obec: maKontaktni ? input.adresaKontaktni!.obec : null,
+      address_kontaktni_ulice: maKontaktni ? (input.adresaKontaktni!.ulice || null) : null,
+      address_kontaktni_cislo: maKontaktni ? input.adresaKontaktni!.cislo : null,
+      address_kontaktni_psc: maKontaktni ? input.adresaKontaktni!.psc : null,
+      address_kontaktni_ruian_kod: maKontaktni ? input.adresaKontaktni!.ruian_kod : null,
+      address_kontaktni_validated_at: maKontaktni ? now : null,
     })
     .eq('id', guard.ownerGuardianId)
 
@@ -611,13 +626,47 @@ export async function linkSecondGuardianSelf(
 
 // Potvrzení žádosti druhým zástupcem — obyčejný UPDATE, RLS už v tuhle
 // chvíli propouští (auth_user_id byl nastaven výše přes RPC 044).
-export async function confirmSecondGuardian(guardianId: string): Promise<EnrollmentResult> {
+type AdresaInput = { obec: string; ulice?: string | null; cislo: string; psc: string; ruian_kod: string }
+
+export interface ConfirmSecondGuardianInput {
+  adresa?: AdresaInput | null
+  adresaKontaktni?: AdresaInput | null
+}
+
+export async function confirmSecondGuardian(
+  guardianId: string,
+  input?: ConfirmSecondGuardianInput,
+): Promise<EnrollmentResult> {
   const { supabase, user } = await requireUser()
   if (!user) return { success: false, error: 'Nejste přihlášeni.' }
 
+  const now = new Date().toISOString()
+  const patch: Database['public']['Tables']['enrollment_guardians']['Update'] = {
+    stav: 'potvrzeno',
+    potvrzeno_at: now,
+  }
+
+  // Adresa druhého zástupce (§9 Q1) — vyplní se při potvrzení účasti.
+  if (input) {
+    const maAdresu = !!input.adresa?.ruian_kod
+    const maKontaktni = !!input.adresaKontaktni?.ruian_kod
+    patch.address_obec = maAdresu ? input.adresa!.obec : null
+    patch.address_ulice = maAdresu ? input.adresa!.ulice || null : null
+    patch.address_cislo = maAdresu ? input.adresa!.cislo : null
+    patch.address_psc = maAdresu ? input.adresa!.psc : null
+    patch.address_ruian_kod = maAdresu ? input.adresa!.ruian_kod : null
+    patch.address_validated_at = maAdresu ? now : null
+    patch.address_kontaktni_obec = maKontaktni ? input.adresaKontaktni!.obec : null
+    patch.address_kontaktni_ulice = maKontaktni ? input.adresaKontaktni!.ulice || null : null
+    patch.address_kontaktni_cislo = maKontaktni ? input.adresaKontaktni!.cislo : null
+    patch.address_kontaktni_psc = maKontaktni ? input.adresaKontaktni!.psc : null
+    patch.address_kontaktni_ruian_kod = maKontaktni ? input.adresaKontaktni!.ruian_kod : null
+    patch.address_kontaktni_validated_at = maKontaktni ? now : null
+  }
+
   const { error } = await supabase
     .from('enrollment_guardians')
-    .update({ stav: 'potvrzeno', potvrzeno_at: new Date().toISOString() })
+    .update(patch)
     .eq('id', guardianId)
     .eq('auth_user_id', user.id)
 

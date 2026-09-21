@@ -341,6 +341,69 @@ export type Database = {
           },
         ]
       }
+      addresses: {
+        Row: {
+          cislo: string
+          country: string
+          created_at: string
+          guardian_id: string | null
+          id: string
+          obec: string
+          psc: string
+          ruian_kod: string | null
+          student_id: string | null
+          typ: Database["public"]["Enums"]["address_typ"]
+          ulice: string | null
+          updated_at: string
+          validated_at: string | null
+        }
+        Insert: {
+          cislo: string
+          country?: string
+          created_at?: string
+          guardian_id?: string | null
+          id?: string
+          obec: string
+          psc: string
+          ruian_kod?: string | null
+          student_id?: string | null
+          typ: Database["public"]["Enums"]["address_typ"]
+          ulice?: string | null
+          updated_at?: string
+          validated_at?: string | null
+        }
+        Update: {
+          cislo?: string
+          country?: string
+          created_at?: string
+          guardian_id?: string | null
+          id?: string
+          obec?: string
+          psc?: string
+          ruian_kod?: string | null
+          student_id?: string | null
+          typ?: Database["public"]["Enums"]["address_typ"]
+          ulice?: string | null
+          updated_at?: string
+          validated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "addresses_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "addresses_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance_records: {
         Row: {
           absence_request_id: string | null
@@ -1941,6 +2004,12 @@ export type Database = {
       enrollment_guardians: {
         Row: {
           address_cislo: string | null
+          address_kontaktni_cislo: string | null
+          address_kontaktni_obec: string | null
+          address_kontaktni_psc: string | null
+          address_kontaktni_ruian_kod: string | null
+          address_kontaktni_ulice: string | null
+          address_kontaktni_validated_at: string | null
           address_obec: string | null
           address_psc: string | null
           address_ruian_kod: string | null
@@ -1965,6 +2034,12 @@ export type Database = {
         }
         Insert: {
           address_cislo?: string | null
+          address_kontaktni_cislo?: string | null
+          address_kontaktni_obec?: string | null
+          address_kontaktni_psc?: string | null
+          address_kontaktni_ruian_kod?: string | null
+          address_kontaktni_ulice?: string | null
+          address_kontaktni_validated_at?: string | null
           address_obec?: string | null
           address_psc?: string | null
           address_ruian_kod?: string | null
@@ -1989,6 +2064,12 @@ export type Database = {
         }
         Update: {
           address_cislo?: string | null
+          address_kontaktni_cislo?: string | null
+          address_kontaktni_obec?: string | null
+          address_kontaktni_psc?: string | null
+          address_kontaktni_ruian_kod?: string | null
+          address_kontaktni_ulice?: string | null
+          address_kontaktni_validated_at?: string | null
           address_obec?: string | null
           address_psc?: string | null
           address_ruian_kod?: string | null
@@ -6564,6 +6645,7 @@ export type Database = {
       zrusit_potvrzeni_blok: { Args: { p_blok_id: string }; Returns: undefined }
     }
     Enums: {
+      address_typ: "trvale" | "kontaktni"
       alert_severity: "info" | "warning" | "critical"
       contract_type: "enrollment" | "amendment" | "termination"
       dokument_smer: "prijaty" | "odchozi" | "vlastni"
@@ -7073,6 +7155,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      address_typ: ["trvale", "kontaktni"],
       alert_severity: ["info", "warning", "critical"],
       contract_type: ["enrollment", "amendment", "termination"],
       dokument_smer: ["prijaty", "odchozi", "vlastni"],

@@ -8,6 +8,10 @@ import Link from 'next/link'
 import { NEXT_SCHOOL_YEAR } from '@/lib/config'
 import StudentConsentNotice from '@/app/dashboard/_components/StudentConsentNotice'
 import WithdrawStudentButton from './_components/WithdrawStudentButton'
+import StudijniSmlouvaButton from './_components/StudijniSmlouvaButton'
+import AddressesPanel from './_components/AddressesPanel'
+import { getStudentAddresses, getGuardianAddresses, type AddressRow } from '@/lib/addresses'
+import type { ValidovanaAdresa } from '@/lib/enrollment/types'
 
 function formatDate(date: string | null | undefined): string {
   if (!date) return '—'
@@ -89,16 +93,61 @@ export default async function ZakDetailPage({
   const activeSchoolYear = currentMembership?.school_year ?? NEXT_SCHOOL_YEAR
   const activeGroupId = currentMembership?.group_id ?? null
 
+  // Prefill studijní smlouvy: nástupní ročník → počet zbývajících ročníků
+  // (budoucí prvňák 9), počáteční školní rok = nejstarší zařazení.
+  const { data: eduOldest } = await supabase
+    .from('student_education_mode')
+    .select('rocnik')
+    .eq('student_id', id)
+    .order('valid_from', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  const nastupniRocnik = (eduOldest as { rocnik?: number } | null)?.rocnik ?? 1
+  const smlouvaPocetRocniku = Math.min(Math.max(10 - nastupniRocnik, 1), 9)
+  const membershipsArr = (memberships ?? []) as { school_year?: string }[]
+  const smlouvaSkolniRok = membershipsArr[membershipsArr.length - 1]?.school_year ?? activeSchoolYear
+
   // 3. Zákonní zástupci
   const { data: guardianLinks } = await supabase
     .from('student_guardian_links')
     .select(
-      `role, je_zakonny_zastupce, je_primarni_kontakt, dostava_komunikaci,
+      `role, je_zakonny_zastupce, je_primarni_kontakt, dostava_komunikaci, guardian_id,
        guardians(first_name, last_name, email, phone_primary, phone_secondary, address_street, address_city, address_zip)`
     )
     .eq('student_id', id)
     .is('platnost_do', null)
     .order('je_primarni_kontakt', { ascending: false })
+
+  // Adresy (jednotný model) pro panel editace — jen zákonní zástupci.
+  const rowToValidovana = (a: AddressRow | null): ValidovanaAdresa | null =>
+    a
+      ? {
+          obec: a.obec,
+          ulice: a.ulice,
+          cislo: a.cislo,
+          psc: a.psc,
+          ruian_kod: a.ruian_kod ?? '',
+          validated_at: a.validated_at ?? '',
+        }
+      : null
+  const zzLinks = ((guardianLinks as any[]) ?? []).filter((l) => l.je_zakonny_zastupce && l.guardian_id)
+  const [studAddrPair, guardAddrMap] = await Promise.all([
+    getStudentAddresses(supabase, id),
+    getGuardianAddresses(supabase, zzLinks.map((l) => l.guardian_id as string)),
+  ])
+  const studentAdresy = {
+    trvale: rowToValidovana(studAddrPair.trvale),
+    kontaktni: rowToValidovana(studAddrPair.kontaktni),
+  }
+  const guardiani = zzLinks.map((l) => {
+    const pair = guardAddrMap.get(l.guardian_id as string)
+    return {
+      id: l.guardian_id as string,
+      jmeno: [l.guardians?.first_name, l.guardians?.last_name].filter(Boolean).join(' ') || 'Zástupce',
+      trvale: rowToValidovana(pair?.trvale ?? null),
+      kontaktni: rowToValidovana(pair?.kontaktni ?? null),
+    }
+  })
 
   // 4. BOZP status
   const { data: bozpZaznamy } = await supabase
@@ -216,6 +265,13 @@ export default async function ZakDetailPage({
               Katalogový list → PDF
             </a>
           )}
+          {isDirector && (
+            <StudijniSmlouvaButton
+              studentId={id}
+              defaultPocetRocniku={smlouvaPocetRocniku}
+              defaultSkolniRok={smlouvaSkolniRok}
+            />
+          )}
           {isDirector && s.status === 'active' && (
             <WithdrawStudentButton studentId={id} studentName={fullName} />
           )}
@@ -311,6 +367,11 @@ export default async function ZakDetailPage({
           </div>
         )}
       </Section>
+
+      {/* Adresy (jednotný model) — editace ředitel/VP */}
+      {isDirectorOrVp && (
+        <AddressesPanel studentId={id} studentAdresy={studentAdresy} guardiani={guardiani} />
+      )}
 
       {/* Osobní dotazník — jen personál mimo readonly */}
       {!isReadonly && (
