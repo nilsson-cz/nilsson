@@ -2,7 +2,16 @@ import { redirect, notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { linkSecondGuardianSelf } from '@/app/actions/enrollment'
 import ConfirmSecondGuardian from './ConfirmSecondGuardian'
-import { STAV_LABELS, STAV_VARIANT, GUARDIAN_ROLE_LABELS, type EnrollmentStav, type GuardianRole } from '@/lib/enrollment/types'
+import { STAV_LABELS, STAV_VARIANT, GUARDIAN_ROLE_LABELS, type EnrollmentStav, type GuardianRole, type ValidovanaAdresa } from '@/lib/enrollment/types'
+
+// Rekonstrukce ValidovanaAdresa z DB polí (jako adrZDb ve wizardu).
+function adrZDb(
+  obec: string | null, ulice: string | null, cislo: string | null,
+  psc: string | null, ruian_kod: string | null,
+): ValidovanaAdresa | null {
+  if (!ruian_kod || !obec || !cislo || !psc) return null
+  return { obec, ulice, cislo, psc, ruian_kod, validated_at: '' }
+}
 
 // app/zapis/pripojit/[guardianId]/page.tsx
 // Cíl pozvánky pro druhého zákonného zástupce (e-mail z sendGuardianInvite,
@@ -53,7 +62,7 @@ export default async function PripojitPage({
   // RLS teď (po úspěšném napojení) dovolí číst vlastní řádek i žádost.
   const { data: guardian } = await supabase
     .from('enrollment_guardians')
-    .select('id, application_id, first_name, last_name, email, stav, pribuzensky_vztah')
+    .select('id, application_id, first_name, last_name, email, stav, pribuzensky_vztah, address_obec, address_ulice, address_cislo, address_psc, address_ruian_kod, address_kontaktni_obec, address_kontaktni_ulice, address_kontaktni_cislo, address_kontaktni_psc, address_kontaktni_ruian_kod')
     .eq('id', guardianId)
     .maybeSingle()
 
@@ -135,7 +144,13 @@ export default async function PripojitPage({
         </div>
       </div>
 
-      <ConfirmSecondGuardian guardianId={guardian.id} stav={guardian.stav as any} appId={guardian.application_id} />
+      <ConfirmSecondGuardian
+        guardianId={guardian.id}
+        stav={guardian.stav as 'pozvan' | 'zaregistrovan' | 'potvrzeno'}
+        appId={guardian.application_id}
+        initialAdresa={adrZDb(guardian.address_obec, guardian.address_ulice, guardian.address_cislo, guardian.address_psc, guardian.address_ruian_kod)}
+        initialKontaktni={adrZDb(guardian.address_kontaktni_obec, guardian.address_kontaktni_ulice, guardian.address_kontaktni_cislo, guardian.address_kontaktni_psc, guardian.address_kontaktni_ruian_kod)}
+      />
     </div>
   )
 }

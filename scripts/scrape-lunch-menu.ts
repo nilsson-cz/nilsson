@@ -148,31 +148,21 @@ export interface ParseResult {
 }
 
 /**
- * Naparsuje textovou podobu stránky. Stavový automat:
- *  - kotvou je první řádek s rozsahem týdne (díky tomu se přeskočí navigace,
- *    kde jsou taky odkazy „Jídelní lístek“, ale bez data),
- *  - parsuje do dalšího holého nadpisu „Jídelní lístek“ (= prázdná šablona
- *    příštího týdne) nebo do sekce „Nepřehlédněte“,
- *  - do výsledku jdou jen dny s ≥1 položkou (další obrana proti šabloně).
+ * Naparsuje JEDEN blok jednoho týdne (řádky od jeho záhlaví „DD.M. – DD.M.“ dál,
+ * po další záhlaví / holou šablonu / „Nepřehlédněte“). Stavový automat:
+ *  - kotví na PONDĚLÍ ISO týdne obsahujícího začátek ze záhlaví — dny jsou vždy
+ *    indexované Po=0..Pá=4, ale záhlaví („1.9. – 4.9.") nemusí začínat pondělím
+ *    (první školní týden, týden po svátku…); bez ukotvení na pondělí by se
+ *    všechny datumy posunuly o rozdíl (bug: week_start=úterý → menu_date +1 den),
+ *  - holá šablona „Jídelní lístek“ i sekce „Nepřehlédněte“ blok ukončí,
+ *  - do výsledku jdou jen dny s ≥1 položkou (obrana proti prázdné šabloně).
  */
-export function parseMenuText(text: string, now: Date = new Date()): ParseResult {
-  const warnings: string[] = [];
-  const lines = text
-    .split(/\r?\n/)
-    .map((l) => l.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim())
-    .filter(Boolean);
-
-  const anchorIdx = lines.findIndex((l) => WEEK_RE.test(l));
-  if (anchorIdx === -1) {
-    throw new Error('Nenalezena hlavička týdne (rozsah dat) – změna šablony?');
-  }
-
-  const hm = lines[anchorIdx].match(WEEK_RE)!;
+function parseWeekBlock(
+  lines: string[],
+  now: Date,
+): { week: ParsedWeek; days: MenuDay[] } {
+  const hm = lines[0].match(WEEK_RE)!;
   const week = inferWeek(+hm[1], +hm[2], +hm[3], +hm[4], now);
-  // Dny jsou vždy indexované Po=0..Pá=4, ale záhlaví („1.9. – 4.9.") nemusí
-  // začínat pondělím (první školní týden, týden po svátku…). Kotvíme proto na
-  // PONDĚLÍ ISO týdne obsahujícího začátek ze záhlaví — jinak by se všechny
-  // datumy posunuly o rozdíl (bug: week_start=úterý 1.9. → menu_date o den napřed).
   const monday = mondayOfWeek(new Date(week.weekStart + 'T00:00:00'));
   const weekStartIso = fmtDate(monday);
   const weekEndIso = fmtDate(addDays(monday, 4)); // pátek téhož týdne
@@ -183,7 +173,7 @@ export function parseMenuText(text: string, now: Date = new Date()): ParseResult
   >();
   let current: number | null = null;
 
-  for (let i = anchorIdx + 1; i < lines.length; i++) {
+  for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
 
     if (/^jídelní\s+lístek$/i.test(line)) break; // prázdná šablona dalšího týdne
@@ -232,13 +222,70 @@ export function parseMenuText(text: string, now: Date = new Date()): ParseResult
       week_start: weekStartIso,
       week_end: weekEndIso,
     });
-    if (!data.soup) warnings.push(`Den ${fmtDate(date)} nemá polévku.`);
+  }
+  return { week, days };
+}
+
+/**
+ * Naparsuje textovou podobu stránky. Stránka může obsahovat VÍC datovaných týdnů
+ * (aktuální + příští) — každý blok „Jídelní lístek DD.M. – DD.M.“ parsujeme
+ * samostatně (parseWeekBlock) a kotvíme na JEHO pondělí. Kdybychom drželi jednu
+ * kotvu, týdny by se slily a datumy posunuly o týden (reálný bug ze září 2026:
+ * škola přestala publikovat příští týden jako holou šablonu a dala mu vlastní
+ * rozsah dat → sloučení + duplicitní option_no → pád upsertu).
+ *
+ * Navigace nahoře („Jídelní lístek" bez data) je před prvním záhlavím a odpadne.
+ */
+export function parseMenuText(text: string, now: Date = new Date()): ParseResult {
+  const warnings: string[] = [];
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+
+  const headerIdxs = lines.reduce<number[]>((acc, l, i) => {
+    if (WEEK_RE.test(l)) acc.push(i);
+    return acc;
+  }, []);
+  if (headerIdxs.length === 0) {
+    throw new Error('Nenalezena hlavička týdne (rozsah dat) – změna šablony?');
   }
 
-  if (days.length === 0) throw new Error('Naparsováno 0 dní s položkami.');
-  if (days.length !== 5)
-    warnings.push(`Naparsováno ${days.length} dní (očekáváno 5).`);
+  // Každý datovaný blok parsujeme samostatně; při kolizi menu_date přebije
+  // pozdější blok (upsert je stejně idempotentní dle menu_date).
+  const byDate = new Map<string, MenuDay>();
+  for (let h = 0; h < headerIdxs.length; h++) {
+    const start = headerIdxs[h];
+    const end = h + 1 < headerIdxs.length ? headerIdxs[h + 1] : lines.length;
+    const block = parseWeekBlock(lines.slice(start, end), now);
+    for (const day of block.days) byDate.set(day.menu_date, day);
+  }
 
+  const days = [...byDate.values()].sort((a, b) =>
+    a.menu_date.localeCompare(b.menu_date),
+  );
+  if (days.length === 0) throw new Error('Naparsováno 0 dní s položkami.');
+
+  for (const d of days) {
+    if (!d.soup) warnings.push(`Den ${d.menu_date} nemá polévku.`);
+  }
+
+  // Anomálie: čekáme aspoň jeden plný (5denní) týden. Míň bývá známka rozbité
+  // šablony — nevaříme z toho chybu, jen upozornění na Discord (viz main()).
+  const perWeek = new Map<string, number>();
+  for (const d of days) {
+    perWeek.set(d.week_start, (perWeek.get(d.week_start) ?? 0) + 1);
+  }
+  if (![...perWeek.values()].some((n) => n === 5)) {
+    warnings.push(
+      `Žádný týden nemá 5 dní (nalezeno ${days.length} dní v ${perWeek.size} týdnech) – zkontrolovat šablonu?`,
+    );
+  }
+
+  const week: ParsedWeek = {
+    weekStart: days[0].week_start,
+    weekEnd: days[days.length - 1].week_end,
+  };
   return { week, days, warnings };
 }
 

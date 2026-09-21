@@ -80,6 +80,11 @@ interface OwnerData {
   address_cislo: string | null
   address_psc: string | null
   address_ruian_kod: string | null
+  address_kontaktni_obec: string | null
+  address_kontaktni_ulice: string | null
+  address_kontaktni_cislo: string | null
+  address_kontaktni_psc: string | null
+  address_kontaktni_ruian_kod: string | null
 }
 
 // ── Pomocné: rekonstrukce ValidovanaAdresa z DB polí ────────────────────
@@ -178,6 +183,13 @@ export default function EnrollmentWizard({
     adrZDb(owner.address_obec, owner.address_ulice, owner.address_cislo,
       owner.address_psc, owner.address_ruian_kod)
   )
+  const [ownerKontaktni, setOwnerKontaktni] = useState<ValidovanaAdresa | null>(
+    adrZDb(owner.address_kontaktni_obec, owner.address_kontaktni_ulice, owner.address_kontaktni_cislo,
+      owner.address_kontaktni_psc, owner.address_kontaktni_ruian_kod)
+  )
+  const [ownerJinaKontaktni, setOwnerJinaKontaktni] = useState<boolean>(
+    !!owner.address_kontaktni_ruian_kod
+  )
 
   // ── Živá věková klasifikace (pro sekci Zdraví) ───────────────────────
   const [klas, setKlas] = useState<VekovaKlasifikace | null>(
@@ -245,10 +257,14 @@ export default function EnrollmentWizard({
         if (!ownerForm.first_name.trim() || !ownerForm.last_name.trim()) {
           setError('Vyplňte jméno a příjmení.'); return
         }
+        if (!ownerAdr) {
+          setError('Ověřte prosím adresu svého trvalého bydliště.'); return
+        }
         res = await saveEnrollmentOwner(app.id, {
           ...ownerForm,
-          adresa: ownerAdr
-            ? { obec: ownerAdr.obec, ulice: ownerAdr.ulice, cislo: ownerAdr.cislo, psc: ownerAdr.psc, ruian_kod: ownerAdr.ruian_kod }
+          adresa: { obec: ownerAdr.obec, ulice: ownerAdr.ulice, cislo: ownerAdr.cislo, psc: ownerAdr.psc, ruian_kod: ownerAdr.ruian_kod },
+          adresaKontaktni: ownerKontaktni
+            ? { obec: ownerKontaktni.obec, ulice: ownerKontaktni.ulice, cislo: ownerKontaktni.cislo, psc: ownerKontaktni.psc, ruian_kod: ownerKontaktni.ruian_kod }
             : null,
         })
       }
@@ -331,6 +347,8 @@ export default function EnrollmentWizard({
           <StepZastupce
             ownerForm={ownerForm} setOwnerForm={setOwnerForm}
             ownerAdr={ownerAdr} setOwnerAdr={setOwnerAdr}
+            ownerKontaktni={ownerKontaktni} setOwnerKontaktni={setOwnerKontaktni}
+            ownerJinaKontaktni={ownerJinaKontaktni} setOwnerJinaKontaktni={setOwnerJinaKontaktni}
             email={owner.email}
           />
         )}
@@ -598,7 +616,7 @@ function StepPrestup({ prestup, setPrestup }: any) {
   )
 }
 
-function StepZastupce({ ownerForm, setOwnerForm, ownerAdr, setOwnerAdr, email }: any) {
+function StepZastupce({ ownerForm, setOwnerForm, ownerAdr, setOwnerAdr, ownerKontaktni, setOwnerKontaktni, ownerJinaKontaktni, setOwnerJinaKontaktni, email }: any) {
   const set = (k: string, v: any) => setOwnerForm((o: any) => ({ ...o, [k]: v }))
   return (
     <div className="space-y-4">
@@ -631,8 +649,35 @@ function StepZastupce({ ownerForm, setOwnerForm, ownerAdr, setOwnerAdr, email }:
           <input type="text" value={ownerForm.datova_schranka} onChange={(e) => set('datova_schranka', e.target.value)} className={inputClass} />
         </div>
       </div>
-      <div className="pt-2 border-t border-(--portal-border)">
-        <AddressField label="Vaše adresa" hint="Nepovinné, ale pomůže při komunikaci. Musí být ověřená." value={ownerAdr} onChange={setOwnerAdr} />
+      <div className="pt-2 border-t border-(--portal-border) space-y-4">
+        <AddressField
+          label="Vaše adresa trvalého bydliště"
+          hint="Musí být ověřená v registru RÚIAN."
+          value={ownerAdr}
+          onChange={setOwnerAdr}
+          required
+        />
+
+        <label className="flex items-center gap-2 text-sm text-(--portal-text)">
+          <input
+            type="checkbox"
+            checked={ownerJinaKontaktni}
+            onChange={(e) => {
+              setOwnerJinaKontaktni(e.target.checked)
+              if (!e.target.checked) setOwnerKontaktni(null)
+            }}
+          />
+          Mám jinou kontaktní (doručovací) adresu
+        </label>
+        {ownerJinaKontaktni && (
+          <AddressField
+            label="Kontaktní adresa"
+            hint="Kam vám má škola doručovat, pokud se liší od trvalého bydliště."
+            value={ownerKontaktni}
+            onChange={setOwnerKontaktni}
+            required
+          />
+        )}
       </div>
     </div>
   )

@@ -8,6 +8,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { getActiveSchoolYear, prevSchoolYear } from '@/lib/school-year'
 import { getVystupyWithHodnoceni } from '@/lib/mapa-pokroku'
 import { prevodNaZnamku, type Stupen, type ZnamkaVysledek } from './znamka'
+import { getStudentAddresses, getGuardianAddresses, formatAddressLine } from '@/lib/addresses'
 import type {
   KatalogovyListData,
   KLPredmetProspech,
@@ -152,7 +153,7 @@ export async function gatherKatalogovyList(
   const { data: gl } = await supabase
     .from('student_guardian_links')
     .select(
-      `role, je_primarni_kontakt,
+      `role, je_primarni_kontakt, guardian_id,
        guardians(first_name, last_name, email, phone_primary, phone_secondary,
                  address_street, address_city, address_zip, address_delivery)`
     )
@@ -161,23 +162,35 @@ export async function gatherKatalogovyList(
     .is('platnost_do', null)
     .order('je_primarni_kontakt', { ascending: false })
 
+  // Jednotný adresní model (M3): addresses = zdroj, guardians.address_* = fallback.
+  const guardianIds = ((gl ?? []) as { guardian_id: string | null }[])
+    .map((l) => l.guardian_id)
+    .filter((x): x is string => !!x)
+  const [studAddr, guardAddr] = await Promise.all([
+    getStudentAddresses(supabase, studentId),
+    getGuardianAddresses(supabase, guardianIds),
+  ])
+
   const zastupci: KLZakonnyZastupce[] = ((gl as any[]) ?? []).map((l) => {
     const g = l.guardians ?? {}
+    const a = l.guardian_id ? guardAddr.get(l.guardian_id)?.trvale ?? null : null
     return {
       jmeno: [g.first_name, g.last_name].filter(Boolean).join(' '),
       vztah: VZTAH_LABEL[l.role] ?? l.role,
-      bydliste: formatAdresa(g.address_street, g.address_city, g.address_zip),
+      bydliste: formatAddressLine(a) ?? formatAdresa(g.address_street, g.address_city, g.address_zip),
       telefon: g.phone_primary ?? g.phone_secondary ?? null,
       email: g.email ?? null,
     }
   })
 
-  // Adresa žáka = adresa primárního zákonného zástupce (PRD R9).
+  // Adresa žáka: addresses (trvalé/kontaktní) → fallback adresa primárního ZZ (PRD R9).
   const primar = ((gl as any[]) ?? [])[0]?.guardians ?? null
-  const trvale = primar
+  const trvaleFallback = primar
     ? formatAdresa(primar.address_street, primar.address_city, primar.address_zip)
     : null
-  const korespondencni = primar?.address_delivery ?? trvale
+  const trvale = formatAddressLine(studAddr.trvale) ?? trvaleFallback
+  const korespondencni =
+    formatAddressLine(studAddr.kontaktni) ?? primar?.address_delivery ?? trvale
 
   // --- předchozí vzdělávání ---
   const { data: history } = await supabase

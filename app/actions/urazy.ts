@@ -16,6 +16,7 @@
  */
 
 import { createSupabaseServerClient as createServerClient } from '@/lib/supabase-server'
+import { getStudentAddresses, getGuardianAddresses, formatStreet } from '@/lib/addresses'
 import { CURRENT_SCHOOL_YEAR } from '@/lib/config'
 import { shouldBeZaznam, ciselnikLabel, formatPoradove, CAST_TELA, type UrazZaznam } from '@/lib/urazy'
 import { buildZaznamAnswers, CSI_B02_PRIJATO } from '@/lib/urazy-csi'
@@ -192,6 +193,7 @@ export async function getUrazPrefill(studentId: string): Promise<UrazPrefill | n
 
   type LinkRow = {
     je_primarni_kontakt: boolean | null
+    guardian_id: string | null
     guardians: {
       first_name: string | null
       last_name: string | null
@@ -204,7 +206,7 @@ export async function getUrazPrefill(studentId: string): Promise<UrazPrefill | n
   const { data: links } = await supabase
     .from('student_guardian_links')
     .select(
-      'je_primarni_kontakt, guardians ( first_name, last_name, address_street, address_city, address_zip )',
+      'je_primarni_kontakt, guardian_id, guardians ( first_name, last_name, address_street, address_city, address_zip )',
     )
     .eq('student_id', studentId)
     .eq('je_zakonny_zastupce', true)
@@ -213,22 +215,29 @@ export async function getUrazPrefill(studentId: string): Promise<UrazPrefill | n
     .returns<LinkRow[]>()
 
   const primar = links?.[0]?.guardians ?? null
+  const primarGid = links?.[0]?.guardian_id ?? null
   const zzJmeno = primar ? [primar.first_name, primar.last_name].filter(Boolean).join(' ') : ''
+
+  // Jednotný adresní model (M3): addresses = zdroj, guardians.address_* = fallback.
+  const studAddr = await getStudentAddresses(supabase, studentId)
+  const primarAddr = primarGid
+    ? (await getGuardianAddresses(supabase, [primarGid])).get(primarGid)?.trvale ?? null
+    : null
 
   return {
     zraneny: {
       jmeno: st.first_name,
       prijmeni: st.last_name,
       datum_narozeni: st.birth_date,
-      ulice: primar?.address_street ?? null,
-      psc: primar?.address_zip ?? null,
-      obec: primar?.address_city ?? null,
+      ulice: formatStreet(studAddr.trvale) ?? primar?.address_street ?? null,
+      psc: studAddr.trvale?.psc ?? primar?.address_zip ?? null,
+      obec: studAddr.trvale?.obec ?? primar?.address_city ?? null,
     },
     zz: {
       jmeno: zzJmeno || null,
-      ulice: primar?.address_street ?? null,
-      psc: primar?.address_zip ?? null,
-      obec: primar?.address_city ?? null,
+      ulice: formatStreet(primarAddr) ?? primar?.address_street ?? null,
+      psc: primarAddr?.psc ?? primar?.address_zip ?? null,
+      obec: primarAddr?.obec ?? primar?.address_city ?? null,
     },
   }
 }
