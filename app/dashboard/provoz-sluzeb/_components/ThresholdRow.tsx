@@ -8,6 +8,8 @@ import { setUsageThreshold } from '@/app/actions/usage-monitor'
  * Editovatelný řádek konfigurace prahu jedné metriky.
  * Ruční limit se uplatní tam, kde ho API nevrací (Supabase i GitHub — enhanced
  * billing už included_minutes nehlásí). Poměry přijímají procenta (80) i zlomek (0.8).
+ * U metrik typu „minimum" (`floor`, např. kredit SMS) je limit spodní hranice
+ * a poměry se neuplatní — needitují se.
  */
 export default function ThresholdRow({
   service,
@@ -20,6 +22,7 @@ export default function ThresholdRow({
   critRatio,
   enabled,
   apiProvidesLimit,
+  floor = false,
 }: {
   service: string
   metric: string
@@ -31,6 +34,7 @@ export default function ThresholdRow({
   critRatio: number
   enabled: boolean
   apiProvidesLimit: boolean
+  floor?: boolean
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -74,7 +78,7 @@ export default function ThresholdRow({
             <input
               value={limit}
               onChange={(e) => { setLimit(e.target.value); setSaved(false) }}
-              placeholder="neomezeno"
+              placeholder={floor ? 'minimum' : 'neomezeno'}
               inputMode="decimal"
               className={`w-24 ${inputCls}`}
             />
@@ -82,6 +86,9 @@ export default function ThresholdRow({
           </div>
         )}
       </td>
+      {floor ? (
+        <td colSpan={2} className="px-3 py-2.5 text-xs text-gray-400">alert pod minimem</td>
+      ) : (<>
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-1">
           <input value={warn} onChange={(e) => { setWarn(e.target.value); setSaved(false) }}
@@ -96,6 +103,7 @@ export default function ThresholdRow({
           <span className="text-xs text-gray-400">%</span>
         </div>
       </td>
+      </>)}
       <td className="px-3 py-2.5">
         <label className="inline-flex items-center gap-1.5 text-xs text-gray-600 dark:text-stone-300">
           <input type="checkbox" checked={on} onChange={(e) => { setOn(e.target.checked); setSaved(false) }} />

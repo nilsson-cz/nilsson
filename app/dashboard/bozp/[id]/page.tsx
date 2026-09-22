@@ -1,4 +1,4 @@
-﻿import { createSupabaseServerClient as createServerClient } from '@/lib/supabase-server'
+import { createSupabaseServerClient as createServerClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { removeStudentFromBozp } from '@/app/actions/bozp'
@@ -43,7 +43,7 @@ export default async function BozpDetailPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createServerClient()
 
-  // ZĂˇznam BOZP
+  // Záznam BOZP
   const { data: zaznam, error: zaznamError } = await supabase
     .from('bozp_zaznamy')
     .select(
@@ -64,7 +64,7 @@ export default async function BozpDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  // Ĺ˝Ăˇci pĹ™Ă­tomnĂ­ na tomto BOZP zĂˇznamu
+  // Žáci přítomní na tomto BOZP záznamu
   const { data: attendance, error: attError } = await supabase
     .from('bozp_attendance')
     .select(
@@ -76,14 +76,14 @@ export default async function BozpDetailPage({ params }: PageProps) {
     .eq('bozp_id', id)
     .returns<AttendanceRow[]>()
 
-  // VĹˇichni aktivnĂ­ ĹľĂˇci (pro formulĂˇĹ™ pĹ™idĂˇnĂ­)
+  // Všichni aktivní žáci (pro formulář přidání)
   const { data: allActive } = await supabase
     .from('students')
     .select('id, first_name, last_name, kod_zaka')
     .eq('status', 'active')
     .returns<ActiveStudent[]>()
 
-  // AktuĂˇlnĂ­ role staff (pro podmĂ­nÄ›nĂ© zobrazenĂ­ tlaÄŤĂ­tka Odebrat)
+  // Aktuální role staff (pro podmíněné zobrazení tlačítka Odebrat)
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -97,7 +97,7 @@ export default async function BozpDetailPage({ params }: PageProps) {
   const attendanceList = attendance ?? []
   const allActiveList = allActive ?? []
 
-  // Ĺ˝Ăˇci, kteĹ™Ă­ v zĂˇznamu jeĹˇtÄ› nejsou
+  // Žáci, kteří v záznamu ještě nejsou
   const attendedIds = new Set(attendanceList.map((a) => a.student_id))
   const availableToAdd = allActiveList.filter((s) => !attendedIds.has(s.id))
 
@@ -123,11 +123,11 @@ export default async function BozpDetailPage({ params }: PageProps) {
         <Link href="/dashboard/bozp" className="hover:text-gray-600 transition-colors">
           BOZP
         </Link>
-        <span aria-hidden>â€ş</span>
+        <span aria-hidden>›</span>
         <span className="text-gray-700 capitalize">{datumFormatted}</span>
       </nav>
 
-      {/* HlaviÄŤka zĂˇznamu */}
+      {/* Hlavička záznamu */}
       <div className="rounded-lg border border-gray-200 bg-white p-5 mb-6">
         <div className="flex items-start justify-between gap-4 mb-3">
           <div>
@@ -137,22 +137,22 @@ export default async function BozpDetailPage({ params }: PageProps) {
                 zaznam.je_hromadne ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
               }`}
             >
-              {zaznam.je_hromadne ? 'HromadnĂ© BOZP' : 'IndividuĂˇlnĂ­ BOZP'}
+              {zaznam.je_hromadne ? 'Hromadné BOZP' : 'Individuální BOZP'}
             </span>
           </div>
           <span className="shrink-0 text-sm font-medium text-gray-500">
-            {attendanceList.length} ĹľĂˇkĹŻ
+            {attendanceList.length} žáků
           </span>
         </div>
 
         <dl className="space-y-2 text-sm">
           <div>
-            <dt className="text-gray-400 text-xs uppercase tracking-wide font-medium mb-0.5">Popis pouÄŤenĂ­</dt>
+            <dt className="text-gray-400 text-xs uppercase tracking-wide font-medium mb-0.5">Popis poučení</dt>
             <dd className="text-gray-700">{zaznam.popis}</dd>
           </div>
           <div className="flex gap-6 pt-1">
             <div>
-              <dt className="text-gray-400 text-xs uppercase tracking-wide font-medium mb-0.5">Ĺ kolnĂ­ rok</dt>
+              <dt className="text-gray-400 text-xs uppercase tracking-wide font-medium mb-0.5">Školní rok</dt>
               <dd className="text-gray-700">{zaznam.school_year}</dd>
             </div>
             {zaznam.created_by && (
@@ -164,22 +164,22 @@ export default async function BozpDetailPage({ params }: PageProps) {
               </div>
             )}
             <div>
-              <dt className="text-gray-400 text-xs uppercase tracking-wide font-medium mb-0.5">ZapsĂˇno</dt>
+              <dt className="text-gray-400 text-xs uppercase tracking-wide font-medium mb-0.5">Zapsáno</dt>
               <dd className="text-gray-700">{createdAtFormatted}</dd>
             </div>
           </div>
         </dl>
       </div>
 
-      {/* Ĺ˝Ăˇci proĹˇkolenĂ­ */}
+      {/* Žáci proškolení */}
       <section>
         <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
-          ProĹˇkolenĂ­ ĹľĂˇci
+          Proškolení žáci
         </h2>
 
         {attError && (
           <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            Chyba pĹ™i naÄŤĂ­tĂˇnĂ­ dochĂˇzky: {attError.message}
+            Chyba při načítání docházky: {attError.message}
           </div>
         )}
 
@@ -198,7 +198,7 @@ export default async function BozpDetailPage({ params }: PageProps) {
                   >
                     <div className="flex items-center gap-3">
                       <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-xs" aria-hidden>
-                        âś“
+                        ✓
                       </span>
                       <span className="text-sm text-gray-900">
                         {s.last_name} {s.first_name}
@@ -206,15 +206,15 @@ export default async function BozpDetailPage({ params }: PageProps) {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-mono text-gray-400">{s.kod_zaka}</span>
-                      {/* Odkaz na detail ĹľĂˇka */}
+                      {/* Odkaz na detail žáka */}
                       <Link
                         href={`/dashboard/zaci/${s.id}`}
                         className="text-xs text-gray-300 hover:text-gray-500 transition-colors"
-                        title="Detail ĹľĂˇka"
+                        title="Detail žáka"
                       >
-                        â†’
+                        →
                       </Link>
-                      {/* OdebrĂˇnĂ­ â€” pouze director/vp */}
+                      {/* Odebrání — pouze director/vp */}
                       {canDelete && (
                         <form
                           action={async () => {
@@ -225,9 +225,9 @@ export default async function BozpDetailPage({ params }: PageProps) {
                           <button
                             type="submit"
                             className="text-xs text-red-300 hover:text-red-600 transition-colors px-1"
-                            title="Odebrat ĹľĂˇka ze zĂˇznamu"
+                            title="Odebrat žáka ze záznamu"
                           >
-                            âś•
+                            ✕
                           </button>
                         </form>
                       )}
@@ -238,14 +238,14 @@ export default async function BozpDetailPage({ params }: PageProps) {
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-gray-200 py-8 text-center text-sm text-gray-400 mb-4">
-            Ĺ˝ĂˇdnĂ­ ĹľĂˇci zatĂ­m v zĂˇznamu nejsou
+            Žádní žáci zatím v záznamu nejsou
           </div>
         )}
 
-        {/* PĹ™idat ĹľĂˇka */}
+        {/* Přidat žáka */}
         <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            PĹ™idat ĹľĂˇka do zĂˇznamu
+            Přidat žáka do záznamu
           </h3>
           <AddStudentToRecord bozpId={id} availableStudents={availableToAdd} />
         </div>

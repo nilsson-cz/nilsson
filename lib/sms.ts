@@ -111,6 +111,30 @@ export async function sendSms(opts: { number: string; message: string }): Promis
   }
 }
 
+/**
+ * Zbývající předplacený kredit (Kč) — akce `credit_info` (read-only, nestojí nic).
+ * Odpověď: <result><err>0</err><credit>123.45</credit></result>.
+ * Vyhazuje výjimku s popisem chyby — volá ji monitoring adaptér, který ji převede
+ * na metriku ok=false.
+ */
+export async function getSmsCredit(): Promise<number> {
+  const auth = buildAuth()
+  if ('error' in auth) throw new Error(auth.error)
+
+  const params = new URLSearchParams({ action: 'credit_info', ...auth.params })
+  const res = await fetch(`${API_URL}?${params.toString()}`, { method: 'GET' })
+  const body = (await res.text()).trim()
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`)
+
+  const parsed = parseErr(body)
+  if (!parsed.ok) throw new Error(parsed.detail)
+
+  const m = body.match(/<credit>\s*(-?[\d.,]+)\s*<\/credit>/i)
+  const credit = m ? Number(m[1].replace(',', '.')) : NaN
+  if (!Number.isFinite(credit)) throw new Error(`odpověď bez <credit>: ${body.slice(0, 200)}`)
+  return credit
+}
+
 /** Zavolá read-only akci `inbox` s danými parametry a přeloží <err>. */
 async function callInbox(params: URLSearchParams): Promise<SmsResult> {
   try {

@@ -1,10 +1,10 @@
 "use client"
 
 // app/auth/confirm/page.tsx
-// ZpracovĂˇnĂ­ magic link tokenu.
-// Supabase mĹŻĹľe poslat dva typy token_hash:
-//   - pkce_...  â†’ PKCE flow â†’ exchangeCodeForSession()
-//   - ostatnĂ­   â†’ plain flow â†’ verifyOtp()
+// Zpracování magic link tokenu.
+// Supabase může poslat dva typy token_hash:
+//   - pkce_...  → PKCE flow → exchangeCodeForSession()
+//   - ostatní   → plain flow → verifyOtp()
 
 import { Suspense, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -45,7 +45,7 @@ function ConfirmInner() {
 
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-      <p style={{ color: "#666", fontSize: "14px" }}>PĹ™ihlaĹˇuji...</p>
+      <p style={{ color: "#666", fontSize: "14px" }}>Přihlašuji...</p>
     </div>
   )
 }
