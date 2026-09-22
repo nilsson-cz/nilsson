@@ -34,7 +34,7 @@ export default async function ZapisDetailPage({
   // Řádek vlastníka pro tohoto uživatele
   const { data: owner } = await supabase
     .from('enrollment_guardians')
-    .select('id, first_name, last_name, telefon, pribuzensky_vztah, datova_schranka, email, address_obec, address_ulice, address_cislo, address_psc, address_ruian_kod, address_validated_at, address_kontaktni_obec, address_kontaktni_ulice, address_kontaktni_cislo, address_kontaktni_psc, address_kontaktni_ruian_kod')
+    .select('id, first_name, last_name, telefon, pribuzensky_vztah, datova_schranka, email, address_obec, address_ulice, address_cislo, address_psc, address_ruian_kod, address_validated_at, address_kontaktni_obec, address_kontaktni_ulice, address_kontaktni_cislo, address_kontaktni_psc, address_kontaktni_ruian_kod, address_kontaktni_country')
     .eq('application_id', id)
     .eq('auth_user_id', user.id)
     .eq('role_v_zadosti', 'vlastnik')

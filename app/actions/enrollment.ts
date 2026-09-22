@@ -296,8 +296,49 @@ async function maybeAdvanceToRozpracovany(supabase: any, appId: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Kontaktní adresa v žádosti může být ZAHRANIČNÍ (country != 'CZ') → bez RÚIAN.
+// Trvalé bydliště zůstává vždy ČR (ruian_kod povinný).
+// ---------------------------------------------------------------------------
+
+type AdresaKontaktniInput = {
+  obec: string
+  ulice?: string | null
+  cislo: string
+  psc: string
+  ruian_kod: string | null // null = zahraniční / neověřená
+  country?: string          // ISO 3166-1 alpha-2, default 'CZ'
+}
+
+// „Vyplněná" kontaktní adresa = má obec + číslo + PSČ (ruian_kod jen u ČR).
+function maKontaktni(k?: AdresaKontaktniInput | null): boolean {
+  return !!(k && k.obec && k.cislo && k.psc)
+}
+
+// Kontaktní je uložitelná: cizina stačí bez RÚIAN, ČR musí mít ruian_kod.
+function kontaktniValidni(k?: AdresaKontaktniInput | null): boolean {
+  if (!maKontaktni(k)) return false
+  return (k!.country ?? 'CZ') === 'CZ' ? !!k!.ruian_kod : true
+}
+
+// Sloupcové hodnoty kontaktní adresy (obecné; volající namapuje na svůj prefix).
+function kontaktniColy(k: AdresaKontaktniInput | null | undefined, now: string) {
+  const ma = maKontaktni(k)
+  const cr = ma && (k!.country ?? 'CZ') === 'CZ'
+  const ruian = cr ? (k!.ruian_kod ?? null) : null
+  return {
+    obec: ma ? k!.obec : null,
+    ulice: ma ? (k!.ulice || null) : null,
+    cislo: ma ? k!.cislo : null,
+    psc: ma ? k!.psc : null,
+    ruian_kod: ruian,
+    validated_at: ruian ? now : null,
+    country: ma ? (k!.country ?? 'CZ') : 'CZ',
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 5) Uložení adresy dítěte (trvalé bydliště + volitelně kontaktní)
-//    Ukládá jen VALIDOVANOU adresu — ruian_kod + validated_at povinné.
+//    Trvalé = VALIDOVANÉ (ruian_kod + validated_at). Kontaktní může být zahraniční.
 // ---------------------------------------------------------------------------
 
 export interface SaveDiteAdresaInput {
@@ -309,13 +350,7 @@ export interface SaveDiteAdresaInput {
     ruian_kod: string
   }
   bydli_jinde: boolean
-  kontaktni?: {
-    obec: string
-    ulice?: string | null
-    cislo: string
-    psc: string
-    ruian_kod: string
-  } | null
+  kontaktni?: AdresaKontaktniInput | null
 }
 
 export async function saveEnrollmentDiteAdresa(
@@ -332,14 +367,12 @@ export async function saveEnrollmentDiteAdresa(
   if (!t?.ruian_kod || !t?.obec || !t?.cislo || !t?.psc) {
     return { success: false, error: 'Trvalé bydliště dítěte musí být ověřené proti registru adres.' }
   }
-  if (input.bydli_jinde) {
-    const k = input.kontaktni
-    if (!k?.ruian_kod || !k?.obec || !k?.cislo || !k?.psc) {
-      return { success: false, error: 'Kontaktní adresa musí být ověřená, nebo odškrtněte „dítě bydlí jinde".' }
-    }
+  if (input.bydli_jinde && !kontaktniValidni(input.kontaktni)) {
+    return { success: false, error: 'Kontaktní adresa musí být kompletní (v ČR ověřená v registru), nebo odškrtněte „dítě bydlí jinde".' }
   }
 
   const now = new Date().toISOString()
+  const kc = kontaktniColy(input.bydli_jinde ? input.kontaktni : null, now)
   const { error } = await supabase
     .from('enrollment_applications')
     .update({
@@ -350,13 +383,14 @@ export async function saveEnrollmentDiteAdresa(
       dite_trvale_bydliste_ruian_kod: t.ruian_kod,
       dite_trvale_bydliste_validated_at: now,
       dite_bydli_jinde: input.bydli_jinde,
-      // Kontaktní adresa — buď kompletní validovaná, nebo vynulovaná
-      dite_kontaktni_adresa_obec: input.bydli_jinde ? input.kontaktni!.obec : null,
-      dite_kontaktni_adresa_ulice: input.bydli_jinde ? (input.kontaktni!.ulice || null) : null,
-      dite_kontaktni_adresa_cislo: input.bydli_jinde ? input.kontaktni!.cislo : null,
-      dite_kontaktni_adresa_psc: input.bydli_jinde ? input.kontaktni!.psc : null,
-      dite_kontaktni_adresa_ruian_kod: input.bydli_jinde ? input.kontaktni!.ruian_kod : null,
-      dite_kontaktni_adresa_validated_at: input.bydli_jinde ? now : null,
+      // Kontaktní adresa — kompletní (ČR ověřená / cizina bez RÚIAN), nebo vynulovaná
+      dite_kontaktni_adresa_obec: kc.obec,
+      dite_kontaktni_adresa_ulice: kc.ulice,
+      dite_kontaktni_adresa_cislo: kc.cislo,
+      dite_kontaktni_adresa_psc: kc.psc,
+      dite_kontaktni_adresa_ruian_kod: kc.ruian_kod,
+      dite_kontaktni_adresa_validated_at: kc.validated_at,
+      dite_kontaktni_adresa_country: kc.country,
     })
     .eq('id', appId)
 
@@ -386,13 +420,7 @@ export interface SaveOwnerInput {
     psc: string
     ruian_kod: string
   } | null
-  adresaKontaktni?: {
-    obec: string
-    ulice?: string | null
-    cislo: string
-    psc: string
-    ruian_kod: string
-  } | null
+  adresaKontaktni?: AdresaKontaktniInput | null
 }
 
 export async function saveEnrollmentOwner(
@@ -411,7 +439,7 @@ export async function saveEnrollmentOwner(
 
   const now = new Date().toISOString()
   const maAdresu = !!input.adresa?.ruian_kod
-  const maKontaktni = !!input.adresaKontaktni?.ruian_kod
+  const kc = kontaktniColy(input.adresaKontaktni, now)
 
   const { error } = await supabase
     .from('enrollment_guardians')
@@ -427,12 +455,13 @@ export async function saveEnrollmentOwner(
       address_psc: maAdresu ? input.adresa!.psc : null,
       address_ruian_kod: maAdresu ? input.adresa!.ruian_kod : null,
       address_validated_at: maAdresu ? now : null,
-      address_kontaktni_obec: maKontaktni ? input.adresaKontaktni!.obec : null,
-      address_kontaktni_ulice: maKontaktni ? (input.adresaKontaktni!.ulice || null) : null,
-      address_kontaktni_cislo: maKontaktni ? input.adresaKontaktni!.cislo : null,
-      address_kontaktni_psc: maKontaktni ? input.adresaKontaktni!.psc : null,
-      address_kontaktni_ruian_kod: maKontaktni ? input.adresaKontaktni!.ruian_kod : null,
-      address_kontaktni_validated_at: maKontaktni ? now : null,
+      address_kontaktni_obec: kc.obec,
+      address_kontaktni_ulice: kc.ulice,
+      address_kontaktni_cislo: kc.cislo,
+      address_kontaktni_psc: kc.psc,
+      address_kontaktni_ruian_kod: kc.ruian_kod,
+      address_kontaktni_validated_at: kc.validated_at,
+      address_kontaktni_country: kc.country,
     })
     .eq('id', guard.ownerGuardianId)
 
@@ -630,7 +659,7 @@ type AdresaInput = { obec: string; ulice?: string | null; cislo: string; psc: st
 
 export interface ConfirmSecondGuardianInput {
   adresa?: AdresaInput | null
-  adresaKontaktni?: AdresaInput | null
+  adresaKontaktni?: AdresaKontaktniInput | null
 }
 
 export async function confirmSecondGuardian(
@@ -649,19 +678,20 @@ export async function confirmSecondGuardian(
   // Adresa druhého zástupce (§9 Q1) — vyplní se při potvrzení účasti.
   if (input) {
     const maAdresu = !!input.adresa?.ruian_kod
-    const maKontaktni = !!input.adresaKontaktni?.ruian_kod
+    const kc = kontaktniColy(input.adresaKontaktni, now)
     patch.address_obec = maAdresu ? input.adresa!.obec : null
     patch.address_ulice = maAdresu ? input.adresa!.ulice || null : null
     patch.address_cislo = maAdresu ? input.adresa!.cislo : null
     patch.address_psc = maAdresu ? input.adresa!.psc : null
     patch.address_ruian_kod = maAdresu ? input.adresa!.ruian_kod : null
     patch.address_validated_at = maAdresu ? now : null
-    patch.address_kontaktni_obec = maKontaktni ? input.adresaKontaktni!.obec : null
-    patch.address_kontaktni_ulice = maKontaktni ? input.adresaKontaktni!.ulice || null : null
-    patch.address_kontaktni_cislo = maKontaktni ? input.adresaKontaktni!.cislo : null
-    patch.address_kontaktni_psc = maKontaktni ? input.adresaKontaktni!.psc : null
-    patch.address_kontaktni_ruian_kod = maKontaktni ? input.adresaKontaktni!.ruian_kod : null
-    patch.address_kontaktni_validated_at = maKontaktni ? now : null
+    patch.address_kontaktni_obec = kc.obec
+    patch.address_kontaktni_ulice = kc.ulice
+    patch.address_kontaktni_cislo = kc.cislo
+    patch.address_kontaktni_psc = kc.psc
+    patch.address_kontaktni_ruian_kod = kc.ruian_kod
+    patch.address_kontaktni_validated_at = kc.validated_at
+    patch.address_kontaktni_country = kc.country
   }
 
   const { error } = await supabase

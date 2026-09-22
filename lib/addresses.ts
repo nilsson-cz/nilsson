@@ -7,6 +7,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
+import { countryName } from '@/lib/countries'
 
 export type AddressRow = Database['public']['Tables']['addresses']['Row']
 export type AddressTyp = Database['public']['Enums']['address_typ']
@@ -65,12 +66,13 @@ export async function getGuardianAddresses(
 
 // ── Formátování ────────────────────────────────────────────────────────────
 
-/** Jednořádkově „ulice číslo, PSČ obec". */
+/** Jednořádkově „ulice číslo, PSČ obec" (+ země u zahraniční adresy). */
 export function formatAddressLine(a: AddressRow | null | undefined): string | null {
   if (!a) return null
   const r1 = [a.ulice, a.cislo].filter(Boolean).join(' ')
   const r2 = [a.psc, a.obec].filter(Boolean).join(' ')
-  return [r1, r2].filter((p) => p.length > 0).join(', ') || null
+  const zahranici = a.country && a.country !== 'CZ' ? countryName(a.country) : null
+  return [r1, r2, zahranici].filter((p) => p && p.length > 0).join(', ') || null
 }
 
 /** Ulice + číslo (bez PSČ/obce) — pro formuláře, kde je PSČ zvlášť. */

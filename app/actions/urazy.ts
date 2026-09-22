@@ -197,16 +197,13 @@ export async function getUrazPrefill(studentId: string): Promise<UrazPrefill | n
     guardians: {
       first_name: string | null
       last_name: string | null
-      address_street: string | null
-      address_city: string | null
-      address_zip: string | null
     } | null
   }
 
   const { data: links } = await supabase
     .from('student_guardian_links')
     .select(
-      'je_primarni_kontakt, guardian_id, guardians ( first_name, last_name, address_street, address_city, address_zip )',
+      'je_primarni_kontakt, guardian_id, guardians ( first_name, last_name )',
     )
     .eq('student_id', studentId)
     .eq('je_zakonny_zastupce', true)
@@ -218,7 +215,7 @@ export async function getUrazPrefill(studentId: string): Promise<UrazPrefill | n
   const primarGid = links?.[0]?.guardian_id ?? null
   const zzJmeno = primar ? [primar.first_name, primar.last_name].filter(Boolean).join(' ') : ''
 
-  // Jednotný adresní model (M3): addresses = zdroj, guardians.address_* = fallback.
+  // Jednotný adresní model (M6): addresses je JEDINÝ zdroj adres (guardians.address_* dropnuto).
   const studAddr = await getStudentAddresses(supabase, studentId)
   const primarAddr = primarGid
     ? (await getGuardianAddresses(supabase, [primarGid])).get(primarGid)?.trvale ?? null
@@ -229,15 +226,15 @@ export async function getUrazPrefill(studentId: string): Promise<UrazPrefill | n
       jmeno: st.first_name,
       prijmeni: st.last_name,
       datum_narozeni: st.birth_date,
-      ulice: formatStreet(studAddr.trvale) ?? primar?.address_street ?? null,
-      psc: studAddr.trvale?.psc ?? primar?.address_zip ?? null,
-      obec: studAddr.trvale?.obec ?? primar?.address_city ?? null,
+      ulice: formatStreet(studAddr.trvale),
+      psc: studAddr.trvale?.psc ?? null,
+      obec: studAddr.trvale?.obec ?? null,
     },
     zz: {
       jmeno: zzJmeno || null,
-      ulice: formatStreet(primarAddr) ?? primar?.address_street ?? null,
-      psc: primarAddr?.psc ?? primar?.address_zip ?? null,
-      obec: primarAddr?.obec ?? primar?.address_city ?? null,
+      ulice: formatStreet(primarAddr),
+      psc: primarAddr?.psc ?? null,
+      obec: primarAddr?.obec ?? null,
     },
   }
 }

@@ -1732,6 +1732,7 @@ export type Database = {
           dite_bydli_jinde: boolean
           dite_jmeno: string
           dite_kontaktni_adresa_cislo: string | null
+          dite_kontaktni_adresa_country: string
           dite_kontaktni_adresa_obec: string | null
           dite_kontaktni_adresa_psc: string | null
           dite_kontaktni_adresa_ruian_kod: string | null
@@ -1790,6 +1791,7 @@ export type Database = {
           dite_bydli_jinde?: boolean
           dite_jmeno: string
           dite_kontaktni_adresa_cislo?: string | null
+          dite_kontaktni_adresa_country?: string
           dite_kontaktni_adresa_obec?: string | null
           dite_kontaktni_adresa_psc?: string | null
           dite_kontaktni_adresa_ruian_kod?: string | null
@@ -1848,6 +1850,7 @@ export type Database = {
           dite_bydli_jinde?: boolean
           dite_jmeno?: string
           dite_kontaktni_adresa_cislo?: string | null
+          dite_kontaktni_adresa_country?: string
           dite_kontaktni_adresa_obec?: string | null
           dite_kontaktni_adresa_psc?: string | null
           dite_kontaktni_adresa_ruian_kod?: string | null
@@ -2005,6 +2008,7 @@ export type Database = {
         Row: {
           address_cislo: string | null
           address_kontaktni_cislo: string | null
+          address_kontaktni_country: string
           address_kontaktni_obec: string | null
           address_kontaktni_psc: string | null
           address_kontaktni_ruian_kod: string | null
@@ -2035,6 +2039,7 @@ export type Database = {
         Insert: {
           address_cislo?: string | null
           address_kontaktni_cislo?: string | null
+          address_kontaktni_country?: string
           address_kontaktni_obec?: string | null
           address_kontaktni_psc?: string | null
           address_kontaktni_ruian_kod?: string | null
@@ -2065,6 +2070,7 @@ export type Database = {
         Update: {
           address_cislo?: string | null
           address_kontaktni_cislo?: string | null
+          address_kontaktni_country?: string
           address_kontaktni_obec?: string | null
           address_kontaktni_psc?: string | null
           address_kontaktni_ruian_kod?: string | null
@@ -2420,13 +2426,6 @@ export type Database = {
       }
       guardians: {
         Row: {
-          address_city: string | null
-          address_country: string | null
-          address_delivery: string | null
-          address_ruian_kod: string | null
-          address_street: string | null
-          address_validated_at: string | null
-          address_zip: string | null
           created_at: string
           data_box_id: string | null
           email: string | null
@@ -2441,13 +2440,6 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
-          address_city?: string | null
-          address_country?: string | null
-          address_delivery?: string | null
-          address_ruian_kod?: string | null
-          address_street?: string | null
-          address_validated_at?: string | null
-          address_zip?: string | null
           created_at?: string
           data_box_id?: string | null
           email?: string | null
@@ -2462,13 +2454,6 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
-          address_city?: string | null
-          address_country?: string | null
-          address_delivery?: string | null
-          address_ruian_kod?: string | null
-          address_street?: string | null
-          address_validated_at?: string | null
-          address_zip?: string | null
           created_at?: string
           data_box_id?: string | null
           email?: string | null

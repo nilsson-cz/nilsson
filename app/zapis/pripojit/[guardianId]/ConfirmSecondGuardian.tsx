@@ -31,8 +31,13 @@ export default function ConfirmSecondGuardian({
   const [kontaktni, setKontaktni] = useState<ValidovanaAdresa | null>(initialKontaktni)
   const [jinaKontaktni, setJinaKontaktni] = useState<boolean>(!!initialKontaktni)
 
+  // Trvalé bydliště je vždy ČR přes RÚIAN → ruian_kod je vyplněný.
   const mapAdr = (a: ValidovanaAdresa) => ({
-    obec: a.obec, ulice: a.ulice, cislo: a.cislo, psc: a.psc, ruian_kod: a.ruian_kod,
+    obec: a.obec, ulice: a.ulice, cislo: a.cislo, psc: a.psc, ruian_kod: a.ruian_kod!,
+  })
+  // Kontaktní může být zahraniční → ruian_kod nullable + country.
+  const mapKontaktni = (a: ValidovanaAdresa) => ({
+    obec: a.obec, ulice: a.ulice, cislo: a.cislo, psc: a.psc, ruian_kod: a.ruian_kod, country: a.country,
   })
 
   function potvrdit() {
@@ -44,7 +49,7 @@ export default function ConfirmSecondGuardian({
     startTransition(async () => {
       const res = await confirmSecondGuardian(guardianId, {
         adresa: mapAdr(adr),
-        adresaKontaktni: kontaktni ? mapAdr(kontaktni) : null,
+        adresaKontaktni: kontaktni ? mapKontaktni(kontaktni) : null,
       })
       if (res.success) {
         setLocalStav('potvrzeno')
@@ -94,7 +99,8 @@ export default function ConfirmSecondGuardian({
         {jinaKontaktni && (
           <AddressField
             label="Kontaktní adresa"
-            hint="Kam vám má škola doručovat, pokud se liší od trvalého bydliště."
+            hint="Kam vám má škola doručovat, pokud se liší od trvalého bydliště. Může být i zahraniční."
+            allowForeign
             value={kontaktni}
             onChange={setKontaktni}
             required

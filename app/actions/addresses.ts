@@ -59,7 +59,7 @@ export async function saveAddress(input: SaveAddressInput): Promise<SaveAddressR
       psc: adresa.psc,
       ruian_kod: adresa.ruian_kod || null,
       validated_at: adresa.validated_at || null,
-      country: 'CZ',
+      country: adresa.country || 'CZ',
     })
     if (ins.error) {
       return { success: false, error: 'Uložení adresy selhalo.' }

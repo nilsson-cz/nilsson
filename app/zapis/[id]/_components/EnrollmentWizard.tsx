@@ -59,6 +59,7 @@ interface AppData {
   dite_kontaktni_adresa_cislo: string | null
   dite_kontaktni_adresa_psc: string | null
   dite_kontaktni_adresa_ruian_kod: string | null
+  dite_kontaktni_adresa_country: string | null
   // přestup
   prestup_k_datu: string | null
   soucasna_skola: string | null
@@ -85,6 +86,7 @@ interface OwnerData {
   address_kontaktni_cislo: string | null
   address_kontaktni_psc: string | null
   address_kontaktni_ruian_kod: string | null
+  address_kontaktni_country: string | null
 }
 
 // ── Pomocné: rekonstrukce ValidovanaAdresa z DB polí ────────────────────
@@ -94,7 +96,21 @@ function adrZDb(
   psc: string | null, ruian: string | null
 ): ValidovanaAdresa | null {
   if (!ruian || !obec || !cislo || !psc) return null
-  return { obec, ulice: ulice || null, cislo, psc, ruian_kod: ruian, validated_at: '' }
+  // Trvalé bydliště je vždy ČR (RÚIAN); zahraniční se u trvalého nezadává.
+  return { obec, ulice: ulice || null, cislo, psc, ruian_kod: ruian, validated_at: '', country: 'CZ' }
+}
+
+// Kontaktní adresa může být zahraniční (ruian_kod null, country != 'CZ') → RÚIAN
+// nevyžadujeme, stačí obec + číslo + PSČ.
+function adrKontaktniZDb(
+  obec: string | null, ulice: string | null, cislo: string | null,
+  psc: string | null, ruian: string | null, country: string | null,
+): ValidovanaAdresa | null {
+  if (!obec || !cislo || !psc) return null
+  return {
+    obec, ulice: ulice || null, cislo, psc,
+    ruian_kod: ruian, validated_at: ruian ? '' : null, country: country || 'CZ',
+  }
 }
 
 const inputClass =
@@ -167,9 +183,9 @@ export default function EnrollmentWizard({
   )
   const [bydliJinde, setBydliJinde] = useState(app.dite_bydli_jinde)
   const [kontaktni, setKontaktni] = useState<ValidovanaAdresa | null>(
-    adrZDb(app.dite_kontaktni_adresa_obec, app.dite_kontaktni_adresa_ulice,
+    adrKontaktniZDb(app.dite_kontaktni_adresa_obec, app.dite_kontaktni_adresa_ulice,
       app.dite_kontaktni_adresa_cislo, app.dite_kontaktni_adresa_psc,
-      app.dite_kontaktni_adresa_ruian_kod)
+      app.dite_kontaktni_adresa_ruian_kod, app.dite_kontaktni_adresa_country)
   )
 
   const [ownerForm, setOwnerForm] = useState({
@@ -184,11 +200,11 @@ export default function EnrollmentWizard({
       owner.address_psc, owner.address_ruian_kod)
   )
   const [ownerKontaktni, setOwnerKontaktni] = useState<ValidovanaAdresa | null>(
-    adrZDb(owner.address_kontaktni_obec, owner.address_kontaktni_ulice, owner.address_kontaktni_cislo,
-      owner.address_kontaktni_psc, owner.address_kontaktni_ruian_kod)
+    adrKontaktniZDb(owner.address_kontaktni_obec, owner.address_kontaktni_ulice, owner.address_kontaktni_cislo,
+      owner.address_kontaktni_psc, owner.address_kontaktni_ruian_kod, owner.address_kontaktni_country)
   )
   const [ownerJinaKontaktni, setOwnerJinaKontaktni] = useState<boolean>(
-    !!owner.address_kontaktni_ruian_kod
+    !!owner.address_kontaktni_obec
   )
 
   // ── Živá věková klasifikace (pro sekci Zdraví) ───────────────────────
@@ -230,10 +246,10 @@ export default function EnrollmentWizard({
         if (!trvale) { setError('Ověřte prosím trvalé bydliště dítěte v registru adres.'); return }
         if (bydliJinde && !kontaktni) { setError('Ověřte kontaktní adresu, nebo odškrtněte „dítě bydlí jinde".'); return }
         res = await saveEnrollmentDiteAdresa(app.id, {
-          trvale: { obec: trvale.obec, ulice: trvale.ulice, cislo: trvale.cislo, psc: trvale.psc, ruian_kod: trvale.ruian_kod },
+          trvale: { obec: trvale.obec, ulice: trvale.ulice, cislo: trvale.cislo, psc: trvale.psc, ruian_kod: trvale.ruian_kod! },
           bydli_jinde: bydliJinde,
           kontaktni: bydliJinde && kontaktni
-            ? { obec: kontaktni.obec, ulice: kontaktni.ulice, cislo: kontaktni.cislo, psc: kontaktni.psc, ruian_kod: kontaktni.ruian_kod }
+            ? { obec: kontaktni.obec, ulice: kontaktni.ulice, cislo: kontaktni.cislo, psc: kontaktni.psc, ruian_kod: kontaktni.ruian_kod, country: kontaktni.country }
             : null,
         })
       } else if (step.id === 'zdravi' || step.id === 'prestup') {
@@ -262,9 +278,9 @@ export default function EnrollmentWizard({
         }
         res = await saveEnrollmentOwner(app.id, {
           ...ownerForm,
-          adresa: { obec: ownerAdr.obec, ulice: ownerAdr.ulice, cislo: ownerAdr.cislo, psc: ownerAdr.psc, ruian_kod: ownerAdr.ruian_kod },
+          adresa: { obec: ownerAdr.obec, ulice: ownerAdr.ulice, cislo: ownerAdr.cislo, psc: ownerAdr.psc, ruian_kod: ownerAdr.ruian_kod! },
           adresaKontaktni: ownerKontaktni
-            ? { obec: ownerKontaktni.obec, ulice: ownerKontaktni.ulice, cislo: ownerKontaktni.cislo, psc: ownerKontaktni.psc, ruian_kod: ownerKontaktni.ruian_kod }
+            ? { obec: ownerKontaktni.obec, ulice: ownerKontaktni.ulice, cislo: ownerKontaktni.cislo, psc: ownerKontaktni.psc, ruian_kod: ownerKontaktni.ruian_kod, country: ownerKontaktni.country }
             : null,
         })
       }
@@ -488,7 +504,7 @@ function StepAdresa({ trvale, setTrvale, bydliJinde, setBydliJinde, kontaktni, s
         Dítě fakticky bydlí na jiné adrese (kontaktní adresa)
       </label>
       {bydliJinde && (
-        <AddressField label="Kontaktní adresa dítěte" value={kontaktni} onChange={setKontaktni} required />
+        <AddressField label="Kontaktní adresa dítěte" value={kontaktni} onChange={setKontaktni} required allowForeign />
       )}
     </div>
   )
@@ -672,10 +688,11 @@ function StepZastupce({ ownerForm, setOwnerForm, ownerAdr, setOwnerAdr, ownerKon
         {ownerJinaKontaktni && (
           <AddressField
             label="Kontaktní adresa"
-            hint="Kam vám má škola doručovat, pokud se liší od trvalého bydliště."
+            hint="Kam vám má škola doručovat, pokud se liší od trvalého bydliště. Může být i zahraniční."
             value={ownerKontaktni}
             onChange={setOwnerKontaktni}
             required
+            allowForeign
           />
         )}
       </div>

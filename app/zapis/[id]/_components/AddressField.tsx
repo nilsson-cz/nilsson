@@ -1,18 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { validateEnrollmentAddress } from '@/app/actions/enrollment'
+import { countryOptions } from '@/lib/countries'
 import type { AdresaKandidat, ValidovanaAdresa } from '@/lib/enrollment/types'
 
 // app/zapis/[id]/_components/AddressField.tsx
 // Znovupoužitelné pole pro adresu s RÚIAN validací (migrace 041).
 //
-// TVRDÝ BLOK: adresa se nepovažuje za platnou, dokud ji uživatel neověří
-// proti registru adres a nezíská ruian_kod. Jakákoli editace pole po ověření
-// ověření zruší (musí se ověřit znovu) — nelze uložit „ručně přepsanou"
-// adresu, která by se rozešla s ruian_kod.
+// ČR (country='CZ') — TVRDÝ BLOK: adresa se nepovažuje za platnou, dokud ji
+// uživatel neověří proti registru adres a nezíská ruian_kod. Jakákoli editace
+// pole po ověření ověření zruší (musí se ověřit znovu) — nelze uložit „ručně
+// přepsanou" adresu, která by se rozešla s ruian_kod.
 //
-// Stavy odezvy z enrollment_validate_address:
+// Zahraničí (allowForeign + country != 'CZ'): RÚIAN neexistuje → ruční zadání
+// strukturovaných polí bez ověření (ruian_kod i validated_at = null). Adresa je
+// „hotová", jakmile jsou vyplněné obec + číslo + PSČ (ulice je nepovinná).
+//
+// Stavy odezvy z enrollment_validate_address (jen pro ČR):
 //   matched   → 1 adresa, rovnou se převezme
 //   ambiguous → víc kandidátů, uživatel vybere
 //   not_found → červený blok, adresa neexistuje / překlep
@@ -25,6 +30,9 @@ interface AddressFieldProps {
   disabled?: boolean
   // Nápověda pod nadpisem (např. u dítěte vs. zástupce)
   hint?: string
+  // Povolit zahraniční adresu (výběr země). Používá se jen u KONTAKTNÍ adresy;
+  // trvalé bydliště je vždy ČR přes RÚIAN.
+  allowForeign?: boolean
 }
 
 type OvenriState =
@@ -46,6 +54,7 @@ function kandidatNaAdresu(c: AdresaKandidat): ValidovanaAdresa {
     psc: c.psc,
     ruian_kod: c.ruian_kod,
     validated_at: new Date().toISOString(),
+    country: 'CZ',
   }
 }
 
@@ -68,22 +77,57 @@ export default function AddressField({
   required = false,
   disabled = false,
   hint,
+  allowForeign = false,
 }: AddressFieldProps) {
+  const [country, setCountry] = useState(value?.country ?? 'CZ')
   const [obec, setObec]   = useState(value?.obec ?? '')
   const [ulice, setUlice] = useState(value?.ulice ?? '')
   const [cislo, setCislo] = useState(value?.cislo ?? '')
   const [psc, setPsc]     = useState(value?.psc ?? '')
   const [state, setState] = useState<OvenriState>(
-    value ? { kind: 'matched' } : { kind: 'idle' }
+    value?.ruian_kod ? { kind: 'matched' } : { kind: 'idle' }
   )
 
-  const overeno = value !== null && state.kind === 'matched'
+  const countries = useMemo(() => countryOptions(), [])
+  const jeCr = country === 'CZ'
+  const overeno = jeCr && value !== null && value.ruian_kod !== null && state.kind === 'matched'
 
-  // Editace jakéhokoli pole → zneplatní dřívější ověření
-  function edited(setter: (v: string) => void, v: string) {
+  // Zahraniční adresa: poskládá ValidovanaAdresa z aktuálních polí (s override
+  // pro právě měněné pole, protože setState je asynchronní) a emituje ji,
+  // jakmile jsou vyplněné obec + číslo + PSČ. Jinak emituje null.
+  function emitForeign(next: Partial<Record<'obec' | 'ulice' | 'cislo' | 'psc' | 'country', string>>) {
+    const o = (next.obec ?? obec).trim()
+    const u = (next.ulice ?? ulice).trim()
+    const c = (next.cislo ?? cislo).trim()
+    const p = (next.psc ?? psc).trim()
+    const ctry = next.country ?? country
+    if (o && c && p) {
+      onChange({ obec: o, ulice: u || null, cislo: c, psc: p, ruian_kod: null, validated_at: null, country: ctry })
+    } else {
+      onChange(null)
+    }
+  }
+
+  // Editace pole. ČR → zneplatní dřívější ověření. Zahraničí → živě emituje.
+  function edited(field: 'obec' | 'ulice' | 'cislo' | 'psc', setter: (v: string) => void, v: string) {
     setter(v)
-    if (value !== null) onChange(null)
-    if (state.kind !== 'idle') setState({ kind: 'idle' })
+    if (jeCr) {
+      if (value !== null) onChange(null)
+      if (state.kind !== 'idle') setState({ kind: 'idle' })
+    } else {
+      emitForeign({ [field]: v })
+    }
+  }
+
+  function changeCountry(c: string) {
+    setCountry(c)
+    setState({ kind: 'idle' })
+    if (c === 'CZ') {
+      // Návrat do ČR → adresa se musí znovu ověřit v RÚIAN.
+      onChange(null)
+    } else {
+      emitForeign({ country: c })
+    }
   }
 
   async function overit() {
@@ -126,6 +170,10 @@ export default function AddressField({
     setState({ kind: 'matched' })
   }
 
+  // Strukturovaná pole se ukazují: u zahraniční adresy vždy, u ČR dokud není
+  // ověřená (po ověření je nahradí zelený box se souhrnem).
+  const zobrazitPole = !jeCr || !overeno
+
   return (
     <fieldset className="space-y-3" disabled={disabled}>
       <div>
@@ -135,51 +183,74 @@ export default function AddressField({
         {hint && <p className="text-xs text-gray-500 mt-0.5">{hint}</p>}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="sm:col-span-2">
-          <label className="block text-xs text-gray-500 mb-1">Obec / město</label>
-          <input
-            type="text" value={obec}
-            onChange={(e) => edited(setObec, e.target.value)}
-            placeholder="Např. Teplice"
-            className={inputClass}
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="block text-xs text-gray-500 mb-1">
-            Ulice <span className="text-gray-400">(u malých obcí případně část obce)</span>
-          </label>
-          <input
-            type="text" value={ulice}
-            onChange={(e) => edited(setUlice, e.target.value)}
-            placeholder="Např. Masarykova"
-            className={inputClass}
-          />
-        </div>
+      {allowForeign && (
         <div>
-          <label className="block text-xs text-gray-500 mb-1">
-            Číslo popisné / orientační
-          </label>
-          <input
-            type="text" value={cislo}
-            onChange={(e) => edited(setCislo, e.target.value)}
-            placeholder="Např. 150 nebo 150/2"
+          <label className="block text-xs text-gray-500 mb-1">Země</label>
+          <select
+            value={country}
+            onChange={(e) => changeCountry(e.target.value)}
             className={inputClass}
-          />
+          >
+            {countries.map((c) => (
+              <option key={c.code} value={c.code}>{c.name}</option>
+            ))}
+          </select>
         </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">PSČ</label>
-          <input
-            type="text" value={psc} inputMode="numeric"
-            onChange={(e) => edited(setPsc, e.target.value)}
-            placeholder="41501"
-            className={inputClass}
-          />
-        </div>
-      </div>
+      )}
 
-      {/* Akce + stav ověření */}
-      {!overeno && (
+      {zobrazitPole && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="sm:col-span-2">
+            <label className="block text-xs text-gray-500 mb-1">Obec / město</label>
+            <input
+              type="text" value={obec}
+              onChange={(e) => edited('obec', setObec, e.target.value)}
+              placeholder={jeCr ? 'Např. Teplice' : 'Např. Bratislava'}
+              className={inputClass}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs text-gray-500 mb-1">
+              Ulice {jeCr && <span className="text-gray-400">(u malých obcí případně část obce)</span>}
+            </label>
+            <input
+              type="text" value={ulice}
+              onChange={(e) => edited('ulice', setUlice, e.target.value)}
+              placeholder="Např. Masarykova"
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">
+              {jeCr ? 'Číslo popisné / orientační' : 'Číslo domu'}
+            </label>
+            <input
+              type="text" value={cislo}
+              onChange={(e) => edited('cislo', setCislo, e.target.value)}
+              placeholder={jeCr ? 'Např. 150 nebo 150/2' : 'Např. 25'}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">{jeCr ? 'PSČ' : 'PSČ / ZIP'}</label>
+            <input
+              type="text" value={psc} inputMode={jeCr ? 'numeric' : 'text'}
+              onChange={(e) => edited('psc', setPsc, e.target.value)}
+              placeholder={jeCr ? '41501' : '811 01'}
+              className={inputClass}
+            />
+          </div>
+        </div>
+      )}
+
+      {!jeCr && (
+        <p className="text-xs text-gray-500">
+          Zahraniční adresa se neověřuje proti registru RÚIAN — zadejte ji ručně.
+        </p>
+      )}
+
+      {/* Akce + stav ověření — jen pro ČR (RÚIAN) */}
+      {jeCr && !overeno && (
         <button
           type="button"
           onClick={overit}
