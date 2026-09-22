@@ -6,6 +6,7 @@
  * Dostupné všem rolím (v AppNav role = všechny). Gray paleta, vzor VP.
  */
 
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { getMyStaffConsents } from '@/lib/staff-consents'
@@ -41,6 +42,11 @@ export default async function MujProfilPage() {
         <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
           Souhlasy se zpracováním osobních údajů
         </h2>
+        <p className="text-sm text-gray-500">
+          <Link href="/dashboard/souhlasy/plne-zneni#zamestnanci" className="underline underline-offset-2 hover:text-gray-700">
+            Plné znění souhlasu
+          </Link>
+        </p>
         <StaffConsentToggleList rows={consents} />
       </section>
     </div>

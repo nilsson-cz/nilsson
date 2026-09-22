@@ -10,6 +10,7 @@
  * Vzor: Server wrapper (data) + Client komponenta (interaktivita), jako Tripartita.
  */
 
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { getConsentsForGuardian, type GuardianConsentRow } from '@/lib/consents'
@@ -75,7 +76,13 @@ export default async function PortalConsentsPage() {
         Souhlasy
       </h1>
       <p className="text-sm text-stone-500 dark:text-stone-400 mb-6">
-        Souhlasy se zpracováním osobních údajů
+        Souhlasy se zpracováním osobních údajů ·{' '}
+        <Link
+          href="/portal/souhlasy/plne-zneni"
+          className="underline underline-offset-2 hover:text-stone-700 dark:hover:text-stone-200"
+        >
+          plné znění
+        </Link>
       </p>
 
       {children.length === 0 ? (
