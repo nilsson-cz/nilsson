@@ -9,6 +9,7 @@
  * CURRENT_SCHOOL_YEAR z lib/config, table styl + badge styl.
  */
 
+import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { CURRENT_SCHOOL_YEAR } from '@/lib/config'
 import { getConsentOverview, type ConsentState } from '@/lib/consents'
@@ -70,7 +71,12 @@ export default async function ConsentOverviewPage() {
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">GDPR souhlasy</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Školní rok {CURRENT_SCHOOL_YEAR}</p>
+        <p className="text-sm text-gray-500 mt-0.5">
+          Školní rok {CURRENT_SCHOOL_YEAR} ·{' '}
+          <Link href="/dashboard/souhlasy/plne-zneni" className="underline underline-offset-2 hover:text-gray-700">
+            plné znění souhlasů
+          </Link>
+        </p>
       </div>
 
       {deniedTotal > 0 && (
