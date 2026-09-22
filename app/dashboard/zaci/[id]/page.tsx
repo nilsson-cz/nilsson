@@ -112,7 +112,7 @@ export default async function ZakDetailPage({
     .from('student_guardian_links')
     .select(
       `role, je_zakonny_zastupce, je_primarni_kontakt, dostava_komunikaci, guardian_id,
-       guardians(first_name, last_name, email, phone_primary, phone_secondary, address_street, address_city, address_zip)`
+       guardians(first_name, last_name, email, phone_primary, phone_secondary)`
     )
     .eq('student_id', id)
     .is('platnost_do', null)
@@ -126,8 +126,9 @@ export default async function ZakDetailPage({
           ulice: a.ulice,
           cislo: a.cislo,
           psc: a.psc,
-          ruian_kod: a.ruian_kod ?? '',
-          validated_at: a.validated_at ?? '',
+          ruian_kod: a.ruian_kod ?? null,
+          validated_at: a.validated_at ?? null,
+          country: a.country ?? 'CZ',
         }
       : null
   const zzLinks = ((guardianLinks as any[]) ?? []).filter((l) => l.je_zakonny_zastupce && l.guardian_id)
@@ -355,11 +356,7 @@ export default async function ZakDetailPage({
                     {g?.email && <a href={`mailto:${g.email}`} className="block text-gray-600 hover:text-gray-900">{g.email}</a>}
                     {g?.phone_primary && <a href={`tel:${g.phone_primary}`} className="block text-gray-600 hover:text-gray-900">{g.phone_primary}</a>}
                     {g?.phone_secondary && <span className="block text-gray-400 text-xs">{g.phone_secondary}</span>}
-                    {(g?.address_street || g?.address_city) && (
-                      <span className="block text-gray-400 text-xs mt-1">
-                        {[g.address_street, g.address_city, g.address_zip].filter(Boolean).join(", ")}
-                      </span>
-                    )}
+                    {/* Adresy zástupce viz níže „Adresy" panel (jednotný model). */}
                   </div>
                 </div>
               )

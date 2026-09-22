@@ -144,14 +144,17 @@ export type ValidaceAdresyVysledek =
   | { status: 'ambiguous'; candidates: AdresaKandidat[] }
   | { status: 'not_found'; reason?: string }
 
-// Validovaná adresa uložená ve formuláři (to, co jde do DB).
+// Adresa uložená ve formuláři (to, co jde do DB). Pro ČR je „validovaná" =
+// má ruian_kod + validated_at (tvrdý blok RÚIAN). Zahraniční adresa (country !=
+// 'CZ') se zadává ručně bez RÚIAN → ruian_kod i validated_at jsou null.
 export interface ValidovanaAdresa {
   obec: string
   ulice: string | null
   cislo: string
   psc: string
-  ruian_kod: string
-  validated_at: string // ISO
+  ruian_kod: string | null   // null = zahraniční / nevalidovaná adresa
+  validated_at: string | null // ISO; párové s ruian_kod
+  country: string            // ISO 3166-1 alpha-2, default 'CZ'
 }
 
 // ── Údaje o dítěti (dotazník) ───────────────────────────────────────────

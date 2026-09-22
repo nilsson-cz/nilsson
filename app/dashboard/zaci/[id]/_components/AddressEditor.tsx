@@ -46,7 +46,14 @@ export default function AddressEditor({
 
   return (
     <div className="space-y-2">
-      <AddressField label={label} hint={hint} value={local} onChange={setLocal} />
+      {/* Zahraniční adresa jen u kontaktní; trvalé je vždy ČR přes RÚIAN. */}
+      <AddressField
+        label={label}
+        hint={hint}
+        value={local}
+        onChange={setLocal}
+        allowForeign={typ === 'kontaktni'}
+      />
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

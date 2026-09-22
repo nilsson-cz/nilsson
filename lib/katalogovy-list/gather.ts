@@ -48,16 +48,6 @@ const VP_PECE_LABEL: Record<string, string> = {
   po_5: 'podpůrné opatření 5. stupně',
 }
 
-function formatAdresa(
-  street: string | null,
-  city: string | null,
-  zip: string | null
-): string | null {
-  const radek2 = [zip, city].filter(Boolean).join(' ')
-  const cele = [street, radek2].filter(Boolean).join(', ')
-  return cele || null
-}
-
 /** Matriční záznam (ročník + způsob PŠD) platný k referenčnímu datu. */
 async function eduModeKDatu(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
@@ -154,15 +144,14 @@ export async function gatherKatalogovyList(
     .from('student_guardian_links')
     .select(
       `role, je_primarni_kontakt, guardian_id,
-       guardians(first_name, last_name, email, phone_primary, phone_secondary,
-                 address_street, address_city, address_zip, address_delivery)`
+       guardians(first_name, last_name, email, phone_primary, phone_secondary)`
     )
     .eq('student_id', studentId)
     .eq('je_zakonny_zastupce', true)
     .is('platnost_do', null)
     .order('je_primarni_kontakt', { ascending: false })
 
-  // Jednotný adresní model (M3): addresses = zdroj, guardians.address_* = fallback.
+  // Jednotný adresní model (M6): addresses je JEDINÝ zdroj adres (guardians.address_* dropnuto).
   const guardianIds = ((gl ?? []) as { guardian_id: string | null }[])
     .map((l) => l.guardian_id)
     .filter((x): x is string => !!x)
@@ -177,20 +166,15 @@ export async function gatherKatalogovyList(
     return {
       jmeno: [g.first_name, g.last_name].filter(Boolean).join(' '),
       vztah: VZTAH_LABEL[l.role] ?? l.role,
-      bydliste: formatAddressLine(a) ?? formatAdresa(g.address_street, g.address_city, g.address_zip),
+      bydliste: formatAddressLine(a),
       telefon: g.phone_primary ?? g.phone_secondary ?? null,
       email: g.email ?? null,
     }
   })
 
-  // Adresa žáka: addresses (trvalé/kontaktní) → fallback adresa primárního ZZ (PRD R9).
-  const primar = ((gl as any[]) ?? [])[0]?.guardians ?? null
-  const trvaleFallback = primar
-    ? formatAdresa(primar.address_street, primar.address_city, primar.address_zip)
-    : null
-  const trvale = formatAddressLine(studAddr.trvale) ?? trvaleFallback
-  const korespondencni =
-    formatAddressLine(studAddr.kontaktni) ?? primar?.address_delivery ?? trvale
+  // Adresa žáka: addresses (trvalé/kontaktní); korespondenční fallbackuje na trvalé.
+  const trvale = formatAddressLine(studAddr.trvale)
+  const korespondencni = formatAddressLine(studAddr.kontaktni) ?? trvale
 
   // --- předchozí vzdělávání ---
   const { data: history } = await supabase

@@ -5,12 +5,22 @@ import ConfirmSecondGuardian from './ConfirmSecondGuardian'
 import { STAV_LABELS, STAV_VARIANT, GUARDIAN_ROLE_LABELS, type EnrollmentStav, type GuardianRole, type ValidovanaAdresa } from '@/lib/enrollment/types'
 
 // Rekonstrukce ValidovanaAdresa z DB polí (jako adrZDb ve wizardu).
+// Trvalé bydliště je vždy ČR (vyžaduje ruian_kod).
 function adrZDb(
   obec: string | null, ulice: string | null, cislo: string | null,
   psc: string | null, ruian_kod: string | null,
 ): ValidovanaAdresa | null {
   if (!ruian_kod || !obec || !cislo || !psc) return null
-  return { obec, ulice, cislo, psc, ruian_kod, validated_at: '' }
+  return { obec, ulice, cislo, psc, ruian_kod, validated_at: '', country: 'CZ' }
+}
+
+// Kontaktní adresa může být zahraniční (ruian_kod null, country != 'CZ').
+function adrKontaktniZDb(
+  obec: string | null, ulice: string | null, cislo: string | null,
+  psc: string | null, ruian_kod: string | null, country: string | null,
+): ValidovanaAdresa | null {
+  if (!obec || !cislo || !psc) return null
+  return { obec, ulice, cislo, psc, ruian_kod, validated_at: ruian_kod ? '' : null, country: country || 'CZ' }
 }
 
 // app/zapis/pripojit/[guardianId]/page.tsx
@@ -62,7 +72,7 @@ export default async function PripojitPage({
   // RLS teď (po úspěšném napojení) dovolí číst vlastní řádek i žádost.
   const { data: guardian } = await supabase
     .from('enrollment_guardians')
-    .select('id, application_id, first_name, last_name, email, stav, pribuzensky_vztah, address_obec, address_ulice, address_cislo, address_psc, address_ruian_kod, address_kontaktni_obec, address_kontaktni_ulice, address_kontaktni_cislo, address_kontaktni_psc, address_kontaktni_ruian_kod')
+    .select('id, application_id, first_name, last_name, email, stav, pribuzensky_vztah, address_obec, address_ulice, address_cislo, address_psc, address_ruian_kod, address_kontaktni_obec, address_kontaktni_ulice, address_kontaktni_cislo, address_kontaktni_psc, address_kontaktni_ruian_kod, address_kontaktni_country')
     .eq('id', guardianId)
     .maybeSingle()
 
@@ -149,7 +159,7 @@ export default async function PripojitPage({
         stav={guardian.stav as 'pozvan' | 'zaregistrovan' | 'potvrzeno'}
         appId={guardian.application_id}
         initialAdresa={adrZDb(guardian.address_obec, guardian.address_ulice, guardian.address_cislo, guardian.address_psc, guardian.address_ruian_kod)}
-        initialKontaktni={adrZDb(guardian.address_kontaktni_obec, guardian.address_kontaktni_ulice, guardian.address_kontaktni_cislo, guardian.address_kontaktni_psc, guardian.address_kontaktni_ruian_kod)}
+        initialKontaktni={adrKontaktniZDb(guardian.address_kontaktni_obec, guardian.address_kontaktni_ulice, guardian.address_kontaktni_cislo, guardian.address_kontaktni_psc, guardian.address_kontaktni_ruian_kod, guardian.address_kontaktni_country)}
       />
     </div>
   )

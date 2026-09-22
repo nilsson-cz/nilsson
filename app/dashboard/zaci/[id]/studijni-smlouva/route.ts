@@ -34,12 +34,6 @@ function asciiSlug(str: string): string {
   )
 }
 
-function adresa(street: string | null, city: string | null, zip: string | null): string | null {
-  const radek2 = [zip, city].filter(Boolean).join(' ')
-  const cele = [street, radek2].filter(Boolean).join(', ')
-  return cele || null
-}
-
 type GuardianRow = {
   role: string | null
   je_primarni_kontakt: boolean | null
@@ -50,19 +44,18 @@ type GuardianRow = {
     email: string | null
     phone_primary: string | null
     phone_secondary: string | null
-    address_street: string | null
-    address_city: string | null
-    address_zip: string | null
   } | null
 }
 
+// M6: guardians.address_* dropnuto → matrika dává už jen jméno/kontakt,
+// adresa přichází z addresses (overlayAddr) nebo z enrollmentu.
 function rodicZLinku(link: GuardianRow | undefined): SmlouvaRodic | null {
   if (!link?.guardians) return null
   const g = link.guardians
   return {
     jmeno: [g.first_name, g.last_name].filter(Boolean).join(' ') || null,
-    bydliste: adresa(g.address_street, g.address_city, null),
-    psc: g.address_zip ?? null,
+    bydliste: null,
+    psc: null,
     email: g.email ?? null,
     telefon: g.phone_primary ?? g.phone_secondary ?? null,
   }
@@ -148,8 +141,7 @@ export async function GET(
     .from('student_guardian_links')
     .select(
       `role, je_primarni_kontakt, guardian_id,
-       guardians(first_name, last_name, email, phone_primary, phone_secondary,
-                 address_street, address_city, address_zip)`,
+       guardians(first_name, last_name, email, phone_primary, phone_secondary)`,
     )
     .eq('student_id', id)
     .eq('je_zakonny_zastupce', true)
@@ -159,10 +151,6 @@ export async function GET(
 
   const otecM = rodicZLinku(links.find((l) => l.role === 'otec'))
   const matkaM = rodicZLinku(links.find((l) => l.role === 'matka'))
-  const primar = links[0]?.guardians ?? null
-  const bydlisteZakaM = primar
-    ? adresa(primar.address_street, primar.address_city, primar.address_zip)
-    : null
 
   // Přijímací žádost (pokud žák vznikl přijetím) — validované adresy: trvalé
   // bydliště dítěte je povinné a do students se neukládá (jen obec/okres kód),
@@ -216,7 +204,7 @@ export async function GET(
 
   const otec = overlayAddr(preferSAdresou(otecE, otecM), otecGid ? guardAddr.get(otecGid)?.trvale ?? null : null)
   const matka = overlayAddr(preferSAdresou(matkaE, matkaM), matkaGid ? guardAddr.get(matkaGid)?.trvale ?? null : null)
-  const bydlisteZaka = formatAddressLine(studAddr.trvale) ?? bydlisteZakaE ?? bydlisteZakaM
+  const bydlisteZaka = formatAddressLine(studAddr.trvale) ?? bydlisteZakaE
 
   // nástupní ročník (matrika) → počet zbývajících ročníků (budoucí prvňák 9)
   const { data: edu } = await supabase
