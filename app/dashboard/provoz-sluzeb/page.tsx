@@ -3,7 +3,8 @@
  * Server Component — director-only: přehled kvót a zdraví infrastruktury (Fáze 1).
  *
  * Čte poslední snapshoty z usage_snapshots (plní denní cron usage-snapshot) a
- * konfiguraci prahů z usage_thresholds. Aktivní metriky: Supabase, GitHub Actions.
+ * konfiguraci prahů z usage_thresholds. Aktivní metriky: Supabase, GitHub Actions,
+ * SMSbrána (kredit — metrika typu „minimum", viz FLOOR_METRICS).
  * (Cloudflare + Railway vyřazeny — viz lib/usage-monitor.ts.) Resend + Vercel = Fáze 2.
  *
  * Guard: jen director (RLS director-only navíc vynucuje DB). Tabulky nejsou
@@ -12,7 +13,7 @@
 
 import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
-import { evaluateMetric, type ServiceMetric, type ThresholdRow as ThresholdConfig, type Level } from '@/lib/usage-monitor'
+import { evaluateMetric, isFloorMetric, type ServiceMetric, type ThresholdRow as ThresholdConfig, type Level } from '@/lib/usage-monitor'
 import ThresholdRow from './_components/ThresholdRow'
 
 export const metadata = { title: 'Provoz služeb — IS Nilsson' }
@@ -21,6 +22,7 @@ export const dynamic = 'force-dynamic'
 const SERVICE_LABEL: Record<string, string> = {
   supabase: 'Supabase',
   github: 'GitHub Actions',
+  smsbrana: 'SMSbrána',
 }
 
 /** Adaptéry, které limit hlásí samy (ruční limit se u nich needituje).
@@ -152,6 +154,7 @@ export default async function ProvozSluzebPage() {
                 const badge = level ? LEVEL_BADGE[level] : null
                 const unit = snap?.unit ?? t.unit ?? ''
                 const ratio = evaluated?.ratio ?? null
+                const floor = isFloorMetric(t.service, t.metric)
                 return (
                   <tr key={`${t.service}|${t.metric}`} className="hover:bg-gray-50 dark:hover:bg-stone-800/50 transition-colors">
                     <td className="px-4 py-2.5">
@@ -162,7 +165,7 @@ export default async function ProvozSluzebPage() {
                       {snap ? `${fmtNum(snap.value)}${unit ? ` ${unit}` : ''}` : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-3 py-2.5 text-right whitespace-nowrap tabular-nums text-gray-500">
-                      {evaluated?.effectiveLimit != null ? `${fmtNum(evaluated.effectiveLimit)}${unit ? ` ${unit}` : ''}` : '—'}
+                      {evaluated?.effectiveLimit != null ? `${floor ? 'min. ' : ''}${fmtNum(evaluated.effectiveLimit)}${unit ? ` ${unit}` : ''}` : '—'}
                     </td>
                     <td className="px-3 py-2.5 w-40">
                       {ratio != null ? (
@@ -175,6 +178,8 @@ export default async function ProvozSluzebPage() {
                           </div>
                           <span className="text-xs tabular-nums text-gray-500 w-10 text-right">{Math.round(ratio * 100)} %</span>
                         </div>
+                      ) : floor ? (
+                        <span className="text-xs text-gray-400">hlídá se minimum</span>
                       ) : (
                         <span className="text-xs text-gray-300">bez limitu</span>
                       )}
@@ -203,6 +208,7 @@ export default async function ProvozSluzebPage() {
         <p className="text-xs text-gray-400">
           „Info" = metrika bez tvrdého limitu (sleduje se jen trend). „Nedostupné" = adaptér při posledním běhu selhal
           (najeď na štítek pro detail). Alerty na Discord chodí jen u metrik se zapnutým prahem při úrovni Zvýšené/Kritické.
+          Kredit SMSbrány je „minimum": pod nastavenou hranicí je Kritické a alert chodí denně, dokud se nedobije.
         </p>
       </section>
 
@@ -212,7 +218,7 @@ export default async function ProvozSluzebPage() {
           <h2 className="text-base font-semibold text-gray-900 dark:text-stone-100">Prahy a limity</h2>
           <p className="text-sm text-gray-500 dark:text-stone-400 mt-0.5">
             Ruční limit uprav tam, kde ho API nehlásí (Supabase, GitHub) — např. podle svého tarifu.
-            Poměry zadej v procentech; kritický ≥ upozornění.
+            Poměry zadej v procentech; kritický ≥ upozornění. U kreditu SMSbrány je limit spodní hranice (minimum v Kč).
           </p>
         </div>
         <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-stone-700">
@@ -241,6 +247,7 @@ export default async function ProvozSluzebPage() {
                   critRatio={t.crit_ratio}
                   enabled={t.enabled}
                   apiProvidesLimit={API_PROVIDES_LIMIT.has(`${t.service}|${t.metric}`)}
+                  floor={isFloorMetric(t.service, t.metric)}
                 />
               ))}
             </tbody>

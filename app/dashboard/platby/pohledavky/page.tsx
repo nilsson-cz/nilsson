@@ -30,7 +30,7 @@ type ObligationRow = {
 }
 
 type Filters = {
-  school_year: string   // '2026/2027' apod. — default CURRENT_SCHOOL_YEAR
+  school_year: string   // '2026/2027' apod., nebo 'all' — default CURRENT_SCHOOL_YEAR
   type:   ObligationType | 'all'
   status: ObligationStatus | 'all'
   month:  string   // 'YYYY-MM' nebo 'all'
@@ -67,8 +67,11 @@ async function fetchObligations(filters: Filters): Promise<ObligationRow[]> {
       id, type, popis, amount, due_date, notified_at, ss_kod,
       students ( first_name, last_name, kod_zaka )
     `)
-    .eq('school_year', filters.school_year)
     .order('due_date', { ascending: false })
+
+  if (filters.school_year !== 'all') {
+    query = query.eq('school_year', filters.school_year)
+  }
 
   if (filters.type !== 'all') {
     query = query.eq('type', filters.type)
@@ -125,10 +128,13 @@ async function fetchObligations(filters: Filters): Promise<ObligationRow[]> {
 
 async function fetchAvailableMonths(schoolYear: string): Promise<string[]> {
   const supabase = await createSupabaseServerClient()
-  const { data } = await supabase
+  let q = supabase
     .from('payment_obligations')
     .select('due_date')
-    .eq('school_year', schoolYear)
+  if (schoolYear !== 'all') {
+    q = q.eq('school_year', schoolYear)
+  }
+  const { data } = await q
 
   const months = new Set<string>()
   ;(data as any[] ?? []).forEach((o: any) => {
@@ -247,21 +253,24 @@ function FilterBar({
 
   return (
     <div className="space-y-2">
-      {/* Školní rok — zobraz jen když je z čeho vybírat */}
-      {years.length > 1 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-stone-400 w-12">Rok</span>
-          {years.map((y) => (
-            <FilterPill
-              key={y}
-              label={y}
-              active={filters.school_year === y}
-              // přepnutí roku resetuje měsíc (měsíce se mezi roky liší)
-              href={url({ school_year: y, month: 'all' })}
-            />
-          ))}
-        </div>
-      )}
+      {/* Školní rok */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-stone-400 w-12">Rok</span>
+        {/* přepnutí roku (i na Vše) resetuje měsíc — měsíce se mezi roky liší */}
+        <FilterPill
+          label="Vše"
+          active={filters.school_year === 'all'}
+          href={url({ school_year: 'all', month: 'all' })}
+        />
+        {years.map((y) => (
+          <FilterPill
+            key={y}
+            label={y}
+            active={filters.school_year === y}
+            href={url({ school_year: y, month: 'all' })}
+          />
+        ))}
+      </div>
 
       {/* Typ */}
       <div className="flex items-center gap-2 flex-wrap">

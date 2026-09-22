@@ -5,7 +5,7 @@
  * Volá se přes GitHub Actions workflow (.github/workflows/usage-snapshot.yml),
  * chráněno CRON_SECRET. Lze spustit i ručně: GET /api/cron/usage-snapshot.
  *
- * Tok: adaptéry (Supabase, GitHub) → uložení snapshotů
+ * Tok: adaptéry (Supabase, GitHub, SMSbrána kredit) → uložení snapshotů
  *      → vyhodnocení prahů → při warn/crit/selhání Discord alert řediteli.
  *
  * Cloudflare vyřazeno: doména běží na Forpsi DNS + Vercel edge, žádná CF zóna.
@@ -13,14 +13,15 @@
  * nedokumentovaným schématem. Resend + Vercel = Fáze 2 (nespolehlivé usage API).
  *
  * Env: CRON_SECRET (ochrana), DISCORD_MONITORING_WEBHOOK_URL (fallback DISCORD_WEBHOOK_URL),
- *      GH_BILLING_TOKEN, GH_USER. Supabase používá SUPABASE_SERVICE_ROLE_KEY (admin klient).
+ *      GH_BILLING_TOKEN, GH_USER, SMSBRANA_LOGIN + SMSBRANA_PASSWORD (kredit). Supabase používá SUPABASE_SERVICE_ROLE_KEY (admin klient).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase-server'
 import { notifyDiscordMessage } from '@/lib/discord'
+import { getSmsCredit } from '@/lib/sms'
 import {
-  fetchGithub, fetchSupabase,
+  fetchGithub, fetchSupabase, fetchSmsbrana,
   evaluateAll, buildAlertMessage,
   type ServiceMetric, type ThresholdRow, type EvaluatedMetric,
 } from '@/lib/usage-monitor'
@@ -45,6 +46,8 @@ export async function GET(req: NextRequest) {
         limitValue: null, effectiveLimit: 500, ratio: 0.94, ok: true, level: 'crit' },
       { service: 'github', metric: 'ci_minutes_month', label: 'CI/cron minuty (měsíc)', value: 1700, unit: 'minutes',
         limitValue: 2000, effectiveLimit: 2000, ratio: 0.85, ok: true, level: 'warn' },
+      { service: 'smsbrana', metric: 'credit_czk', label: 'Zbývající kredit', value: 38, unit: 'Kč',
+        limitValue: null, effectiveLimit: 50, ratio: null, ok: true, level: 'crit' },
     ]
     const msg = buildAlertMessage(sample)
     const sent = msg ? await notifyDiscordMessage({
@@ -67,6 +70,7 @@ export async function GET(req: NextRequest) {
   const groups = await Promise.all([
     fetchGithub(process.env),
     fetchSupabase(supabaseDbSize),
+    fetchSmsbrana(getSmsCredit),
   ])
   const metrics: ServiceMetric[] = groups.flat()
 

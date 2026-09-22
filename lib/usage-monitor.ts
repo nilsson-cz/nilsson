@@ -6,7 +6,7 @@
 // celý cron. Čisté funkce (evaluate*, buildAlertMessage) jsou bez side-efektů,
 // testovatelné samostatně.
 //
-// Aktivní: Supabase, GitHub Actions. (Cloudflare vyřazen — doména běží na Forpsi
+// Aktivní: Supabase, GitHub Actions, SMSbrána (kredit). (Cloudflare vyřazen — doména běží na Forpsi
 // DNS + Vercel edge, žádná CF zóna. Railway vyřazen — billing API vyžaduje
 // account/workspace auth s vratkým nedokumentovaným schématem; nestálo to za to.)
 // Resend + Vercel = Fáze 2.
@@ -48,6 +48,17 @@ export type EvaluatedMetric = ServiceMetric & {
 // ─── Čistá logika: vyhodnocení prahů ─────────────────────────────────────────
 
 /**
+ * Metriky typu „minimum" (zbývající zásoba — čím méně, tím hůř), např. kredit
+ * SMS brány. U nich je `manual_limit` spodní hranice: hodnota POD ní → 'crit'
+ * (alert), jinak 'ok'. Poměry warn/crit se neuplatní, ratio se nepočítá.
+ */
+export const FLOOR_METRICS = new Set<string>(['smsbrana|credit_czk'])
+
+export function isFloorMetric(service: string, metric: string): boolean {
+  return FLOOR_METRICS.has(`${service}|${metric}`)
+}
+
+/**
  * Spojí naměřenou metriku s její konfigurací prahů a vypočte úroveň.
  *   - adaptér selhal (ok=false)                → 'error'
  *   - není limit (API ani ruční)               → 'info' (jen trend, nealertuje)
@@ -80,6 +91,11 @@ export function evaluateMetric(m: ServiceMetric, t: ThresholdRow | undefined): E
     return { ...base, effectiveLimit: null, ratio: null, level: 'info' }
   }
 
+  if (isFloorMetric(m.service, m.metric)) {
+    const level: Level = t?.enabled === false ? 'info' : m.value < effectiveLimit ? 'crit' : 'ok'
+    return { ...base, effectiveLimit, ratio: null, level }
+  }
+
   const ratio = m.value / effectiveLimit
   const alertingOn = t?.enabled !== false
   let level: Level = 'ok'
@@ -109,6 +125,7 @@ export function evaluateAll(
 const SERVICE_LABEL: Record<string, string> = {
   supabase: 'Supabase',
   github: 'GitHub Actions',
+  smsbrana: 'SMSbrána',
 }
 
 function fmtPct(ratio: number): string {
@@ -135,6 +152,10 @@ export function buildAlertMessage(evaluated: EvaluatedMetric[]): string | null {
     const svc = SERVICE_LABEL[e.service] ?? e.service
     const unit = e.unit ? ` ${e.unit}` : ''
     const val = e.value !== null ? fmtNum(e.value) : '?'
+    if (isFloorMetric(e.service, e.metric) && e.effectiveLimit !== null) {
+      const hint = e.service === 'smsbrana' ? ' — dobít, jinak přestanou chodit SMS jídelně' : ''
+      return `**${svc}** — ${e.label}: ${val}${unit} (pod minimem ${fmtNum(e.effectiveLimit)}${unit})${hint}`
+    }
     const lim = e.effectiveLimit !== null ? ` / ${fmtNum(e.effectiveLimit)}${unit}` : ''
     const pct = e.ratio !== null ? ` (${fmtPct(e.ratio)})` : ''
     return `**${svc}** — ${e.label}: ${val}${lim}${pct}`
@@ -143,7 +164,7 @@ export function buildAlertMessage(evaluated: EvaluatedMetric[]): string | null {
   const parts: string[] = ['📊 **Provoz služeb — upozornění**']
 
   if (crit.length > 0) {
-    parts.push('', '🔴 **Kritické (blízko limitu):**', ...crit.map((e) => `• ${line(e)}`))
+    parts.push('', '🔴 **Kritické:**', ...crit.map((e) => `• ${line(e)}`))
   }
   if (warn.length > 0) {
     parts.push('', '🟠 **Zvýšené:**', ...warn.map((e) => `• ${line(e)}`))
@@ -245,5 +266,19 @@ export async function fetchSupabase(rpc: () => Promise<number>): Promise<Service
     return [{ service: 'supabase', metric: 'db_size_mb', value: bytes / BYTES_PER_MB, unit: 'MB', limitValue: null, ok: true }]
   } catch (e) {
     return [fail('supabase', 'db_size_mb', 'MB', e instanceof Error ? e.message : 'RPC error')]
+  }
+}
+
+/**
+ * SMSbrána — zbývající předplacený kredit (Kč), metrika typu „minimum"
+ * (viz FLOOR_METRICS). Když dojde, přestanou chodit ranní SMS jídelně.
+ * @param getCredit  funkce vracející kredit v Kč (lib/sms.ts getSmsCredit), nebo hodí výjimku
+ */
+export async function fetchSmsbrana(getCredit: () => Promise<number>): Promise<ServiceMetric[]> {
+  try {
+    const credit = await getCredit()
+    return [{ service: 'smsbrana', metric: 'credit_czk', value: credit, unit: 'Kč', limitValue: null, ok: true }]
+  } catch (e) {
+    return [fail('smsbrana', 'credit_czk', 'Kč', e instanceof Error ? e.message : 'credit_info error')]
   }
 }
