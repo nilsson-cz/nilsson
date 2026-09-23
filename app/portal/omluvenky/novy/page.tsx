@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { isAttending } from '@/lib/portal-children'
 import GuardianOmluvenkaForm from './_components/GuardianOmluvenkaForm'
 
 // app/portal/omluvenky/novy/page.tsx — Server wrapper
@@ -22,13 +23,13 @@ export default async function PortalNovaOmluvenkaPage() {
   // Načíst děti tohoto guardiana (aktivní vazby)
   const { data: linksRaw } = await supabase
     .from('student_guardian_links')
-    .select('student_id, students ( id, first_name, last_name, kod_zaka )')
+    .select('student_id, students ( id, first_name, last_name, kod_zaka, status, withdrawal_date )')
     .eq('guardian_id', guardian.id)
     .is('platnost_do', null)
 
   const children = ((linksRaw as any[]) ?? [])
     .map((l: any) => l.students)
-    .filter(Boolean)
+    .filter((s) => s && isAttending(s))
     .sort((a: any, b: any) => a.last_name.localeCompare(b.last_name, 'cs'))
 
   return (

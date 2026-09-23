@@ -7,6 +7,7 @@
  */
 
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { isAttending } from '@/lib/portal-children'
 import { redirect } from 'next/navigation'
 import { payliboUrl } from '@/lib/paylibo'
 
@@ -63,19 +64,20 @@ async function fetchGuardianData(): Promise<{
   if (!guardianRaw) return null
   const guardian = guardianRaw as any
 
-  // Načíst děti přes student_guardian_links
+  // Načíst děti přes student_guardian_links (aktivní vazba + dítě dochází, migrace 126)
   const { data: linksRaw } = await supabase
     .from('student_guardian_links')
     .select(`
       students (
-        id, first_name, last_name, kod_zaka
+        id, first_name, last_name, kod_zaka, status, withdrawal_date
       )
     `)
     .eq('guardian_id', guardian.id)
+    .is('platnost_do', null)
 
   const students = (linksRaw as any[] ?? [])
     .map((l: any) => l.students)
-    .filter(Boolean)
+    .filter((s) => s && isAttending(s))
 
   if (students.length === 0) {
     return {

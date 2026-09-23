@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { isAttending, type AttendanceFields } from '@/lib/portal-children'
 import LunchCalendar from './_components/LunchCalendar'
 import WeekMenuBrowser from './_components/WeekMenuBrowser'
 import type { LunchDay, LunchMenuDay } from '@/app/actions/portal-obedy'
@@ -59,13 +60,14 @@ export default async function PortalObedyPage() {
 
   const { data: linksRaw } = await supabase
     .from('student_guardian_links')
-    .select('students ( id, first_name, last_name )')
+    .select('students ( id, first_name, last_name, status, withdrawal_date )')
     .eq('guardian_id', guardian.id)
     .is('platnost_do', null)
 
-  const children = ((linksRaw as { students: { id: string; first_name: string; last_name: string } | null }[]) ?? [])
+  type ChildRow = { id: string; first_name: string; last_name: string } & AttendanceFields
+  const children = ((linksRaw as { students: ChildRow | null }[]) ?? [])
     .map((l) => l.students)
-    .filter((s): s is { id: string; first_name: string; last_name: string } => Boolean(s))
+    .filter((s): s is ChildRow => Boolean(s) && isAttending(s!))
 
   if (children.length === 0) {
     return (

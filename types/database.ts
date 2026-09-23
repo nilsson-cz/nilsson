@@ -6622,6 +6622,7 @@ export type Database = {
         Args: { p_campaign_id: string }
         Returns: boolean
       }
+      student_is_attending: { Args: { p_student_id: string }; Returns: boolean }
       usage_db_size: { Args: never; Returns: number }
       zrusit_blok_priznak: {
         Args: { p_blok_id: string; p_typ_kod: string }
