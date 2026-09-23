@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { isAttending } from '@/lib/portal-children'
 import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import StudentQuestionnaireForm from './_components/StudentQuestionnaireForm'
@@ -35,13 +36,13 @@ export default async function PortalDotaznikPage({
   // Děti (aktivní vazby)
   const { data: linksRaw } = await supabase
     .from('student_guardian_links')
-    .select('students ( id, first_name, last_name )')
+    .select('students ( id, first_name, last_name, status, withdrawal_date )')
     .eq('guardian_id', guardian.id)
     .is('platnost_do', null)
 
   const children: Child[] = ((linksRaw as any[]) ?? [])
     .map((l) => l.students)
-    .filter(Boolean)
+    .filter((s) => s && isAttending(s))
     .sort((a: Child, b: Child) => a.last_name.localeCompare(b.last_name, 'cs'))
 
   // Guardian část (jednou pro rodiče)

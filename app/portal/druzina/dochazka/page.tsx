@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { isAttending, type AttendanceFields } from '@/lib/portal-children'
 import { getActiveSchoolYear } from '@/lib/school-year'
 import DruzinaCalendar from './_components/DruzinaCalendar'
 import type { DruzinaDay } from '@/app/actions/portal-druzina-dochazka'
@@ -42,13 +43,13 @@ export default async function PortalDruzinaDochazkaPage() {
 
   const { data: linksRaw } = await supabase
     .from('student_guardian_links')
-    .select('students ( id, first_name, last_name )')
+    .select('students ( id, first_name, last_name, status, withdrawal_date )')
     .eq('guardian_id', guardian.id)
     .is('platnost_do', null)
 
-  const children = ((linksRaw as { students: Child | null }[]) ?? [])
+  const children = ((linksRaw as { students: (Child & AttendanceFields) | null }[]) ?? [])
     .map((l) => l.students)
-    .filter((s): s is Child => Boolean(s))
+    .filter((s): s is Child & AttendanceFields => Boolean(s) && isAttending(s!))
     .sort((a, b) => a.last_name.localeCompare(b.last_name, 'cs'))
 
   // Denní přihlašování dává smysl jen pro děti s aktivním zápisem do družiny.

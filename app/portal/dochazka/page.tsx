@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { isAttending } from '@/lib/portal-children'
 
 // app/portal/dochazka/page.tsx — přehled docházky pro zákonného zástupce
 // Read-only; RLS zajistí, že guardian vidí jen svá dítka
@@ -39,13 +40,13 @@ export default async function PortalDochazkaPage() {
   // Děti guardiana
   const { data: linksRaw } = await supabase
     .from('student_guardian_links')
-    .select('student_id, students ( id, first_name, last_name )')
+    .select('student_id, students ( id, first_name, last_name, status, withdrawal_date )')
     .eq('guardian_id', guardian.id)
     .is('platnost_do', null)
 
   const children = ((linksRaw as any[]) ?? [])
     .map((l: any) => l.students)
-    .filter(Boolean)
+    .filter((s) => s && isAttending(s))
 
   if (children.length === 0) {
     return (
