@@ -94,17 +94,22 @@ export default async function ZaciPage({
   // Ročník per žák pro ZOBRAZOVANÝ školní rok — ne „k dnešku". Matriční záznam
   // (student_education_mode) je verzovaný a povýšení platí od 1. 9. daného roku;
   // kdybychom četli k dnešku, do 1. 9. by se nový/povýšený ročník neukázal.
-  // Referenční datum = 1. 9. zobrazovaného roku. RLS: ředitel/vp/readonly vidí
-  // vše, průvodce/asistent jen svou skupinu → ostatním „Bez ročníku". Roster je
+  // Bereme záznam platný KDYKOLI během zobrazovaného roku (1. 9. – 31. 8.), ne
+  // jen k 1. 9. — přestupující žák nastupuje v průběhu roku (valid_from =
+  // datum nástupu) a při čtení k 1. 9. by zůstal „Bez ročníku". Při více
+  // záznamech v roce vyhrává nejnovější. RLS: ředitel/vp/readonly vidí vše,
+  // průvodce/asistent jen svou skupinu → ostatním „Bez ročníku". Roster je
   // SECURITY DEFINER (vidí všechny žáky), proto ročník doplňujeme zvlášť.
   if (students.length > 0) {
-    const refDate = `${schoolYear.slice(0, 4)}-09-01`
+    const startYear = Number(schoolYear.slice(0, 4))
+    const yearStart = `${startYear}-09-01`
+    const yearEnd = `${startYear + 1}-08-31`
     const { data: eduModes } = await supabase
       .from('student_education_mode')
       .select('student_id, rocnik, valid_from')
       .in('student_id', students.map((s) => s.id))
-      .lte('valid_from', refDate)
-      .or(`valid_to.is.null,valid_to.gte.${refDate}`)
+      .lte('valid_from', yearEnd)
+      .or(`valid_to.is.null,valid_to.gte.${yearStart}`)
       .not('rocnik', 'is', null)
       .order('valid_from', { ascending: false })
 
