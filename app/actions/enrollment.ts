@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 import type { Database } from '@/types/database'
 import { notifyDiscord } from '@/lib/discord'
 import { sendGuardianInvite } from '@/lib/enrollment/send-guardian-invite'
+import { zkontrolujRodneCislo, pohlaviZRodnehoCisla, jeCeskeObcanstvi } from '@/lib/rodne-cislo'
 import type {
   EnrollmentTyp,
   ValidaceAdresyVysledek,
@@ -226,6 +227,21 @@ export async function saveEnrollmentDite(
     return { success: false, error: 'Vyplňte datum narození dítěte.' }
   }
 
+  // Rodné číslo je nepovinné (cizinec ho mít nemusí), ale vyplněné musí být
+  // platné (MODULO11, platné datum) a odpovídat datu narození — jinak ho
+  // po přijetí odmítne matrika MŠMT. Ukládá se jednotně „RRMMDD/XXXX".
+  const rc = zkontrolujRodneCislo(input.rodne_cislo)
+  if (rc.stav === 'neplatne') {
+    return { success: false, error: `Rodné číslo není platné: ${rc.duvod}.` }
+  }
+  if (rc.stav === 'ok' && !rc.cizinec && rc.datumZRc !== input.datum_narozeni) {
+    return { success: false, error: 'Rodné číslo neodpovídá datu narození dítěte — zkontrolujte obojí.' }
+  }
+  // Pohlaví je v RČ zakódované (u dívek měsíc +50) — nesoulad = překlep.
+  if (rc.stav === 'ok' && input.pohlavi && pohlaviZRodnehoCisla(rc.rodc!) !== input.pohlavi) {
+    return { success: false, error: 'Pohlaví neodpovídá rodnému číslu — zkontrolujte obojí.' }
+  }
+
   // Věková klasifikace (uloží se spolu s daty)
   const rokZapisu = await odvodRokZapisu(supabase)
   const { data: klas } = await supabase.rpc('enrollment_classify_age', {
@@ -241,7 +257,7 @@ export async function saveEnrollmentDite(
     .update({
       dite_jmeno: input.dite_jmeno.trim(),
       dite_prijmeni: input.dite_prijmeni.trim(),
-      rodne_cislo: input.rodne_cislo?.trim() || null,
+      rodne_cislo: rc.formatovane,
       datum_narozeni: input.datum_narozeni,
       misto_narozeni: input.misto_narozeni?.trim() || null,
       statni_obcanstvi: input.statni_obcanstvi?.trim() || null,
@@ -548,6 +564,14 @@ export async function submitEnrollmentApplication(
   const chybi: string[] = []
   if (!app.dite_jmeno?.trim() || !app.dite_prijmeni?.trim()) chybi.push('jméno dítěte')
   if (!app.datum_narozeni || app.datum_narozeni === '1970-01-01') chybi.push('datum narození')
+  // RČ povinné u dítěte s českým občanstvím (to ho má vždy); cizinec ho mít
+  // nemusí — škola mu případně přidělí dočasný kód (matrika MŠMT).
+  if (!app.rodne_cislo?.trim() && jeCeskeObcanstvi(app.statni_obcanstvi)) {
+    chybi.push('rodné číslo dítěte (u dítěte bez českého občanství vyplňte občanství)')
+  } else if (app.rodne_cislo?.trim() && zkontrolujRodneCislo(app.rodne_cislo).stav !== 'ok') {
+    // Rozpracovaná žádost uložená před zavedením kontroly RČ.
+    chybi.push('platné rodné číslo dítěte')
+  }
   if (!app.dite_trvale_bydliste_ruian_kod) chybi.push('ověřené trvalé bydliště dítěte')
   if (app.vekova_kategorie === 'prilis_mlade' && !app.prilis_mlade_potvrzeno) {
     return { success: false, error: 'Dítě je pro tento školní rok příliš mladé. Kontaktujte prosím školu.' }

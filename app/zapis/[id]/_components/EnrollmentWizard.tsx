@@ -20,6 +20,7 @@ import {
   type ValidovanaAdresa,
   type VekovaKlasifikace,
 } from '@/lib/enrollment/types'
+import { zkontrolujRodneCislo, pohlaviZRodnehoCisla, jeCeskeObcanstvi } from '@/lib/rodne-cislo'
 
 // ── Typy vstupních dat z DB ─────────────────────────────────────────────
 
@@ -117,6 +118,32 @@ const inputClass =
   'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 ' +
   'focus:outline-none focus:ring-2 focus:ring-indigo-500'
 const labelClass = 'block text-sm font-medium text-gray-700 mb-1'
+
+/**
+ * Okamžitá kontrola rodného čísla pod polem (stejná pravidla jako server,
+ * lib/rodne-cislo.ts): formát, dělitelnost 11, soulad s datem narození
+ * a s pohlavím. Povinné jen při českém občanství (hlídá odeslání žádosti).
+ */
+function RodneCisloHint({ rc, datumNarozeni, pohlavi, povinne }: {
+  rc: string; datumNarozeni: string; pohlavi: string; povinne: boolean
+}) {
+  if (!rc?.trim()) {
+    return povinne
+      ? <p className="mt-1 text-xs text-gray-500">Povinné u dítěte s českým občanstvím.</p>
+      : <p className="mt-1 text-xs text-gray-500">Dítě bez českého rodného čísla může pole nechat prázdné.</p>
+  }
+  const k = zkontrolujRodneCislo(rc)
+  if (k.stav === 'neplatne') {
+    return <p className="mt-1 text-xs text-red-600">Rodné číslo není platné: {k.duvod}.</p>
+  }
+  if (k.stav === 'ok' && !k.cizinec && datumNarozeni && k.datumZRc !== datumNarozeni) {
+    return <p className="mt-1 text-xs text-red-600">Rodné číslo neodpovídá datu narození.</p>
+  }
+  if (k.stav === 'ok' && pohlavi && pohlaviZRodnehoCisla(k.rodc!) !== pohlavi) {
+    return <p className="mt-1 text-xs text-red-600">Rodné číslo neodpovídá zvolenému pohlaví.</p>
+  }
+  return <p className="mt-1 text-xs text-green-700">✓ Rodné číslo je v pořádku.</p>
+}
 
 // ── Krokový model ───────────────────────────────────────────────────────
 
@@ -454,8 +481,16 @@ function StepDite({ dite, setDite, jePrestup }: any) {
           <input type="date" value={dite.datum_narozeni} onChange={(e) => set('datum_narozeni', e.target.value)} className={inputClass} />
         </div>
         <div>
-          <label className={labelClass}>Rodné číslo</label>
+          <label className={labelClass}>
+            Rodné číslo {jeCeskeObcanstvi(dite.statni_obcanstvi) && <span className="text-red-500">*</span>}
+          </label>
           <input type="text" value={dite.rodne_cislo} onChange={(e) => set('rodne_cislo', e.target.value)} placeholder="000000/0000" className={inputClass} />
+          <RodneCisloHint
+            rc={dite.rodne_cislo}
+            datumNarozeni={dite.datum_narozeni}
+            pohlavi={dite.pohlavi}
+            povinne={jeCeskeObcanstvi(dite.statni_obcanstvi)}
+          />
         </div>
         <div>
           <label className={labelClass}>Místo narození</label>

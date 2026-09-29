@@ -4594,6 +4594,8 @@ export type Database = {
           kod_zaka: string
           kod_zaka_msmt: string | null
           last_name: string
+          msmt_izop: string | null
+          msmt_odhl: string | null
           nationality: string | null
           obec_bydliste_kod: string | null
           okres_bydliste_kod: string | null
@@ -4631,6 +4633,8 @@ export type Database = {
           kod_zaka: string
           kod_zaka_msmt?: string | null
           last_name: string
+          msmt_izop?: string | null
+          msmt_odhl?: string | null
           nationality?: string | null
           obec_bydliste_kod?: string | null
           okres_bydliste_kod?: string | null
@@ -4668,6 +4672,8 @@ export type Database = {
           kod_zaka?: string
           kod_zaka_msmt?: string | null
           last_name?: string
+          msmt_izop?: string | null
+          msmt_odhl?: string | null
           nationality?: string | null
           obec_bydliste_kod?: string | null
           okres_bydliste_kod?: string | null
@@ -6554,6 +6560,11 @@ export type Database = {
         }
         Returns: undefined
       }
+      msmt_kod_zaka_z_kod_zaka: {
+        Args: { p_kod_zaka: string }
+        Returns: string
+      }
+      msmt_novy_kod_zaka: { Args: never; Returns: string }
       nastavit_blok_priznak: {
         Args: {
           p_blok_id: string

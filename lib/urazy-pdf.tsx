@@ -15,6 +15,7 @@
 import 'server-only'
 import path from 'node:path'
 import { Document, Page, View, Text, StyleSheet, Font, renderToBuffer } from '@react-pdf/renderer'
+import { msmtEnv } from '@/lib/msmt-env'
 import {
   ciselnikLabel,
   formatPoradove,
@@ -44,7 +45,7 @@ function ensureFont() {
 const SKOLA = {
   nazev: process.env.SCHOOL_NAME ?? 'Základní škola Vilekula Teplice',
   adresa: process.env.SCHOOL_ADDRESS ?? 'J. V. Sládka 1548/22, 415 01 Teplice',
-  izo: process.env.MSMT_IZO ?? '',
+  izo: msmtEnv().izo,
   ico: process.env.SCHOOL_ICO ?? '23136316',
   redIzo: process.env.SCHOOL_RED_IZO ?? '691018901',
   reditel: process.env.SCHOOL_DIRECTOR ?? 'Ing. Jakub Mráček',

@@ -61,9 +61,12 @@ export async function getHolidayDates(): Promise<{ datum: string; nazev: string 
   return listAllHolidays()
 }
 
-export async function getGroupsForUser(): Promise<Group[]> {
+// schoolYear: skupiny kterého roku (default aktivní rok). Uzavření pololetí
+// potřebuje i loňské skupiny — 2. pololetí předchozího roku se vykazuje MŠMT
+// v podzimním sběru; docházka i souhrny jsou vázané na group_id toho roku.
+export async function getGroupsForUser(schoolYear?: string): Promise<Group[]> {
   const supabase = await getSupabase()
-  const activeYear = await getActiveSchoolYear()
+  const activeYear = schoolYear ?? await getActiveSchoolYear()
 
   // Ředitel i výchovný poradce mají přístup k docházce napříč všemi třídami — RLS na
   // attendance_records gate na is_director_or_vp() (read/insert/update). UI proto musí
