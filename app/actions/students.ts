@@ -67,6 +67,53 @@ export async function updateRodneCislo(studentId: string, rawRc: string): Promis
   return { success: true, hodnota: kontrola.formatovane }
 }
 
+/**
+ * Položky souboru „a“, které vyplňuje škola (students.msmt_*, migrace 132).
+ * Metodika MŠMT 2026: SZ, ZZ a NADANI jen u PO 1. stupně bez doporučení ŠPZ
+ * (s doporučením jsou zakódované v ID_ZNEV); ZVJ u všech (0 = nedostatečná
+ * znalost vyučovacího jazyka).
+ */
+export type MsmtSvpPole = 'msmt_sz' | 'msmt_zz' | 'msmt_nadani' | 'msmt_zvj'
+
+const KONTROLA_SVP: Record<MsmtSvpPole, { re: RegExp; chyba: string }> = {
+  // SZ — 0, nebo od 2026/27 sedmimístný kód ABCDEFG se škálou 0/1/2/4
+  msmt_sz:     { re: /^(0|[0124]{7})$/, chyba: 'SZ je 0, nebo 7 číslic z hodnot 0, 1, 2, 4' },
+  msmt_zz:     { re: /^[01]$/,          chyba: 'ZZ je 0 nebo 1' },
+  msmt_nadani: { re: /^[01]$/,          chyba: 'NADANI je 0 nebo 1' },
+  msmt_zvj:    { re: /^[01]$/,          chyba: 'ZVJ je 0 nebo 1' },
+}
+
+/** Výchozí hodnoty (= co škola MŠMT dosud posílala); prázdný vstup je vrací. */
+const VYCHOZI_SVP: Record<MsmtSvpPole, string> = {
+  msmt_sz: '0', msmt_zz: '0', msmt_nadani: '0', msmt_zvj: '1',
+}
+
+/** Uloží položku souboru „a“ u žáka. Oprávnění: pouze director. */
+export async function updateMsmtSvp(studentId: string, pole: MsmtSvpPole, raw: string): Promise<Vysledek> {
+  const supabase = await createSupabaseServerClient()
+  const zakaz = await jenReditel(supabase)
+  if (zakaz) return { error: zakaz }
+
+  const k = KONTROLA_SVP[pole]
+  if (!k) return { error: 'Neznámé pole' }
+  const hodnota = raw.replace(/\s/g, '') || VYCHOZI_SVP[pole]
+  if (!k.re.test(hodnota)) return { error: k.chyba }
+
+  const { error } = await supabase
+    .from('students')
+    .update(
+      pole === 'msmt_sz' ? { msmt_sz: hodnota }
+      : pole === 'msmt_zz' ? { msmt_zz: hodnota }
+      : pole === 'msmt_nadani' ? { msmt_nadani: hodnota }
+      : { msmt_zvj: hodnota },
+    )
+    .eq('id', studentId)
+  if (error) return { error: error.message }
+
+  revalidate()
+  return { success: true, hodnota }
+}
+
 /** Kódy matriky MŠMT, které se u žáka zadávají ručně. */
 export type MsmtPole = 'msmt_odhl' | 'msmt_izop' | 'kod_zahajeni'
 
