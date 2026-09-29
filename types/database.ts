@@ -4312,87 +4312,6 @@ export type Database = {
           },
         ]
       }
-      student_matrika_a: {
-        Row: {
-          created_at: string
-          created_by: string
-          id: string
-          id_znev: string | null
-          indi: string | null
-          jaz_podp: boolean
-          jaz_prip: boolean
-          nadani: string | null
-          prodl_dv: boolean
-          pspo: number | null
-          student_id: string
-          sz: string
-          typ_tr: string
-          upr_vyst: boolean
-          uvp: boolean
-          valid_from: string
-          valid_to: string | null
-          zvj: string | null
-          zz: string
-        }
-        Insert: {
-          created_at?: string
-          created_by: string
-          id?: string
-          id_znev?: string | null
-          indi?: string | null
-          jaz_podp?: boolean
-          jaz_prip?: boolean
-          nadani?: string | null
-          prodl_dv?: boolean
-          pspo?: number | null
-          student_id: string
-          sz?: string
-          typ_tr?: string
-          upr_vyst?: boolean
-          uvp?: boolean
-          valid_from: string
-          valid_to?: string | null
-          zvj?: string | null
-          zz?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string
-          id?: string
-          id_znev?: string | null
-          indi?: string | null
-          jaz_podp?: boolean
-          jaz_prip?: boolean
-          nadani?: string | null
-          prodl_dv?: boolean
-          pspo?: number | null
-          student_id?: string
-          sz?: string
-          typ_tr?: string
-          upr_vyst?: boolean
-          uvp?: boolean
-          valid_from?: string
-          valid_to?: string | null
-          zvj?: string | null
-          zz?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "student_matrika_a_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "staff"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "student_matrika_a_student_id_fkey"
-            columns: ["student_id"]
-            isOneToOne: false
-            referencedRelation: "students"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       student_matrika_changes: {
         Row: {
           created_at: string
@@ -4595,7 +4514,13 @@ export type Database = {
           kod_zaka_msmt: string | null
           last_name: string
           msmt_izop: string | null
+          msmt_jaz_podp: boolean
+          msmt_jaz_prip: boolean
+          msmt_nadani: string
           msmt_odhl: string | null
+          msmt_sz: string
+          msmt_zvj: string
+          msmt_zz: string
           nationality: string | null
           obec_bydliste_kod: string | null
           okres_bydliste_kod: string | null
@@ -4634,7 +4559,13 @@ export type Database = {
           kod_zaka_msmt?: string | null
           last_name: string
           msmt_izop?: string | null
+          msmt_jaz_podp?: boolean
+          msmt_jaz_prip?: boolean
+          msmt_nadani?: string
           msmt_odhl?: string | null
+          msmt_sz?: string
+          msmt_zvj?: string
+          msmt_zz?: string
           nationality?: string | null
           obec_bydliste_kod?: string | null
           okres_bydliste_kod?: string | null
@@ -4673,7 +4604,13 @@ export type Database = {
           kod_zaka_msmt?: string | null
           last_name?: string
           msmt_izop?: string | null
+          msmt_jaz_podp?: boolean
+          msmt_jaz_prip?: boolean
+          msmt_nadani?: string
           msmt_odhl?: string | null
+          msmt_sz?: string
+          msmt_zvj?: string
+          msmt_zz?: string
           nationality?: string | null
           obec_bydliste_kod?: string | null
           okres_bydliste_kod?: string | null
@@ -5587,6 +5524,171 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vecne_skupiny"
             referencedColumns: ["spis_znak"]
+          },
+        ]
+      }
+      vp_doporuceni: {
+        Row: {
+          care_id: string | null
+          cislo_jednaci: string | null
+          created_at: string
+          created_by: string
+          datum_vydani: string | null
+          id: string
+          id_znev: string | null
+          id_znev_dalsi: string | null
+          indi: string
+          izo_spz: string | null
+          platnost_do: string | null
+          platnost_od: string
+          poznamka: string | null
+          prodl_dv: number
+          pspo: number
+          stav: string
+          student_id: string
+          termin_kontroly: string | null
+          ukonceno_k: string | null
+          updated_at: string
+          upr_vyst: boolean
+          uvp: string
+          zdroj: string
+        }
+        Insert: {
+          care_id?: string | null
+          cislo_jednaci?: string | null
+          created_at?: string
+          created_by: string
+          datum_vydani?: string | null
+          id?: string
+          id_znev?: string | null
+          id_znev_dalsi?: string | null
+          indi?: string
+          izo_spz?: string | null
+          platnost_do?: string | null
+          platnost_od: string
+          poznamka?: string | null
+          prodl_dv?: number
+          pspo: number
+          stav?: string
+          student_id: string
+          termin_kontroly?: string | null
+          ukonceno_k?: string | null
+          updated_at?: string
+          upr_vyst?: boolean
+          uvp?: string
+          zdroj?: string
+        }
+        Update: {
+          care_id?: string | null
+          cislo_jednaci?: string | null
+          created_at?: string
+          created_by?: string
+          datum_vydani?: string | null
+          id?: string
+          id_znev?: string | null
+          id_znev_dalsi?: string | null
+          indi?: string
+          izo_spz?: string | null
+          platnost_do?: string | null
+          platnost_od?: string
+          poznamka?: string | null
+          prodl_dv?: number
+          pspo?: number
+          stav?: string
+          student_id?: string
+          termin_kontroly?: string | null
+          ukonceno_k?: string | null
+          updated_at?: string
+          upr_vyst?: boolean
+          uvp?: string
+          zdroj?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vp_doporuceni_care_id_fkey"
+            columns: ["care_id"]
+            isOneToOne: false
+            referencedRelation: "vp_student_care"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vp_doporuceni_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vp_doporuceni_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vp_podpurna_opatreni: {
+        Row: {
+          created_at: string
+          datum_ukonceni: string | null
+          datum_zahajeni: string | null
+          doporuceni_id: string
+          druh: string
+          fn: string
+          fpp: string | null
+          id: string
+          kod_nfn: string | null
+          pocet_jednotek: number | null
+          poskytovano_do: string | null
+          poskytovano_od: string | null
+          poznamka: string | null
+          stupen: number | null
+          updated_at: string
+          zdroj_financovani: string | null
+        }
+        Insert: {
+          created_at?: string
+          datum_ukonceni?: string | null
+          datum_zahajeni?: string | null
+          doporuceni_id: string
+          druh: string
+          fn?: string
+          fpp?: string | null
+          id?: string
+          kod_nfn?: string | null
+          pocet_jednotek?: number | null
+          poskytovano_do?: string | null
+          poskytovano_od?: string | null
+          poznamka?: string | null
+          stupen?: number | null
+          updated_at?: string
+          zdroj_financovani?: string | null
+        }
+        Update: {
+          created_at?: string
+          datum_ukonceni?: string | null
+          datum_zahajeni?: string | null
+          doporuceni_id?: string
+          druh?: string
+          fn?: string
+          fpp?: string | null
+          id?: string
+          kod_nfn?: string | null
+          pocet_jednotek?: number | null
+          poskytovano_do?: string | null
+          poskytovano_od?: string | null
+          poznamka?: string | null
+          stupen?: number | null
+          updated_at?: string
+          zdroj_financovani?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vp_podpurna_opatreni_doporuceni_id_fkey"
+            columns: ["doporuceni_id"]
+            isOneToOne: false
+            referencedRelation: "vp_doporuceni"
+            referencedColumns: ["id"]
           },
         ]
       }

@@ -11,6 +11,7 @@ import type {
 } from '@/lib/vp-shared'
 import { filterPrivateDokumenty } from '@/lib/vp-shared'
 import { CURRENT_SCHOOL_YEAR } from '@/lib/config'
+import type { Doporuceni, PodpurneOpatreni } from '@/lib/vp-doporuceni-shared'
 
 // ---------------------------------------------------------------------------
 // Pomocná funkce: zjistí roli aktuálního staff
@@ -118,4 +119,68 @@ export async function getVpAlertCount(): Promise<number> {
 
   if (error) throw new Error(`getVpAlertCount: ${error.message}`)
   return count ?? 0
+}
+
+/**
+ * Doporučení ŠPZ žáka včetně podpůrných opatření, nejnovější nahoře.
+ * RLS: jen director + vp (ostatním vrací prázdný seznam).
+ * Bez PostgREST embed — dva dotazy a spojení v JS.
+ */
+export async function getDoporuceniByStudent(studentId: string): Promise<Doporuceni[]> {
+  const supabase = await createSupabaseServerClient()
+
+  const { data: dop, error } = await supabase
+    .from('vp_doporuceni')
+    .select('*')
+    .eq('student_id', studentId)
+    .order('platnost_od', { ascending: false })
+  if (error) throw new Error(`getDoporuceniByStudent: ${error.message}`)
+  if (!dop?.length) return []
+
+  const { data: po, error: poErr } = await supabase
+    .from('vp_podpurna_opatreni')
+    .select('*')
+    .in('doporuceni_id', dop.map((d) => d.id))
+    .order('datum_zahajeni', { ascending: true })
+  if (poErr) throw new Error(`getDoporuceniByStudent (PO): ${poErr.message}`)
+
+  return dop.map((d) => ({
+    id:              d.id,
+    student_id:      d.student_id,
+    care_id:         d.care_id,
+    izo_spz:         d.izo_spz,
+    cislo_jednaci:   d.cislo_jednaci,
+    datum_vydani:    d.datum_vydani,
+    platnost_od:     d.platnost_od,
+    platnost_do:     d.platnost_do,
+    ukonceno_k:      d.ukonceno_k,
+    termin_kontroly: d.termin_kontroly,
+    pspo:            d.pspo,
+    id_znev:         d.id_znev,
+    id_znev_dalsi:   d.id_znev_dalsi,
+    indi:            d.indi as Doporuceni['indi'],
+    uvp:             d.uvp as Doporuceni['uvp'],
+    upr_vyst:        d.upr_vyst,
+    prodl_dv:        d.prodl_dv,
+    stav:            d.stav as Doporuceni['stav'],
+    poznamka:        d.poznamka,
+    zdroj:           d.zdroj as Doporuceni['zdroj'],
+    opatreni: (po ?? [])
+      .filter((p) => p.doporuceni_id === d.id)
+      .map((p) => ({
+        id:                p.id,
+        druh:              p.druh,
+        stupen:            p.stupen,
+        pocet_jednotek:    p.pocet_jednotek,
+        zdroj_financovani: p.zdroj_financovani as PodpurneOpatreni['zdroj_financovani'],
+        kod_nfn:           p.kod_nfn,
+        fpp:               p.fpp as PodpurneOpatreni['fpp'],
+        fn:                p.fn as PodpurneOpatreni['fn'],
+        datum_zahajeni:    p.datum_zahajeni,
+        datum_ukonceni:    p.datum_ukonceni,
+        poskytovano_od:    p.poskytovano_od,
+        poskytovano_do:    p.poskytovano_do,
+        poznamka:          p.poznamka,
+      })),
+  }))
 }

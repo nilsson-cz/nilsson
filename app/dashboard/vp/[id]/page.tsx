@@ -1,10 +1,11 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
-import { getVpCareById } from '@/lib/vp'
+import { getVpCareById, getDoporuceniByStudent } from '@/lib/vp'
 import { TYP_PECE_LABEL, VP_STATUS_LABEL, DOKUMENT_META } from '@/lib/vp-shared'
 import { VpEditForm } from './_components/VpEditForm'
 import { DokumentyChecklist } from './_components/DokumentyChecklist'
+import { DoporuceniSekce } from './_components/DoporuceniSekce'
 import StudentConsentNotice from '@/app/dashboard/_components/StudentConsentNotice'
 
 export const metadata = { title: 'VP detail — IS Nilsson' }
@@ -33,9 +34,19 @@ export default async function VpDetailPage({
   // Žák
   const { data: student } = await supabase
     .from('students')
-    .select('id, first_name, last_name, kod_zaka')
+    .select('id, first_name, last_name, kod_zaka, birth_date')
     .eq('id', care.student_id)
     .maybeSingle()
+
+  // Doporučení ŠPZ (RLS: jen director + vp)
+  const doporuceni = canEdit ? await getDoporuceniByStudent(care.student_id) : []
+
+  // Doporučení překrývající se se školním rokem péče — stejné pravidlo jako
+  // trigger trg_vp_care_z_doporuceni (vyhrává nejnovější platnost_od).
+  const rokOd = `${care.school_year.slice(0, 4)}-09-01`
+  const rokDo = `${Number(care.school_year.slice(0, 4)) + 1}-08-31`
+  const ridiciDoporuceni = doporuceni.find((d) =>
+    d.platnost_od <= rokDo && (d.ukonceno_k ?? d.platnost_do ?? rokDo) >= rokOd) ?? null
 
   // Aktivní alerty pro tento záznam
   const { data: alerts } = await supabase
@@ -155,6 +166,21 @@ export default async function VpDetailPage({
         </div>
       </div>
 
+      {/* Doporučení ŠPZ — jen director + vp */}
+      {canEdit && student && (
+        <DoporuceniSekce
+          careId={id}
+          studentId={care.student_id}
+          student={{
+            first_name: student.first_name,
+            last_name:  student.last_name,
+            birth_date: student.birth_date,
+          }}
+          doporuceni={doporuceni}
+          isDirector={role === 'director'}
+        />
+      )}
+
       {/* Checklist dokumentů */}
       <DokumentyChecklist
         careId={id}
@@ -166,6 +192,9 @@ export default async function VpDetailPage({
       <VpEditForm
         care={care as any}
         canEdit={canEdit}
+        ridiciDoporuceni={ridiciDoporuceni
+          ? { pspo: ridiciDoporuceni.pspo, maTerminKontroly: !!ridiciDoporuceni.termin_kontroly }
+          : null}
       />
 
       {/* Poznámka */}

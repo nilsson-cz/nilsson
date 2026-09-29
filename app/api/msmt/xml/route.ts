@@ -4,7 +4,8 @@
  * GET /api/msmt/xml?type=01&sber=podzimni-2026
  *
  * Parametry:
- *   type  — '01' (základní) | '01a' (žáci s PO) | default: '01'
+ *   type  — '01' (základní) | '01a' (SVP/PO — z modulu VP)
+ *           | '01b' (PO s kódem NFN, jen podzim — z modulu VP) | default: '01'
  *   sber  — 'jarni-RRRR' (RDAT 31. 3.) | 'podzimni-RRRR' (RDAT 30. 9.);
  *           default: nejbližší rozhodné datum (lib/msmt-sber.ts)
  *
@@ -16,7 +17,7 @@
  * Formát a položky: lib/msmt-xml.ts (ZS.025). Chybí-li v IS povinný údaj,
  * vrací 422 se seznamem — neúplný soubor se nevydá.
  *
- * Env: MSMT_IZO (povinné), MSMT_TELEFON (hlavička, volitelné).
+ * Env: MSMT_IZO (povinné), MSMT_TELEFON (hlavička, povinné — 9 číslic).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -24,7 +25,9 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 import {
   generateZakladni,
   generateSouborA,
+  generateSouborB,
   chybejiciPolozky,
+  JE_KOD_OKRESU_MSMT,
   type ZakMatrika,
   type ZakMatrikaA,
   type MatrikaAObdobi,
@@ -34,6 +37,13 @@ import {
 import { zkontrolujRodneCislo } from '@/lib/rodne-cislo'
 import { parseSber } from '@/lib/msmt-sber'
 import { msmtEnv } from '@/lib/msmt-env'
+import { nactiDataSouboruA, obdobiA, jeRelevantniProA, kontrolaDoporuceni } from '@/lib/msmt-soubor-a'
+import { nactiDataSouboruB, vetySouboruB } from '@/lib/msmt-soubor-b'
+
+/** Název třídy žáka k datu (ISO). */
+function kDatuTrida(z: ZakMatrika, iso: string): string | null {
+  return z.tridy.find((t) => t.od <= iso && (!t.do || t.do >= iso))?.nazev ?? null
+}
 
 // Explicitně Node.js runtime — iconv-lite není kompatibilní s Edge
 export const runtime = 'nodejs'
@@ -67,7 +77,7 @@ type StudentRow = {
   obec_bydliste_kod: string | null; okres_bydliste_kod: string | null
   msmt_odhl: string | null; msmt_izop: string | null; kod_zahajeni: string | null
   delka_programu: number | null; cizi_jazyky: unknown; zdroj_financovani: string | null
-  sp_obvod: string | null; has_svp: boolean
+  sp_obvod: string | null
 }
 
 export async function GET(request: NextRequest) {
@@ -89,17 +99,23 @@ export async function GET(request: NextRequest) {
   const sp   = request.nextUrl.searchParams
   const type = sp.get('type') ?? '01'
   const sber = parseSber(sp.get('sber'))
-  if (type !== '01' && type !== '01a') {
-    return NextResponse.json(
-      { error: `Typ '${type}' není implementován. Soubor 'b' (podpůrná opatření, jen podzim) zatím není hotový.` },
-      { status: 400 },
-    )
+  if (type !== '01' && type !== '01a' && type !== '01b') {
+    return NextResponse.json({ error: `Neznámý typ souboru '${type}'.` }, { status: 400 })
+  }
+  if (type === '01b' && !sber.souborB) {
+    return NextResponse.json({ error: 'Soubor „b“ se předává jen při podzimním sběru (RDAT 30. 9.).' }, { status: 400 })
   }
 
   const env = msmtEnv()
   if (!env.izo) {
     return NextResponse.json(
       { error: 'Env proměnná MSMT_IZO není nastavena (Vercel → Settings → Environment Variables)' },
+      { status: 500 },
+    )
+  }
+  if (!/^\d{9}$/.test(env.telefon)) {
+    return NextResponse.json(
+      { error: 'Env proměnná MSMT_TELEFON chybí nebo nemá 9 číslic — MŠMT ji vyžaduje v hlavičce souboru (Vercel → Settings → Environment Variables, např. 777323557).' },
       { status: 500 },
     )
   }
@@ -124,7 +140,7 @@ export async function GET(request: NextRequest) {
       id, first_name, last_name, kod_zaka, kod_zaka_msmt, birth_number, birth_date,
       enrollment_date, withdrawal_date, citizenship, obec_bydliste_kod,
       okres_bydliste_kod, msmt_odhl, msmt_izop, kod_zahajeni,
-      delka_programu, cizi_jazyky, zdroj_financovani, sp_obvod, has_svp
+      delka_programu, cizi_jazyky, zdroj_financovani, sp_obvod
     `)
     .in('status', ['active', 'withdrawn'])
     .lte('enrollment_date', sber.obdobiDo)
@@ -160,6 +176,20 @@ export async function GET(request: NextRequest) {
   if (gErr) return NextResponse.json({ error: gErr.message }, { status: 500 })
   const groupName = new Map((groups ?? []).map((g) => [g.id, g.name]))
 
+  // OKRESB = kód NUTS/LAU (CZ0426). Žáci ze zápisu mají z RÚIAN číselný kód
+  // okresu (3509…) → převod přes ruian_okresy.nuts_lau (testovací server
+  // MŠMT 2026-09-29 číselné kódy odmítl).
+  const ciselneOkresy = [...new Set(((students ?? []) as StudentRow[])
+    .map((s) => s.okres_bydliste_kod)
+    .filter((k): k is string => !!k && !JE_KOD_OKRESU_MSMT.test(k)))]
+  const { data: okresy, error: oErr } = ciselneOkresy.length
+    ? await supabase.from('ruian_okresy').select('kod_okresu, nuts_lau').in('kod_okresu', ciselneOkresy)
+    : { data: [] as { kod_okresu: string; nuts_lau: string | null }[], error: null }
+  if (oErr) return NextResponse.json({ error: oErr.message }, { status: 500 })
+  const nutsOkresu = new Map((okresy ?? []).map((o) => [o.kod_okresu, o.nuts_lau]))
+  const okresMsmt = (k: string | null): string | null =>
+    !k ? null : JE_KOD_OKRESU_MSMT.test(k) ? k : (nutsOkresu.get(k) ?? k)
+
   // --- Sestavení žáků ---
   const zaci: (ZakMatrika & { id: string; jmeno: string })[] = []
   const chyby: string[] = []
@@ -179,7 +209,7 @@ export async function GET(request: NextRequest) {
       birth_date: s.birth_date,
       citizenship: s.citizenship,
       obec_kod: s.obec_bydliste_kod,
-      okres_kod: s.okres_bydliste_kod,
+      okres_kod: okresMsmt(s.okres_bydliste_kod),
       sp_obvod: s.sp_obvod,
       odhl: s.msmt_odhl,
       izop: s.msmt_izop,
@@ -216,27 +246,68 @@ export async function GET(request: NextRequest) {
     return xmlResponse(xml, `Z${env.izo}_01.xml`)
   }
 
-  // --- Typ 01a — žáci s PO (záznam matriky „a" s pspo > 0) ---
-  const svpIds = ((students ?? []) as StudentRow[]).filter((s) => s.has_svp).map((s) => s.id)
-  const { data: aRows, error: aErr } = svpIds.length
-    ? await supabase.from('student_matrika_a')
-        .select('student_id, pspo, indi, nadani, id_znev, uvp, prodl_dv, upr_vyst, typ_tr, sz, zz, zvj, jaz_podp, jaz_prip, valid_from, valid_to')
-        .in('student_id', svpIds)
-    : { data: [], error: null }
-  if (aErr) return NextResponse.json({ error: aErr.message }, { status: 500 })
+  // --- Typ 01b — podpůrná opatření s kódem NFN (lib/msmt-soubor-b.ts) ---
+  if (type === '01b') {
+    let dataB
+    try {
+      dataB = await nactiDataSouboruB(supabase, zaci.map((z) => z.id))
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 500 })
+    }
+    const { vety, chyby: chybyB } = vetySouboruB(dataB, zaci, sber)
+    if (chybyB.length) {
+      return NextResponse.json(
+        { error: `Nelze vygenerovat soubor „b“ — doplňte doporučení ŠPZ v modulu VP: ${chybyB.join('; ')}`, chyby: chybyB },
+        { status: 422 },
+      )
+    }
+    const zakInfo = new Map(zaci.map((z) => [z.id, { enrollment_date: z.enrollment_date, kod_zahajeni: z.kod_zahajeni }]))
+    const xml = await toWin1250(generateSouborB(vety, { ...cfg, redIzo: env.redIzo }, zakInfo))
+    return xmlResponse(xml, `Z${env.izo}_01b.xml`)
+  }
 
-  const zaciA: ZakMatrikaA[] = zaci.flatMap((z) => {
-    const matrikaA: MatrikaAObdobi[] = (aRows ?? [])
-      .filter((r) => r.student_id === z.id && (r.pspo ?? 0) > 0)
-      .map((r) => ({
-        od: r.valid_from, do: r.valid_to, pspo: r.pspo as number,
-        indi: r.indi, nadani: r.nadani, id_znev: r.id_znev,
-        uvp: r.uvp, prodl_dv: r.prodl_dv, upr_vyst: r.upr_vyst,
-        typ_tr: r.typ_tr, sz: r.sz, zz: r.zz, zvj: r.zvj,
-        jaz_podp: r.jaz_podp, jaz_prip: r.jaz_prip,
-      }))
-    return matrikaA.length && z.kod_zaka_msmt ? [{ ...z, matrikaA }] : []
-  })
+  // --- Typ 01a — údaje z modulu VP (lib/msmt-soubor-a.ts) ---
+  let dataA
+  try {
+    dataA = await nactiDataSouboruA(supabase, zaci.map((z) => z.id))
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 })
+  }
+  const rdatIso = sber.obdobiDo
+  const chybyA: string[] = []
+  const vybrani = new Set<string>()
+  const obdobiZaka = new Map<string, MatrikaAObdobi[]>()
+  for (const z of zaci) {
+    const obdobi = obdobiA(dataA, z.id, z.enrollment_date)
+    obdobiZaka.set(z.id, obdobi)
+    const vObdobiSberu = obdobi.filter((o) => o.od <= rdatIso && (!o.do || o.do >= sber.obdobiOd))
+    if (vObdobiSberu.some((o) => jeRelevantniProA(o))) vybrani.add(z.id)
+    const k = kontrolaDoporuceni(dataA, z.id, sber.obdobiOd, rdatIso)
+    if (k?.problemy.length) chybyA.push(`${z.jmeno}: ${k.problemy.join(', ')}`)
+  }
+  if (chybyA.length) {
+    return NextResponse.json(
+      { error: `Nelze vygenerovat soubor „a“ — doplňte doporučení ŠPZ v modulu VP: ${chybyA.join('; ')}`, chyby: chybyA },
+      { status: 422 },
+    )
+  }
+
+  // Třída s asistentem pedagoga musí mít v souboru „a“ aspoň jednoho žáka
+  // (metodika: postačuje informace o jednom žákovi ze třídy).
+  const tridaKRdat = (id: string) => kDatuTrida(zaci.find((z) => z.id === id)!, rdatIso)
+  const tridySAsistentem = new Map<string, string>()
+  for (const z of zaci) {
+    const o = (obdobiZaka.get(z.id) ?? []).find((x) => x.od <= rdatIso && (!x.do || x.do >= rdatIso))
+    const trida = tridaKRdat(z.id)
+    if (o && trida && o.typ_tr !== '100A0' && !tridySAsistentem.has(trida)) tridySAsistentem.set(trida, z.id)
+  }
+  for (const [trida, prvniZak] of tridySAsistentem) {
+    if (![...vybrani].some((id) => tridaKRdat(id) === trida)) vybrani.add(prvniZak)
+  }
+
+  const zaciA: ZakMatrikaA[] = zaci
+    .filter((z) => vybrani.has(z.id) && z.kod_zaka_msmt)
+    .map((z) => ({ ...z, matrikaA: obdobiZaka.get(z.id) ?? [] }))
 
   const xml = await toWin1250(generateSouborA(zaciA, cfg))
   return xmlResponse(xml, `Z${env.izo}_01a.xml`)

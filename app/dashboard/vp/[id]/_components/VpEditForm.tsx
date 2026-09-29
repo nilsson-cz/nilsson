@@ -9,9 +9,13 @@ import type { TypVpPece, VpStudentCare } from '@/lib/vp-shared'
 interface Props {
   care:    VpStudentCare
   canEdit: boolean
+  /** Doporučení ŠPZ platné v roce péče — stupeň a platnost pak dopočítává DB (migrace 132). */
+  ridiciDoporuceni?: { pspo: number; maTerminKontroly: boolean } | null
 }
 
-export function VpEditForm({ care, canEdit }: Props) {
+export function VpEditForm({ care, canEdit, ridiciDoporuceni = null }: Props) {
+  const zDoporuceni   = !!ridiciDoporuceni
+  const reviewZamcene = !!ridiciDoporuceni?.maTerminKontroly
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -34,9 +38,12 @@ export function VpEditForm({ care, canEdit }: Props) {
     setSaved(false)
     startTransition(async () => {
       const result = await updateVpCare(care.id, {
-        typ_pece:          typPece,
-        spz_valid_until:   spzValidUntil  || null,
-        spz_review_due:    spzReviewDue   || null,
+        // Pole řízená doporučením neposíláme — trigger je stejně přepíše.
+        ...(zDoporuceni ? {} : {
+          typ_pece:        typPece,
+          spz_valid_until: spzValidUntil || null,
+        }),
+        ...(reviewZamcene ? {} : { spz_review_due: spzReviewDue || null }),
         ivp_required:      ivpRequired,
         ivp_evaluated_at:  ivpEvaluatedAt || null,
         drive_url_public:  drivePublic    || null,
@@ -74,7 +81,12 @@ export function VpEditForm({ care, canEdit }: Props) {
       {/* Typ péče */}
       <div className="space-y-1.5">
         <label className="block text-sm font-medium text-gray-700">Typ péče</label>
-        {canEdit ? (
+        {zDoporuceni && (
+          <p className="text-xs text-gray-500">
+            Řídí se doporučením ŠPZ (PO {ridiciDoporuceni!.pspo}. stupně) — stupeň a platnost se mění v sekci Doporučení ŠPZ.
+          </p>
+        )}
+        {canEdit && !zDoporuceni ? (
           <div className="flex flex-wrap gap-2">
             {(Object.entries(TYP_PECE_LABEL) as [TypVpPece, string][]).map(([key, label]) => (
               <button
@@ -102,7 +114,7 @@ export function VpEditForm({ care, canEdit }: Props) {
           <label className="block text-sm font-medium text-gray-700">
             Platnost doporučení ŠPZ
           </label>
-          {canEdit ? (
+          {canEdit && !zDoporuceni ? (
             <input
               type="date"
               value={spzValidUntil}
@@ -121,7 +133,7 @@ export function VpEditForm({ care, canEdit }: Props) {
           <label className="block text-sm font-medium text-gray-700">
             Termín přehodnocení ŠPZ
           </label>
-          {canEdit ? (
+          {canEdit && !reviewZamcene ? (
             <input
               type="date"
               value={spzReviewDue}

@@ -16,17 +16,22 @@
  * Data DD.MM.RRRR. Generuje UTF-8 string, volající převede na windows-1250.
  *
  *   _01.xml  — základní soubor, žák identifikován RODC (rodné číslo)
- *   _01a.xml — soubor „a" (žáci s PO), žák identifikován KOD_ZAKA (ne RČ!)
- *   _01b.xml — podpůrná opatření 2.–5. st. (jen podzim) — TODO
+ *   _01a.xml — soubor „a" (SVP/PO/jazyk), žák identifikován KOD_ZAKA (ne RČ!);
+ *              údaje z modulu VP (lib/msmt-soubor-a.ts)
+ *   _01b.xml — podpůrná opatření 2.–5. st. s kódem NFN (jen podzim), verze ZSb.22;
+ *              věty sestavuje lib/msmt-soubor-b.ts, formát dat jako přijatý
+ *              soubor „b" z podzimu 2025 (RDAT DD.MM.RRRR, ostatní data ISO)
  *
  * Věty (vetyZaka): školní rok (R-1)/R se dělí k 1. 2. (V1 do 31. 1., V2 od 1. 2.)
- * — stejně jako přijatý jarní soubor 2026; OML_H/NEOML_H nese V2. Na podzim
+ * — stejně jako přijatý jarní soubor 2026; OML_H/NEOML_H nese na jaře V2, na podzim
+ * věta od 1. 9. R (kontroly MŠMT 9075/9077). Na podzim
  * navíc věta od 1. 9. R (postup do vyššího ročníku) a u odešlých žáků věta
  * o ukončení (KOD_VETY 3). Kódy z číselníků viz MSMT_KODY.
  */
 
 import type { SberKontext } from './msmt-sber'
 import { jeCeskeObcanstvi } from './rodne-cislo'
+import type { VetaB } from './msmt-soubor-b'
 
 // ---------------------------------------------------------------------------
 // Kódy (číselníky MŠMT) — hodnoty z přijatých souborů, případně z metodiky
@@ -48,6 +53,9 @@ export const MSMT_KODY = {
   JAZ1_DEFAULT: '02',       // přijaté soubory: všichni žáci 02 / A
   P_JAZ1_DEFAULT: 'A',
 } as const
+
+/** OKRESB (RAOR) = kód NUTS/LAU okresu, např. CZ0426 (Praha CZ0100). */
+export const JE_KOD_OKRESU_MSMT = /^CZ0\d{3}$/
 
 // ---------------------------------------------------------------------------
 // Vstupní data
@@ -99,21 +107,21 @@ export interface ZakMatrika {
   neoml_h: number | null
 }
 
-/** Záznam matriky „a" v čase (student_matrika_a). */
+/** Údaje souboru „a" platné v období (odvozené z VP — lib/msmt-soubor-a.ts). */
 export interface MatrikaAObdobi {
   od: string
   do: string | null
-  pspo: number
-  indi: string | null
-  nadani: string | null
-  id_znev: string | null
-  uvp: boolean
-  prodl_dv: boolean
+  pspo: number | null      // null = bez PO
+  indi: string             // 0 / 1 / 5
+  nadani: string           // 0 / 1
+  id_znev: string | null   // 7 nebo 13 znaků
+  uvp: string              // 0 / 2 / 3 / 4
+  prodl_dv: number         // počet let
   upr_vyst: boolean
-  typ_tr: string
+  typ_tr: string           // 100A0 / 100A1 / 100A2
   sz: string
   zz: string
-  zvj: string | null
+  zvj: string
   jaz_podp: boolean
   jaz_prip: boolean
 }
@@ -220,8 +228,9 @@ interface VetaInterval {
 /**
  * Věty žáka pro daný sběr (R = rok RDAT):
  *   V1  1. 9. (R-1) / nástup → 31. 1. R
- *   V2  1. 2. R / nástup → (jaro: aktuální; podzim: 31. 8. R) — nese OML
- *   V3  (jen podzim) 1. 9. R / nástup → aktuální (postup do vyššího ročníku)
+ *   V2  1. 2. R / nástup → (jaro: aktuální; podzim: 31. 8. R) — na jaře nese OML
+ *   V3  (jen podzim) 1. 9. R / nástup → aktuální (postup do vyššího ročníku);
+ *       věta od 1. 9. nese OML 2. pololetí (i věta o ukončení od 1. 9.)
  *   Vu  po odchodu (do RDAT): den po posledním dni docházky → aktuální,
  *       UKONDAT/KOD_UKON, PRIZN_ST 7, KOD_VETY 3
  * Na podzim se vynechá věta končící před 1. 10. (R-1). PLAT_KON = odchod jen
@@ -259,20 +268,29 @@ function vetyZaka(enrollmentIso: string, withdrawalIso: string | null, sber: Sbe
   const v2Zac = enroll > s2s ? enroll : s2s
   if (v2Zac <= (podzim ? ye : rdat) && (!withdraw || withdraw >= v2Zac)) {
     const v2Kon = konec(podzim ? ye : null)
-    const oml = podzim ? v2Zac <= s2e : enroll <= s1e
+    // Jaro: hodiny 1. pololetí nese věta od 1. 2. (přijatý jarní soubor 2026).
+    // Podzim: hodiny 2. pololetí nese věta začínající 1. 9. R, ne V2 —
+    // testovací server MŠMT 2026-09-29: chyba 9077 „u aktivního žáka, jehož
+    // věta nezačíná 1. 9., nesmí být uvedeny zameškané hodiny“ a 9075 „chybí
+    // údaj o zameškaných hodinách v předchozím pololetí“ u věty od 1. 9.
+    const oml = !podzim && enroll <= s1e
     if (!podzim || (v2Kon ?? rdat) >= obdobiOd) vety.push({ zac: v2Zac, kon: v2Kon, oml, ukonceni: false })
   }
+
+  // Podzim: žák, který chodil ve 2. pololetí, má hodiny ve větě od 1. 9. R
+  // (i ve větě o ukončení, pokud odešel k 31. 8.).
+  const omlOd1Zari = (zac: Date) => podzim && enroll <= s2e && zac.getTime() === ny.getTime()
 
   if (podzim) {
     const v3Zac = enroll > ny ? enroll : ny
     if (v3Zac <= rdat && (!withdraw || withdraw >= v3Zac)) {
-      vety.push({ zac: v3Zac, kon: konec(null), oml: false, ukonceni: false })
+      vety.push({ zac: v3Zac, kon: konec(null), oml: omlOd1Zari(v3Zac), ukonceni: false })
     }
   }
 
   if (odesel && vety.length > 0) {
     const zac = plusDen(withdraw!)
-    if (zac <= rdat) vety.push({ zac, kon: null, oml: false, ukonceni: true })
+    if (zac <= rdat) vety.push({ zac, kon: null, oml: omlOd1Zari(zac), ukonceni: true })
   }
 
   return vety
@@ -292,6 +310,7 @@ export function chybejiciPolozky(z: ZakMatrika, sber: SberKontext): string[] {
   const chybi: string[] = []
   if (!z.obec_kod) chybi.push('OBECB (kód obce trvalého pobytu)')
   if (!z.okres_kod) chybi.push('OKRESB (kód okresu)')
+  else if (!JE_KOD_OKRESU_MSMT.test(z.okres_kod)) chybi.push(`OKRESB (kód okresu „${z.okres_kod}“ není NUTS/LAU, např. CZ0426)`)
   if (!z.odhl) chybi.push('ODHL (předchozí vzdělávání)')
   if (!z.izop) chybi.push('IZOP (IZO předchozí školy)')
   if (!z.kod_zahajeni) chybi.push('KOD_ZAH (kód zahájení docházky)')
@@ -310,14 +329,14 @@ export function chybejiciPolozky(z: ZakMatrika, sber: SberKontext): string[] {
 // Generátory
 // ---------------------------------------------------------------------------
 
-function hlavicka(cfg: XmlConfig, soubor: string): string[] {
+function hlavicka(cfg: XmlConfig, soubor: string, verze = 'ZS.025'): string[] {
   const h = cfg.hlavicka
   const t = h.vytvoreno
   const p = (n: number) => String(n).padStart(2, '0')
   const cas = `${fmtDate(t)} ${p(t.getHours())}:${p(t.getMinutes())}:${p(t.getSeconds())}`
   return [
     '<?xml version="1.0" encoding="windows-1250" ?>',
-    '<Vykaz verze="ZS.025">',
+    `<Vykaz verze="${verze}">`,
     '  <Vygen>IS Nilsson</Vygen>',
     `  <autor>${esc(h.autor)}</autor>`,
     h.telefon ? `  <telefon>${esc(h.telefon)}</telefon>` : '  <telefon/>',
@@ -417,35 +436,115 @@ export function generateZakladni(zaci: ZakMatrika[], cfg: XmlConfig): string {
   return lines.join('\n')
 }
 
-/** Soubor „a" _01a.xml — žáci s PO (záznam student_matrika_a s pspo > 0). */
+/**
+ * Rozdělí větu v místech, kde se mění údaje souboru „a" (nové doporučení, změna
+ * asistenta ve třídě…) — metodika: nová věta při každé změně obsahu, věty na sebe
+ * plynule navazují. Věta o ukončení se nedělí.
+ */
+function rozdelVetuA(v: VetaInterval, obdobi: MatrikaAObdobi[], rdat: Date): VetaInterval[] {
+  if (v.ukonceni) return [v]
+  const zac = toIso(v.zac)
+  const kon = toIso(v.kon ?? rdat)
+  const body = obdobi.map((o) => o.od).filter((od) => od > zac && od <= kon).sort()
+  if (body.length === 0) return [v]
+  const out: VetaInterval[] = []
+  let cur = v.zac
+  for (const od of body) {
+    const d = isoToDate(od)
+    out.push({ zac: cur, kon: new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, 12), oml: false, ukonceni: false })
+    cur = d
+  }
+  out.push({ zac: cur, kon: v.kon, oml: false, ukonceni: false })
+  return out
+}
+
+/**
+ * Soubor „a" _01a.xml — žáci s údaji o SVP / PO / jazyce (výběr a hodnoty
+ * odvozuje lib/msmt-soubor-a.ts z modulu VP).
+ */
 export function generateSouborA(zaci: ZakMatrikaA[], cfg: XmlConfig): string {
   const lines = hlavicka(cfg, `Z${cfg.izo}_${MSMT_KODY.CAST}a`)
-  const b = (x: boolean | undefined) => (x ? '1' : '0')
+  const b = (x: boolean) => (x ? '1' : '0')
   for (const z of zaci) {
-    vetyZaka(z.enrollment_date, z.withdrawal_date, cfg.sber).forEach((v, i) => {
+    const vety = vetyZaka(z.enrollment_date, z.withdrawal_date, cfg.sber)
+      .flatMap((v) => rozdelVetuA(v, z.matrikaA, cfg.sber.rdat))
+    vety.forEach((v, i) => {
       const a = kDatu(z.matrikaA, refIso(z, v)) ?? z.matrikaA[0]
       lines.push(
         '  <veta>',
         ...uvod(cfg),
         el('KOD_ZAKA', z.kod_zaka_msmt),
         ...polozkyZaka(z, v, true),
-        el('TYP_TR', a?.typ_tr ?? '100A0'),
-        el('ZVJ', a?.zvj ?? '1'),
-        el('JAZ_PODP', b(a?.jaz_podp)),
-        el('JAZ_PRIP', b(a?.jaz_prip)),
-        el('PSPO', a?.pspo ?? null),
-        el('INDI', a?.indi ?? '0'),
-        el('NADANI', a?.nadani ?? '0'),
-        el('UVP', b(a?.uvp)),
-        el('SZ', a?.sz ?? '0'),
-        el('ZZ', a?.zz ?? '0'),
-        el('PRODL_DV', b(a?.prodl_dv)),
-        el('UPR_VYST', b(a?.upr_vyst)),
-        el('ID_ZNEV', a?.id_znev ?? null),
+        el('TYP_TR', a.typ_tr),
+        el('ZVJ', a.zvj),
+        el('JAZ_PODP', b(a.jaz_podp)),
+        el('JAZ_PRIP', b(a.jaz_prip)),
+        el('PSPO', a.pspo),
+        el('INDI', a.indi),
+        el('NADANI', a.nadani),
+        el('UVP', a.uvp),
+        el('SZ', a.sz),
+        el('ZZ', a.zz),
+        el('PRODL_DV', a.prodl_dv),
+        el('UPR_VYST', b(a.upr_vyst)),
+        el('ID_ZNEV', a.id_znev),
+        // Změna údajů „a" uprostřed věty dostane KOD_ZMEN 0 — kód z číselníku
+        // RAKZ pro změnu SVP nemáme (k ověření na testovacím serveru MŠMT).
         ...polozkyVety(z, v, i === 0),
         '  </veta>',
       )
     })
+  }
+  lines.push('</Vykaz>')
+  return lines.join('\n')
+}
+
+/**
+ * Soubor „b" _01b.xml (ZSb.22) — jedna věta za podpůrné opatření.
+ * Pořadí a tvar položek podle přijatého souboru z podzimu 2025.
+ * `zaci` slouží ke KOD_ZMEN: opatření zahájené dnem příchodu z jiné školy
+ * dostane KOD_ZMEN 2 (jako přijatý soubor).
+ */
+export function generateSouborB(
+  vety: VetaB[],
+  cfg: XmlConfig & { redIzo: string },
+  zaci: Map<string, { enrollment_date: string; kod_zahajeni: string | null }>,
+): string {
+  const lines = hlavicka(cfg, `Z${cfg.izo}_${MSMT_KODY.CAST}b`, 'ZSb.22')
+  for (const v of vety) {
+    const z = zaci.get(v.studentId)
+    const prichod = !!z && v.plat_zac === z.enrollment_date && !['1', '2', '3'].includes(z.kod_zahajeni ?? '')
+    lines.push(
+      '  <veta>',
+      el('RDAT', fmtDate(cfg.sber.rdat)),
+      el('RED_IZO', cfg.redIzo),
+      el('IZO', cfg.izo),
+      el('CAST', MSMT_KODY.CAST),
+      el('KOD_ZAKA', v.kod_zaka),
+      el('TT', v.tt),
+      el('SPECIF', null),
+      el('OBOR', MSMT_KODY.OBOR),
+      el('DRP', null),
+      el('TP', '0'),
+      el('IZO_SPZ', v.izo_spz),
+      el('DAT_VYD', v.dat_vyd),
+      el('DAT_KPD', v.dat_kpd),
+      el('PSPO', v.pspo),
+      el('KOD_NFN', v.kod_nfn),
+      el('FPP', v.fpp),
+      el('FN', v.fn),
+      el('DAT_ZAH', v.dat_zah),
+      el('DAT_UKON', v.dat_ukon),
+      el('ID_ZNEV', v.id_znev),
+      el('KOD_ZMEN', prichod ? MSMT_KODY.KOD_ZMEN_PRICHOD : MSMT_KODY.KOD_ZMEN_BEZ),
+      // ZMENDAT je ve ZSb.22 povinné datum (prázdný element testovací server
+      // 2026-09-29 odmítl: „veta je neúplný, očekáván ZMENDAT“) — bez změny
+      // se uvádí začátek věty = zahájení poskytování PO.
+      el('ZMENDAT', v.plat_zac),
+      el('PLAT_ZAC', v.plat_zac),
+      el('PLAT_KON', v.plat_kon),
+      '  </veta>',
+    )
   }
   lines.push('</Vykaz>')
   return lines.join('\n')

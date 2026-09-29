@@ -13,6 +13,12 @@ function envValue(name: string): string | undefined {
   return v === '' ? undefined : v
 }
 
+/** „+420 777 323 557“ → „777323557“; nic → ''. */
+export function normalizujTelefon(v: string | undefined): string {
+  const d = (v ?? '').replace(/\D/g, '').replace(/^(00)?420(?=\d{9}$)/, '')
+  return d
+}
+
 export function msmtEnv() {
   const izo = envValue('MSMT_IZO') ?? ''
   return {
@@ -24,6 +30,8 @@ export function msmtEnv() {
     typSkoly:   envValue('MSMT_TYP_SKOLY') ?? '2',
     inspisIzo:  envValue('INSPIS_IZO') ?? izo,
     // Telefon do hlavičky MŠMT XML (<telefon>) — staff telefon neeviduje.
-    telefon:    envValue('MSMT_TELEFON') ?? '',
+    // XSD přijímá jen číslice (přijaté soubory: 777323557); prázdný element
+    // validace odmítne (testovací server 2026-09-29). Mezery a +420 se odstraní.
+    telefon:    normalizujTelefon(envValue('MSMT_TELEFON')),
   }
 }

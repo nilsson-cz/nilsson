@@ -3,8 +3,8 @@
  *
  * Přehledová stránka MŠMT výkazů (matrika):
  *   - volba sběru: jarní (RDAT 31. 3.) / podzimní (RDAT 30. 9.) — ?sber=podzimni-2026
- *   - stav prerekvizit (rodná čísla, uzavřené pololetí dle sběru, matrika „a")
- *   - tlačítka ke stažení _01.xml a _01a.xml
+ *   - stav prerekvizit (údaje žáků, uzavřené pololetí dle sběru, doporučení ŠPZ ve VP)
+ *   - tlačítka ke stažení _01.xml, _01a.xml a (podzim) _01b.xml
  * Pravidla sběrů: lib/msmt-sber.ts (metodika MŠMT).
  */
 
@@ -14,6 +14,9 @@ import { zkontrolujRodneCislo } from '@/lib/rodne-cislo'
 import { stprKod } from '@/lib/msmt-xml'
 import { StahnoutXml } from './_components/StahnoutXml'
 import { msmtEnv } from '@/lib/msmt-env'
+import { nactiDataSouboruA, obdobiA, jeRelevantniProA, kontrolaDoporuceni } from '@/lib/msmt-soubor-a'
+import { nactiDataSouboruB, vetySouboruB } from '@/lib/msmt-soubor-b'
+import type { ReactNode } from 'react'
 import {
   parseSber,
   sberKontext,
@@ -63,7 +66,7 @@ export default async function MsmtPage({
   // výběr jako export (app/api/msmt/xml).
   const { data: studentsRaw } = await supabase
     .from('students')
-    .select('id, first_name, last_name, birth_number, enrollment_date, withdrawal_date, has_svp, kod_zaka_msmt, student_matrika_a(pspo)')
+    .select('id, first_name, last_name, birth_number, enrollment_date, withdrawal_date, kod_zaka_msmt')
     .in('status', ['active', 'withdrawn'])
     .lte('enrollment_date', sber.obdobiDo)
     .or(`withdrawal_date.is.null,withdrawal_date.gte.${sber.obdobiOd}`)
@@ -112,22 +115,31 @@ export default async function MsmtPage({
   const uzavritHref  =
     `/dashboard/uzavreni-pololeti?year=${encodeURIComponent(sber.omlSkolniRok)}&semester=${sber.omlPololeti}`
 
-  // --- Prerekvizita 3: žáci s PO mají záznam matriky „a" (pspo > 0) ---
-  const svpStudents = students.filter((s) => s.has_svp)
-  const svpNotReady = svpStudents.filter((s) => {
-    const records = Array.isArray(s.student_matrika_a)
-      ? s.student_matrika_a
-      : s.student_matrika_a
-      ? [s.student_matrika_a]
-      : []
-    const hasRecord = (records as { pspo: number }[]).some((r) => r.pspo > 0)
-    return !(hasRecord && s.kod_zaka_msmt !== null)
-  })
-  const svpTotal = svpStudents.length
-  const svpReady = svpTotal - svpNotReady.length
+  // --- Prerekvizita 3: doporučení ŠPZ ve VP (zdroj souboru „a“ — lib/msmt-soubor-a.ts) ---
+  const dataA = await nactiDataSouboruA(supabase, students.map((s) => s.id))
+  const zaciA = students.filter((s) =>
+    obdobiA(dataA, s.id, s.enrollment_date)
+      .some((o) => o.od <= sber.obdobiDo && (!o.do || o.do >= sber.obdobiOd) && jeRelevantniProA(o)))
+  const kontroly = students
+    .map((s) => ({ s, k: kontrolaDoporuceni(dataA, s.id, sber.obdobiOd, sber.obdobiDo) }))
+    .filter((x): x is { s: typeof students[number]; k: NonNullable<typeof x.k> } => x.k !== null)
+  const poTotal     = kontroly.length
+  const poChyby     = kontroly.filter((x) => x.k.problemy.length > 0)
+  const poUpozorneni = kontroly.filter((x) => x.k.problemy.length === 0 && x.k.upozorneni.length > 0)
+  const poReady     = poTotal - poChyby.length
+
+  // --- Soubor „b“ (jen podzim): věty z vp_podpurna_opatreni (lib/msmt-soubor-b.ts) ---
+  const jmenoZaka = new Map(students.map((s) => [s.id, `${s.last_name} ${s.first_name}`]))
+  const souborB = sber.souborB
+    ? vetySouboruB(
+        await nactiDataSouboruB(supabase, students.map((s) => s.id)),
+        students.map((s) => ({ id: s.id, jmeno: jmenoZaka.get(s.id)!, kod_zaka_msmt: s.kod_zaka_msmt })),
+        sber,
+      )
+    : null
 
   const canGenerateZakladni = allCodesFilled
-  const canGenerateSouborA  = svpReady > 0
+  const canGenerateSouborA  = zaciA.length > 0 && poChyby.length === 0
 
   const allPrereqsMet = canGenerateZakladni && allSemLocked
   const q = `sber=${sberParam(sber)}`
@@ -200,17 +212,28 @@ export default async function MsmtPage({
             actionLabel="Uzavřít →"
           />
           <PrereqRow
-            ok={svpReady === svpTotal && svpTotal > 0}
-            warn={svpTotal > 0 && svpReady < svpTotal}
+            ok={poChyby.length === 0 && poUpozorneni.length === 0}
+            warn={poChyby.length === 0 && poUpozorneni.length > 0}
             label={
-              svpTotal === 0
-                ? 'Žáci s PO: žádní (soubor „a“ bude prázdný)'
-                : `Matrika „a“ žáků s PO: ${svpReady} / ${svpTotal} připraveno`
+              poTotal === 0
+                ? 'Žáci s PO ve VP: žádní'
+                : `Doporučení ŠPZ žáků s PO (modul VP): ${poReady} / ${poTotal} kompletní`
             }
-            note={
-              svpNotReady.length > 0
-                ? `bez stupně PO: ${svpNotReady.map((s) => `${s.last_name} ${s.first_name}`).join(', ')}`
-                : undefined
+            details={
+              [...poChyby, ...poUpozorneni].length > 0 ? (
+                <ul className="mt-1 space-y-0.5 text-xs">
+                  {[...poChyby, ...poUpozorneni].map(({ s, k }) => (
+                    <li key={s.id} className={k.problemy.length ? 'text-red-700' : 'text-amber-700'}>
+                      {s.last_name} {s.first_name}: {[...k.problemy, ...k.upozorneni].join('; ')}
+                      {k.careId && (
+                        <Link href={`/dashboard/vp/${k.careId}`} className="ml-2 text-blue-600 underline">
+                          Karta VP →
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : undefined
             }
           />
         </ul>
@@ -242,25 +265,37 @@ export default async function MsmtPage({
             disabledReason={
               !allCodesFilled
                 ? 'Nejprve doplňte údaje žáků'
-                : svpReady === 0
-                ? 'Žádní žáci s vyplněným pspo'
+                : poChyby.length > 0
+                ? 'Nejprve doplňte doporučení ŠPZ ve VP'
+                : zaciA.length === 0
+                ? 'Žádní žáci se SVP / PO'
                 : undefined
             }
-            badge={svpReady > 0 ? `${svpReady} žák${svpReady > 1 ? 'é' : ''}` : undefined}
+            badge={zaciA.length > 0 ? `${zaciA.length} ${zaciA.length === 1 ? 'žák' : zaciA.length < 5 ? 'žáci' : 'žáků'}` : undefined}
           />
 
-          {/* _01b.xml — jen podzim, zatím není */}
-          {sber.souborB && (
-            <div className="flex items-center justify-between py-3 px-4 rounded-md bg-gray-50 border border-dashed border-gray-200 opacity-50">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Soubor „b“ — podpůrná opatření 2.–5. stupně</p>
-                <p className="text-xs font-mono text-gray-400">Z{IZO}_01b.xml</p>
-                <p className="text-xs text-amber-600 mt-0.5">Pouze podzimní sběr · zatím není hotový</p>
-              </div>
-              <span className="px-4 py-1.5 rounded text-sm bg-gray-200 text-gray-400 cursor-not-allowed">
-                Stáhnout
-              </span>
-            </div>
+          {/* _01b.xml — jen podzim */}
+          {sber.souborB && souborB && (
+            <FileRow
+              label="Soubor „b“ — podpůrná opatření s kódem NFN"
+              filename={`Z${IZO}_01b.xml`}
+              href={`/api/msmt/xml?type=01b&${q}`}
+              enabled={allCodesFilled && souborB.chyby.length === 0 && souborB.vety.length > 0}
+              disabledReason={
+                !allCodesFilled
+                  ? 'Nejprve doplňte údaje žáků'
+                  : souborB.chyby.length > 0
+                  ? `Doplňte ve VP: ${souborB.chyby.join('; ')}`
+                  : souborB.vety.length === 0
+                  ? 'Žádná poskytovaná opatření s kódem NFN — ve sběrové aplikaci zaškrtněte, že soubor „b“ nepředáváte.'
+                  : undefined
+              }
+              badge={souborB.vety.length > 0 ? `${souborB.vety.length} opatření` : undefined}
+              note={souborB.nezahajena.length > 0
+                ? `Bez data skutečného zahájení (do „b“ nejdou): ${souborB.nezahajena
+                    .map((n) => `${jmenoZaka.get(n.studentId) ?? ''} ${n.kod_nfn}`).join(', ')}`
+                : undefined}
+            />
           )}
         </div>
 
@@ -292,6 +327,7 @@ function PrereqRow({
   actionHref,
   actionLabel,
   note,
+  details,
 }: {
   ok: boolean
   warn?: boolean
@@ -299,6 +335,7 @@ function PrereqRow({
   actionHref?: string
   actionLabel?: string
   note?: string
+  details?: ReactNode
 }) {
   const icon  = ok ? '✓' : warn ? '⚠' : '✗'
   const color = ok
@@ -321,6 +358,7 @@ function PrereqRow({
             {actionLabel}
           </Link>
         )}
+        {details}
       </span>
     </li>
   )
@@ -333,6 +371,7 @@ function FileRow({
   enabled,
   disabledReason,
   badge,
+  note,
 }: {
   label: string
   filename: string
@@ -340,6 +379,7 @@ function FileRow({
   enabled: boolean
   disabledReason?: string
   badge?: string
+  note?: string
 }) {
   return (
     <div className="flex items-center justify-between py-3 px-4 rounded-md bg-gray-50 border border-gray-200">
@@ -356,6 +396,7 @@ function FileRow({
         {!enabled && disabledReason && (
           <p className="text-xs text-red-500 mt-0.5">{disabledReason}</p>
         )}
+        {note && <p className="text-xs text-amber-600 mt-0.5">{note}</p>}
       </div>
       {enabled ? (
         <StahnoutXml href={href} filename={filename} />
