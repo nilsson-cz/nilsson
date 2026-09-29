@@ -548,6 +548,15 @@ export const NAV_ITEMS: NavItem[] = [
     tint: T.violet,
   },
   {
+    href: '/dashboard/verejne-finance',
+    label: 'Veřejné finance',
+    icon: Icons.payments,
+    roles: ['director'],
+    primaryFor: [],
+    desc: 'Nárok na státní dotaci po IZO a měsících — normativy, koeficienty, kapacita',
+    tint: T.emerald,
+  },
+  {
     href: '/dashboard/provoz-sluzeb',
     label: 'Provoz služeb',
     icon: Icons.server,

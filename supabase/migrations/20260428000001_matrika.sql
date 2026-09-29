@@ -168,9 +168,9 @@ CREATE TABLE students (
   -- Detailní historická evidence je v tabulce student_education_mode
   education_mode         TEXT              DEFAULT 'standardni'
                          CHECK (education_mode IN (
-                           'standardni',    -- prezenční výuka §§ 36–38 ŠZ
-                           'jiny_zpusob',   -- individuální vzdělávání §38
-                           'domaci'         -- domácí vzdělávání §41
+                           'standardni',    -- docházka do školy § 36 (RASD 11/12/15)
+                           'jiny_zpusob',   -- plnění PŠD v zahraničí § 38 (RASD 21–25)
+                           'domaci'         -- individuální vzdělávání § 41 (RASD 30)
                          )),
 
   -- -------------------------------------------------------------------------

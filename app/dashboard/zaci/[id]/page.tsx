@@ -12,6 +12,7 @@ import StudijniSmlouvaButton from './_components/StudijniSmlouvaButton'
 import AddressesPanel from './_components/AddressesPanel'
 import { getStudentAddresses, getGuardianAddresses, type AddressRow } from '@/lib/addresses'
 import type { ValidovanaAdresa } from '@/lib/enrollment/types'
+import { educationModeLabel } from '@/lib/zpusob-psd'
 
 function formatDate(date: string | null | undefined): string {
   if (!date) return '—'
@@ -31,12 +32,6 @@ const GUARDIAN_ROLE_LABELS: Record<string, string> = {
   sverena_pece: 'Svěřená péče',
   jiny_zz: 'Jiný ZZ',
   kontaktni_osoba: 'Kontaktní osoba',
-}
-
-const EDUCATION_MODE_LABELS: Record<string, string> = {
-  standardni: 'Standardní (§ 36)',
-  jiny_zpusob: 'Jiný způsob (§ 38)',
-  domaci: 'Domácí (§ 41)',
 }
 
 const SEVERITY_CLASSES: Record<string, string> = {
@@ -297,7 +292,7 @@ export default async function ZakDetailPage({
           )}
           <DefItem
             label="Způsob vzdělávání"
-            value={s.education_mode ? (EDUCATION_MODE_LABELS[s.education_mode] ?? s.education_mode) : '—'}
+            value={s.education_mode ? educationModeLabel(s.education_mode) : '—'}
           />
           {s.has_svp && (
             <DefItem

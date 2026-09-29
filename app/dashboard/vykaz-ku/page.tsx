@@ -107,7 +107,7 @@ export default async function VykazKuPage() {
             ? <>Hodnoty zmrazené k&nbsp;{capturedAt ? new Date(capturedAt).toLocaleString('cs-CZ') : '—'}.</>
             : <>Náhled — hodnoty dopočítané naživo (snapshot za tento měsíc zatím nebyl zmrazen).</>}
         </p>
-        <p>Družina se počítá podle reálného výkazu docházky. Obědy zatím nemají v systému reálný výkaz (proto „N/A“).</p>
+        <p>Družina se počítá podle reálného výkazu docházky, obědy podle objednávek (oběd odhlášený omluvenkou se nepočítá). Údaje jsou v systému od září 2026.</p>
         <p>Za červenec a srpen se výkaz nesestavuje.</p>
       </div>
 

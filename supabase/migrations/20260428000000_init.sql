@@ -71,17 +71,16 @@ CREATE TYPE student_status AS ENUM (
   'withdrawn'
 );
 
--- Způsob plnění PŠD (MŠMT číselník RAZD — nejčastější hodnoty pro Vilekulu)
--- Plný číselník viz dokumentace MŠMT ZS.025
--- '11' = standardní prezenční výuka (nejčastější)
--- '30' = individuální vzdělávání §38 školského zákona
--- '40' = vzdělávání v zahraničí §38a
--- '50' = vzdělávání žáka s hlubokým mentálním postižením §42
+-- Způsob plnění PŠD = kód MŠMT číselníku RASD.
+-- POZOR: původní výklad zde byl chybný. Správně (RASD, ověřeno 2026-09-29):
+--   11 docházka do školy, 30 = individuální vzdělávání § 41, § 38 (zahraničí)
+--   má kódy 21–25, 40 (§ 42) zrušen 2019, 50 neexistuje. Migrace 134a doplnila
+--   12/15/21–25 a zakázala 40/50. Výklad v kódu: lib/zpusob-psd.ts.
 CREATE TYPE zpusob_plneni_psd AS ENUM (
-  '11',  -- prezenční výuka — standardní
-  '30',  -- individuální vzdělávání (§38)
-  '40',  -- vzdělávání v zahraničí (§38a)
-  '50'   -- §42
+  '11',  -- školní docházka ve škole v rejstříku
+  '30',  -- individuální vzdělávání (§ 41)
+  '40',  -- § 42 — v RASD zrušen k 31. 8. 2019
+  '50'   -- v RASD neexistuje
 );
 
 -- Stav katalogového listu z předchozí školy (TRD sekce 10.1 addendum)

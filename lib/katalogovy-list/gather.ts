@@ -9,6 +9,7 @@ import { getActiveSchoolYear, prevSchoolYear } from '@/lib/school-year'
 import { getVystupyWithHodnoceni } from '@/lib/mapa-pokroku'
 import { prevodNaZnamku, type Stupen, type ZnamkaVysledek } from './znamka'
 import { getStudentAddresses, getGuardianAddresses, formatAddressLine } from '@/lib/addresses'
+import { zpusobPsdLabel } from '@/lib/zpusob-psd'
 import type {
   KatalogovyListData,
   KLPredmetProspech,
@@ -26,17 +27,6 @@ const VZTAH_LABEL: Record<string, string> = {
   sverena_pece: 'osoba se svěřenou péčí',
   jiny_zz: 'jiný zákonný zástupce',
   kontaktni_osoba: 'kontaktní osoba',
-}
-
-// Způsob plnění PŠD. POZOR: DB enum zpusob_plneni_psd (000_init.sql) je vlastní
-// zjednodušená sada 11/30/40/50, NE plný číselník MŠMT RASD (ten má 11,12,15,21–25,30
-// a 40/50 vůbec nezná). Labely níže sladěné s RASD tam, kde se překrývá, a se
-// správnými paragrafy (komentář v init.sql u 30 chybně uváděl §38 — správně §41).
-const ZPUSOB_PSD_LABEL: Record<string, string> = {
-  '11': 'běžná školní docházka',
-  '30': 'individuální vzdělávání (§ 41 ŠZ)',
-  '40': 'plnění PŠD v zahraničí / v zahraniční škole (§ 38 ŠZ)',
-  '50': 'jiný způsob plnění PŠD (§ 42 ŠZ)',
 }
 
 const VP_PECE_LABEL: Record<string, string> = {
@@ -264,7 +254,7 @@ export async function gatherKatalogovyList(
       pocetLetPsd:
         rocnikSoucasny != null ? Math.max(rocnikSoucasny - 1, 0) : null,
       zpusobPsd: eduSoucasny.zpusob
-        ? ZPUSOB_PSD_LABEL[eduSoucasny.zpusob] ?? `kód ${eduSoucasny.zpusob}`
+        ? zpusobPsdLabel(eduSoucasny.zpusob)
         : null,
     },
     adresa: { trvale, korespondencni },

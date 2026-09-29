@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
     jiny_38: values.jiny_38,
     indiv_41: values.indiv_41,
     druzina_pocet: values.druzina_pocet,
-    obed_pocet: values.obed_pocet, // zatím null (N/A)
+    obed_pocet: values.obed_pocet, // null = N/A (chybí migrace 135)
     captured_at: new Date().toISOString(),
   }
 

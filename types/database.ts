@@ -5527,6 +5527,373 @@ export type Database = {
           },
         ]
       }
+      vf_izo: {
+        Row: {
+          aktivni: boolean
+          id: string
+          izo: string | null
+          kod: string
+          nazev: string
+          poradi: number
+          updated_at: string
+          vlastni: boolean
+        }
+        Insert: {
+          aktivni?: boolean
+          id?: string
+          izo?: string | null
+          kod: string
+          nazev: string
+          poradi?: number
+          updated_at?: string
+          vlastni?: boolean
+        }
+        Update: {
+          aktivni?: boolean
+          id?: string
+          izo?: string | null
+          kod?: string
+          nazev?: string
+          poradi?: number
+          updated_at?: string
+          vlastni?: boolean
+        }
+        Relationships: []
+      }
+      vf_kapacita: {
+        Row: {
+          id: string
+          izo_id: string
+          kapacita: number
+          skolni_rok: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          izo_id: string
+          kapacita: number
+          skolni_rok: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          izo_id?: string
+          kapacita?: number
+          skolni_rok?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vf_kapacita_izo_id_fkey"
+            columns: ["izo_id"]
+            isOneToOne: false
+            referencedRelation: "vf_izo"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vf_koeficient: {
+        Row: {
+          id: string
+          izo_id: string
+          koeficient: number
+          skolni_rok: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          izo_id: string
+          koeficient: number
+          skolni_rok: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          izo_id?: string
+          koeficient?: number
+          skolni_rok?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vf_koeficient_izo_id_fkey"
+            columns: ["izo_id"]
+            isOneToOne: false
+            referencedRelation: "vf_izo"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vf_mesic: {
+        Row: {
+          period: string
+          uzamceno_at: string
+          uzamceno_by: string | null
+        }
+        Insert: {
+          period: string
+          uzamceno_at?: string
+          uzamceno_by?: string | null
+        }
+        Update: {
+          period?: string
+          uzamceno_at?: string
+          uzamceno_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vf_mesic_uzamceno_by_fkey"
+            columns: ["uzamceno_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vf_nastaveni: {
+        Row: {
+          id: number
+          ku_ucty: string[]
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          ku_ucty?: string[]
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          ku_ucty?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      vf_normativ: {
+        Row: {
+          id: string
+          normativ_rocni: number
+          polozka_id: string
+          rok: number
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          normativ_rocni: number
+          polozka_id: string
+          rok: number
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          normativ_rocni?: number
+          polozka_id?: string
+          rok?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vf_normativ_polozka_id_fkey"
+            columns: ["polozka_id"]
+            isOneToOne: false
+            referencedRelation: "vf_polozka"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vf_polozka: {
+        Row: {
+          aktivni: boolean
+          do_kapacity: boolean
+          id: string
+          izo_id: string
+          jednotka: string
+          kod: string
+          letni_cerven: boolean
+          nazev: string
+          poradi: number
+          priorita_kapacity: number
+          rucne_prenaset: boolean
+          vp_druhy: string[]
+          zdroj: string
+        }
+        Insert: {
+          aktivni?: boolean
+          do_kapacity?: boolean
+          id?: string
+          izo_id: string
+          jednotka: string
+          kod: string
+          letni_cerven?: boolean
+          nazev: string
+          poradi?: number
+          priorita_kapacity?: number
+          rucne_prenaset?: boolean
+          vp_druhy?: string[]
+          zdroj: string
+        }
+        Update: {
+          aktivni?: boolean
+          do_kapacity?: boolean
+          id?: string
+          izo_id?: string
+          jednotka?: string
+          kod?: string
+          letni_cerven?: boolean
+          nazev?: string
+          poradi?: number
+          priorita_kapacity?: number
+          rucne_prenaset?: boolean
+          vp_druhy?: string[]
+          zdroj?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vf_polozka_izo_id_fkey"
+            columns: ["izo_id"]
+            isOneToOne: false
+            referencedRelation: "vf_izo"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vf_prijato: {
+        Row: {
+          castka: number
+          created_at: string
+          created_by: string | null
+          datum: string
+          id: string
+          izo_id: string | null
+          obdobi_do: string
+          obdobi_od: string
+          payment_transaction_id: string | null
+          poznamka: string | null
+          updated_at: string
+        }
+        Insert: {
+          castka: number
+          created_at?: string
+          created_by?: string | null
+          datum: string
+          id?: string
+          izo_id?: string | null
+          obdobi_do: string
+          obdobi_od: string
+          payment_transaction_id?: string | null
+          poznamka?: string | null
+          updated_at?: string
+        }
+        Update: {
+          castka?: number
+          created_at?: string
+          created_by?: string | null
+          datum?: string
+          id?: string
+          izo_id?: string | null
+          obdobi_do?: string
+          obdobi_od?: string
+          payment_transaction_id?: string | null
+          poznamka?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vf_prijato_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vf_prijato_izo_id_fkey"
+            columns: ["izo_id"]
+            isOneToOne: false
+            referencedRelation: "vf_izo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vf_prijato_payment_transaction_id_fkey"
+            columns: ["payment_transaction_id"]
+            isOneToOne: true
+            referencedRelation: "payment_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vf_stav_mesic: {
+        Row: {
+          captured_at: string | null
+          id: string
+          period: string
+          pocet_auto: number | null
+          pocet_rucne: number | null
+          polozka_id: string
+          poznamka: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          captured_at?: string | null
+          id?: string
+          period: string
+          pocet_auto?: number | null
+          pocet_rucne?: number | null
+          polozka_id: string
+          poznamka?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          captured_at?: string | null
+          id?: string
+          period?: string
+          pocet_auto?: number | null
+          pocet_rucne?: number | null
+          polozka_id?: string
+          poznamka?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vf_stav_mesic_polozka_id_fkey"
+            columns: ["polozka_id"]
+            isOneToOne: false
+            referencedRelation: "vf_polozka"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vf_stav_mesic_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vf_zpusob_mapa: {
+        Row: {
+          polozka_id: string | null
+          zpusob: Database["public"]["Enums"]["zpusob_plneni_psd"]
+        }
+        Insert: {
+          polozka_id?: string | null
+          zpusob: Database["public"]["Enums"]["zpusob_plneni_psd"]
+        }
+        Update: {
+          polozka_id?: string | null
+          zpusob?: Database["public"]["Enums"]["zpusob_plneni_psd"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vf_zpusob_mapa_polozka_id_fkey"
+            columns: ["polozka_id"]
+            isOneToOne: false
+            referencedRelation: "vf_polozka"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vp_doporuceni: {
         Row: {
           care_id: string | null
@@ -6737,6 +7104,13 @@ export type Database = {
       }
       student_is_attending: { Args: { p_student_id: string }; Returns: boolean }
       usage_db_size: { Args: never; Returns: number }
+      vf_lunch_month_counts: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          mesic: string
+          pocet: number
+        }[]
+      }
       zrusit_blok_priznak: {
         Args: { p_blok_id: string; p_typ_kod: string }
         Returns: undefined
@@ -6830,7 +7204,18 @@ export type Database = {
       typ_vp_pece: "watch" | "po_1" | "po_2" | "po_3" | "po_4" | "po_5"
       typ_zamestnance: "pedagogicky" | "THP"
       zpusob_doruceni: "datova_schranka" | "email" | "posta" | "osobne"
-      zpusob_plneni_psd: "11" | "30" | "40" | "50"
+      zpusob_plneni_psd:
+        | "11"
+        | "12"
+        | "15"
+        | "21"
+        | "22"
+        | "23"
+        | "24"
+        | "25"
+        | "30"
+        | "40"
+        | "50"
       zpusob_vyrizeni:
         | "odpoved_odeslana"
         | "rozhodnuti_vydano"
@@ -7348,7 +7733,19 @@ export const Constants = {
       typ_vp_pece: ["watch", "po_1", "po_2", "po_3", "po_4", "po_5"],
       typ_zamestnance: ["pedagogicky", "THP"],
       zpusob_doruceni: ["datova_schranka", "email", "posta", "osobne"],
-      zpusob_plneni_psd: ["11", "30", "40", "50"],
+      zpusob_plneni_psd: [
+        "11",
+        "12",
+        "15",
+        "21",
+        "22",
+        "23",
+        "24",
+        "25",
+        "30",
+        "40",
+        "50",
+      ],
       zpusob_vyrizeni: [
         "odpoved_odeslana",
         "rozhodnuti_vydano",

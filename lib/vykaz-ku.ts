@@ -13,16 +13,20 @@
  *
  * Datový model (potvrzeno s uživatelem 2026-08-03):
  *   §36/§38/§41  → students.education_mode (snapshot, bez historie):
- *                  'standardni' | 'jiny_zpusob' | 'domaci'.
+ *                  'standardni' | 'jiny_zpusob' | 'domaci' — výklad v lib/zpusob-psd.ts
+ *                  (EDUCATION_MODE; jiny_zpusob = § 38 zahraničí, domaci = § 41).
  *                  Počítají se žáci, jejichž zápis pokrýval POSLEDNÍ DEN měsíce
  *                  (enrollment_date <= poslední den a withdrawal_date buď NULL,
  *                  nebo >= poslední den) — NE aktuální status. Tím se z počtu
  *                  vyřadí žáci zapsaní až na příští rok (budoucí enrollment_date).
  *   družina      → druzina_dochazka: distinct student_id se status='present' za měsíc
  *                  (reálný výkaz — historicky věrné).
- *   obědy        → reálný výkaz odběru obědů v DB zatím NENÍ (jen platební předpisy
- *                  a veřejný jídelníček) → obed_pocet = null → v UI/CSV „N/A".
+ *   obědy        → distinct žáci s ≥1 efektivním obědem v měsíci (RPC
+ *                  vf_lunch_month_counts, migrace 135 — sdílené s modulem Veřejné finance).
+ *                  Bez migrace 135 RPC neexistuje → obed_pocet = null → v UI/CSV „N/A".
  */
+
+import { EDUCATION_MODE, type EducationMode } from '@/lib/zpusob-psd'
 
 export type VykazMonth = { year: number; month: number } // month 1–12
 
@@ -31,7 +35,7 @@ export type VykazMonthValues = {
   jiny_38: number
   indiv_41: number
   druzina_pocet: number
-  /** null = reálný výkaz obědů zatím není napojen. */
+  /** null = obědy nešlo spočítat (chybí migrace 135). */
   obed_pocet: number | null
 }
 
@@ -116,10 +120,10 @@ export async function computeVykazMonth(
 
   let std_36 = 0, jiny_38 = 0, indiv_41 = 0
   for (const s of (studs ?? []) as Array<{ education_mode: string | null }>) {
-    switch (s.education_mode) {
-      case 'standardni':  std_36++;  break
-      case 'jiny_zpusob': jiny_38++; break
-      case 'domaci':      indiv_41++; break
+    switch (EDUCATION_MODE[s.education_mode as EducationMode]?.paragraf) {
+      case '36': std_36++;  break
+      case '38': jiny_38++; break
+      case '41': indiv_41++; break
       // ostatní / null → nezařazeno (nespadá do žádného z §36/§38/§41)
     }
   }
@@ -136,13 +140,20 @@ export async function computeVykazMonth(
     ((druz ?? []) as Array<{ student_id: string }>).map((r) => r.student_id),
   )
 
+  // --- Obědy: distinct žáci s ≥1 efektivním obědem (objednáno, školní den,
+  //     ne autozrušeno omluvenkou) — RPC z migrace 135; bez ní „N/A". ---
+  const { data: lunchRows, error: lErr } = await supabase
+    .rpc('vf_lunch_month_counts', { p_from: first, p_to: last })
+  const obed_pocet = lErr
+    ? null
+    : ((lunchRows ?? []) as Array<{ pocet: number }>).reduce((sum, r) => sum + r.pocet, 0)
+
   return {
     std_36,
     jiny_38,
     indiv_41,
     druzina_pocet: druzinaSet.size,
-    // Reálný výkaz odběru obědů v DB zatím není → N/A.
-    obed_pocet: null,
+    obed_pocet,
   }
 }
 
@@ -155,7 +166,7 @@ export const VYKAZ_ROWS: { key: keyof VykazMonthValues; label: string }[] = [
   { key: 'obed_pocet',    label: 'Žáci s odebraným obědem (≥ 1× za měsíc)' },
 ]
 
-/** Zobrazení hodnoty buňky — null (obědy zatím bez výkazu) → „N/A". */
+/** Zobrazení hodnoty buňky — null (obědy nešlo spočítat) → „N/A". */
 export function displayValue(v: number | null): string {
   return v === null ? 'N/A' : String(v)
 }
