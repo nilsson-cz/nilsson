@@ -49,6 +49,12 @@ export const MSMT_KODY = {
   KOD_UKON_PRESTUP: '3',    // přestup na jinou ZŠ (metodika)
   KOD_ZMEN_BEZ: '0',
   KOD_ZMEN_PRICHOD: '2',    // nástup z jiné školy (přijaté soubory)
+  // Číselník RAKZ (aplikace MŠMT, 30. 9. 2026): 0 beze změny, 1 změna vzdělávání
+  // (obor, druh, forma, délka, způsob), 2 změna organizace vzdělávání (přestup,
+  // přeřazení), 5 zkouška, 6 osobní údaje, 7 osobní identifikátor (RČ),
+  // 8 změna v přiznání / poskytování podpůrných opatření.
+  KOD_ZMEN_ORGANIZACE: '2',
+  KOD_ZMEN_PO: '8',
   KSTPR_CR: '3',            // státní občan ČR (přijaté soubory)
   JAZ1_DEFAULT: '02',       // přijaté soubory: všichni žáci 02 / A
   P_JAZ1_DEFAULT: 'A',
@@ -223,6 +229,8 @@ interface VetaInterval {
   kon: Date | null
   oml: boolean
   ukonceni: boolean
+  /** Věta vzniklá změnou údajů uprostřed období — KOD_ZMEN (RAKZ), ZMENDAT = zac. */
+  kodZmen?: string
 }
 
 /**
@@ -406,9 +414,10 @@ function polozkyVety(z: ZakMatrika, v: VetaInterval, prvni: boolean): string[] {
   // KOD_ZMEN 2 ve větě, kterou žák začíná (jako přijaté soubory).
   const prichod = prvni && toIso(v.zac) === z.enrollment_date
     && !['1', '2', '3'].includes(z.kod_zahajeni ?? '')
+  const kod = prichod ? MSMT_KODY.KOD_ZMEN_PRICHOD : v.kodZmen ?? null
   return [
-    el('KOD_ZMEN', prichod ? MSMT_KODY.KOD_ZMEN_PRICHOD : MSMT_KODY.KOD_ZMEN_BEZ),
-    el('ZMENDAT', prichod ? fmtDate(v.zac) : null),
+    el('KOD_ZMEN', kod ?? MSMT_KODY.KOD_ZMEN_BEZ),
+    el('ZMENDAT', kod ? fmtDate(v.zac) : null),
     el('KOD_VETY', v.ukonceni ? MSMT_KODY.KOD_VETY_UKONCENO : MSMT_KODY.KOD_VETY_ZAK),
     el('PLAT_ZAC', fmtDate(v.zac)),
     el('PLAT_KON', v.kon ? fmtDate(v.kon) : null),
@@ -448,14 +457,34 @@ function rozdelVetuA(v: VetaInterval, obdobi: MatrikaAObdobi[], rdat: Date): Vet
   const body = obdobi.map((o) => o.od).filter((od) => od > zac && od <= kon).sort()
   if (body.length === 0) return [v]
   const out: VetaInterval[] = []
-  let cur = v.zac
+  let cur: VetaInterval = { ...v }
   for (const od of body) {
     const d = isoToDate(od)
-    out.push({ zac: cur, kon: new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, 12), oml: false, ukonceni: false })
-    cur = d
+    const predIso = toIso(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, 12))
+    out.push({ ...cur, kon: isoToDate(predIso) })
+    cur = { zac: d, kon: v.kon, oml: false, ukonceni: false,
+      kodZmen: kodZmenyA(kDatu(obdobi, predIso), kDatu(obdobi, od)) }
   }
-  out.push({ zac: cur, kon: v.kon, oml: false, ukonceni: false })
+  out.push(cur)
   return out
+}
+
+/**
+ * KOD_ZMEN (RAKZ) nové věty „a": 8 = změna v přiznání / poskytování PO (údaje
+ * z doporučení, PLPP, SZ/ZZ/NADANI), 2 = změna organizace vzdělávání (asistent
+ * ve třídě — TYP_TR, jazyková podpora / příprava, ZVJ). Při více změnách má
+ * přednost vyšší kód, výjimkou je 8 (metodika MŠMT, KOD_ZMEN) — proto 2 před 8.
+ */
+export function kodZmenyA(pred: MatrikaAObdobi | undefined, nove: MatrikaAObdobi | undefined): string {
+  if (!pred || !nove) return MSMT_KODY.KOD_ZMEN_BEZ
+  const po = pred.pspo !== nove.pspo || pred.id_znev !== nove.id_znev || pred.indi !== nove.indi
+    || pred.uvp !== nove.uvp || pred.prodl_dv !== nove.prodl_dv || pred.upr_vyst !== nove.upr_vyst
+    || pred.sz !== nove.sz || pred.zz !== nove.zz || pred.nadani !== nove.nadani
+  const organizace = pred.typ_tr !== nove.typ_tr || pred.zvj !== nove.zvj
+    || pred.jaz_podp !== nove.jaz_podp || pred.jaz_prip !== nove.jaz_prip
+  if (organizace) return MSMT_KODY.KOD_ZMEN_ORGANIZACE
+  if (po) return MSMT_KODY.KOD_ZMEN_PO
+  return MSMT_KODY.KOD_ZMEN_BEZ
 }
 
 /**
@@ -488,8 +517,7 @@ export function generateSouborA(zaci: ZakMatrikaA[], cfg: XmlConfig): string {
         el('PRODL_DV', a.prodl_dv),
         el('UPR_VYST', b(a.upr_vyst)),
         el('ID_ZNEV', a.id_znev),
-        // Změna údajů „a" uprostřed věty dostane KOD_ZMEN 0 — kód z číselníku
-        // RAKZ pro změnu SVP nemáme (k ověření na testovacím serveru MŠMT).
+        // Změna údajů „a" uprostřed věty: KOD_ZMEN 8 / 2 (kodZmenyA).
         ...polozkyVety(z, v, i === 0),
         '  </veta>',
       )
