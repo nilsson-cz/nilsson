@@ -15,8 +15,10 @@ import {
 import { STAV_LABELS, STAV_VARIANT, VEKOVA_KATEGORIE_LABELS, type EnrollmentVekovaKategorie, type EnrollmentStav } from '@/lib/enrollment/types'
 import { ROZHODNUTI_LABELS, dostupneAkce, type EnrollmentRozhodnuti } from '@/lib/enrollment/rozhodnuti'
 import { dostupneDokumenty, predRozhodnutimDokumenty } from '@/lib/enrollment/dokumenty'
+import { countryName } from '@/lib/countries'
 import DecisionForm from './_components/DecisionForm'
 import DokumentyPanel from './_components/DokumentyPanel'
+import PredchoziSkolaEditor from './_components/PredchoziSkolaEditor'
 
 export const metadata = { title: 'Detail žádosti — IS Nilsson' }
 export const dynamic = 'force-dynamic'
@@ -24,6 +26,20 @@ export const dynamic = 'force-dynamic'
 function formatDate(d: string | null) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' })
+}
+
+/** Předchozí škola + IZOP pro kontrolu ředitelem (migrace 139). */
+function predchoziSkolaText(
+  app: { predchozi_skola_volba: string | null; predchozi_skola_izo: string | null; predchozi_skola_stat: string | null },
+  nazev: string | null,
+): string | null {
+  switch (app.predchozi_skola_volba) {
+    case 'rejstrik': return `${nazev ?? '—'} (IZO ${app.predchozi_skola_izo})`
+    case 'nechodilo': return 'Nechodilo do MŠ (IZOP 000000000)'
+    case 'zahranici': return `${[nazev, countryName(app.predchozi_skola_stat)].filter(Boolean).join(', ')} — zahraničí${app.predchozi_skola_izo ? ` (IZOP ${app.predchozi_skola_izo})` : ''}`
+    case 'nenalezeno': return `${nazev ?? '—'} — rodič nenašel v rejstříku, IZOP doplnit`
+    default: return nazev
+  }
 }
 
 function Radek({ label, value }: { label: string; value: React.ReactNode }) {
@@ -63,6 +79,18 @@ export default async function ZapisDetailPage({
 
   const app = await getEnrollmentApplicationDetail(id)
   if (!app) notFound()
+
+  // Předchozí škola: před přijetím ji ředitel může doplnit / opravit (IZOP).
+  const skolaRadek = (label: string, druh: 'A00' | 'B00', nazev: string | null) =>
+    app.student_id
+      ? <Radek label={label} value={predchoziSkolaText(app, nazev)} />
+      : (
+        <PredchoziSkolaEditor
+          applicationId={app.id} druh={druh} label={label}
+          text={predchoziSkolaText(app, nazev)}
+          initial={{ volba: app.predchozi_skola_volba, izo: app.predchozi_skola_izo, nazev, stat: app.predchozi_skola_stat }}
+        />
+      )
 
   const [guardians, decisions] = await Promise.all([
     getEnrollmentGuardians(id),
@@ -186,7 +214,7 @@ export default async function ZapisDetailPage({
         <Radek label="Zdravotní omezení" value={app.zdravotni_omezeni} />
         <Radek label="Specifické potřeby" value={app.specificke_potreby} />
         <Radek label="Budoucí ročník" value={app.budouci_rocnik} />
-        <Radek label="Dosavadní škola" value={app.dosavadni_skola} />
+        {app.typ !== 'prestup' && skolaRadek('Mateřská škola', 'A00', app.dosavadni_skola)}
         <Radek label="Další informace" value={app.dalsi_informace} />
       </div>
 
@@ -195,7 +223,7 @@ export default async function ZapisDetailPage({
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-2">Přestup</h2>
           <Radek label="K datu" value={formatDate(app.prestup_k_datu)} />
-          <Radek label="Současná škola" value={app.soucasna_skola} />
+          {skolaRadek('Současná škola', 'B00', app.soucasna_skola)}
           <Radek label="Současná třída" value={app.soucasna_trida} />
           <Radek label="Individuální vzdělávání" value={app.individualni_vzdelavani ? 'Ano' : 'Ne'} />
           <Radek label="Doporučení" value={app.prestup_doporuceni_stav} />

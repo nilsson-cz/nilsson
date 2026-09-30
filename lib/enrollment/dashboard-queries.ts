@@ -93,6 +93,11 @@ export interface EnrollmentApplicationDetail {
   individualni_vzdelavani: boolean | null
   prestup_doporuceni_stav: string | null
 
+  // předchozí škola (migrace 139)
+  predchozi_skola_volba: string | null
+  predchozi_skola_izo: string | null
+  predchozi_skola_stat: string | null
+
   created_at: string
 }
 

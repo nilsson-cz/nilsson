@@ -6,6 +6,8 @@
 import { useState, useTransition, useRef } from 'react'
 import { updateRodneCislo, updateMsmtPole, type MsmtPole } from '@/app/actions/students'
 import { zkontrolujRodneCislo } from '@/lib/rodne-cislo'
+import SkolaVyhledavani from '@/components/skoly/SkolaVyhledavani'
+import type { SkolaZRejstriku } from '@/lib/enrollment/types'
 
 export interface UdajeZaka {
   id: string
@@ -16,6 +18,7 @@ export interface UdajeZaka {
   birth_number: string | null
   msmt_odhl: string | null
   msmt_izop: string | null
+  izop_skola: string | null    // název školy k IZOP z rejstříku (null = kód / nenalezeno)
   kod_zahajeni: string | null
   stpr: string | null          // normalizovaný STPR (null = neznámé občanství)
   citizenship: string | null   // text z IS
@@ -106,6 +109,76 @@ function Pole({
   )
 }
 
+/**
+ * IZOP: ruční pole + hledání školy v rejstříku. Zaniklá škola se ukládá jako
+ * 000000203 (číselník MŠMT), jinak IZO vybrané školy.
+ */
+function IzopPole({
+  zak, ulozit,
+}: {
+  zak: UdajeZaka
+  ulozit: (v: string) => Promise<{ success: true; hodnota: string | null } | { error: string }>
+}) {
+  const [verze, setVerze] = useState(0)
+  const [hodnota, setHodnota] = useState(zak.msmt_izop)
+  const [skola, setSkola] = useState(zak.izop_skola)
+  const [hledam, setHledam] = useState(false)
+  const [chyba, setChyba] = useState('')
+  const [isPending, startTransition] = useTransition()
+
+  const vyber = (s: SkolaZRejstriku) => {
+    const izo = s.zanikla_k ? '000000203' : s.izo
+    startTransition(async () => {
+      const r = await ulozit(izo)
+      if ('error' in r) { setChyba(r.error); return }
+      setHodnota(r.hodnota)
+      setSkola(s.zanikla_k ? `${s.nazev} (zaniklá)` : [s.nazev, s.obec].filter(Boolean).join(', '))
+      setVerze((v) => v + 1)
+      setHledam(false)
+      setChyba('')
+    })
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-start gap-1">
+        <Pole
+          key={verze}
+          initial={hodnota}
+          sirka="w-28"
+          placeholder="IZO (9 číslic)"
+          list="msmt-izop"
+          maxLength={9}
+          kontrola={(v) => (/^\d{9}$/.test(v) ? { ok: true } : { ok: false, zprava: v ? '9 číslic' : 'chybí' })}
+          ulozit={async (v) => {
+            const r = await ulozit(v)
+            if (!('error' in r)) { setHodnota(r.hodnota); setSkola(null) }
+            return r
+          }}
+        />
+        <button
+          type="button" onClick={() => setHledam((h) => !h)} disabled={isPending}
+          title="Najít školu v rejstříku"
+          className="px-1.5 py-1 rounded border border-gray-300 text-xs text-gray-600 hover:bg-gray-100"
+        >
+          {hledam ? '×' : 'Hledat'}
+        </button>
+      </div>
+      {skola && !hledam && <p className="text-xs text-gray-500 max-w-[14rem] whitespace-normal">{skola}</p>}
+      {hledam && (
+        <div className="w-72">
+          <SkolaVyhledavani
+            druh={null} onSelect={vyber} autoFocus
+            placeholder="Škola, obec nebo IZO"
+            inputClassName="w-full px-2 py-1 rounded border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
+      )}
+      {chyba && <p className="text-xs text-red-500">{chyba}</p>}
+    </div>
+  )
+}
+
 export function UdajeZakaRow({ zak, dosavadniSkola }: { zak: UdajeZaka; dosavadniSkola?: string | null }) {
   const ulozPole = (pole: MsmtPole) => (v: string) => updateMsmtPole(zak.id, pole, v)
 
@@ -153,15 +226,7 @@ export function UdajeZakaRow({ zak, dosavadniSkola }: { zak: UdajeZaka; dosavadn
       </td>
 
       <td className="px-3 py-2">
-        <Pole
-          initial={zak.msmt_izop}
-          sirka="w-28"
-          placeholder="IZO (9 číslic)"
-          list="msmt-izop"
-          maxLength={9}
-          kontrola={(v) => (/^\d{9}$/.test(v) ? { ok: true } : { ok: false, zprava: v ? '9 číslic' : 'chybí' })}
-          ulozit={ulozPole('msmt_izop')}
-        />
+        <IzopPole zak={zak} ulozit={ulozPole('msmt_izop')} />
       </td>
 
       <td className="px-3 py-2">

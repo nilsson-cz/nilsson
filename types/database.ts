@@ -1759,6 +1759,9 @@ export type Database = {
           odklad_ppp_stav: Database["public"]["Enums"]["enrollment_doklad_stav"]
           odklad_rezim: string | null
           pohlavi: string | null
+          predchozi_skola_izo: string | null
+          predchozi_skola_stat: string | null
+          predchozi_skola_volba: string | null
           prestup_doporuceni_stav:
             | Database["public"]["Enums"]["enrollment_prestup_doporuceni"]
             | null
@@ -1818,6 +1821,9 @@ export type Database = {
           odklad_ppp_stav?: Database["public"]["Enums"]["enrollment_doklad_stav"]
           odklad_rezim?: string | null
           pohlavi?: string | null
+          predchozi_skola_izo?: string | null
+          predchozi_skola_stat?: string | null
+          predchozi_skola_volba?: string | null
           prestup_doporuceni_stav?:
             | Database["public"]["Enums"]["enrollment_prestup_doporuceni"]
             | null
@@ -1877,6 +1883,9 @@ export type Database = {
           odklad_ppp_stav?: Database["public"]["Enums"]["enrollment_doklad_stav"]
           odklad_rezim?: string | null
           pohlavi?: string | null
+          predchozi_skola_izo?: string | null
+          predchozi_skola_stat?: string | null
+          predchozi_skola_volba?: string | null
           prestup_doporuceni_stav?:
             | Database["public"]["Enums"]["enrollment_prestup_doporuceni"]
             | null
@@ -3818,6 +3827,60 @@ export type Database = {
         }
         Relationships: []
       }
+      skolsky_rejstrik: {
+        Row: {
+          cast_obce: string | null
+          druh: string
+          hledani: string
+          izo: string
+          kod_ruian: number | null
+          kraj: string | null
+          nazev: string
+          obec: string | null
+          psc: string | null
+          red_izo: string
+          snapshot: string
+          ulice: string | null
+          updated_at: string
+          zahajeni: string | null
+          zanikla_k: string | null
+        }
+        Insert: {
+          cast_obce?: string | null
+          druh: string
+          hledani: string
+          izo: string
+          kod_ruian?: number | null
+          kraj?: string | null
+          nazev: string
+          obec?: string | null
+          psc?: string | null
+          red_izo: string
+          snapshot: string
+          ulice?: string | null
+          updated_at?: string
+          zahajeni?: string | null
+          zanikla_k?: string | null
+        }
+        Update: {
+          cast_obce?: string | null
+          druh?: string
+          hledani?: string
+          izo?: string
+          kod_ruian?: number | null
+          kraj?: string | null
+          nazev?: string
+          obec?: string | null
+          psc?: string | null
+          red_izo?: string
+          snapshot?: string
+          ulice?: string | null
+          updated_at?: string
+          zahajeni?: string | null
+          zanikla_k?: string | null
+        }
+        Relationships: []
+      }
       spisy: {
         Row: {
           created_at: string
@@ -4525,7 +4588,7 @@ export type Database = {
           obec_bydliste_kod: string | null
           okres_bydliste_kod: string | null
           photo_consent: boolean
-          predchozi_skola_izo: string | null
+          predchozi_skola_nazev: string | null
           predchozi_vzdelavani: string | null
           sp_obvod: string | null
           status: Database["public"]["Enums"]["student_status"]
@@ -4570,7 +4633,7 @@ export type Database = {
           obec_bydliste_kod?: string | null
           okres_bydliste_kod?: string | null
           photo_consent?: boolean
-          predchozi_skola_izo?: string | null
+          predchozi_skola_nazev?: string | null
           predchozi_vzdelavani?: string | null
           sp_obvod?: string | null
           status?: Database["public"]["Enums"]["student_status"]
@@ -4615,7 +4678,7 @@ export type Database = {
           obec_bydliste_kod?: string | null
           okres_bydliste_kod?: string | null
           photo_consent?: boolean
-          predchozi_skola_izo?: string | null
+          predchozi_skola_nazev?: string | null
           predchozi_vzdelavani?: string | null
           sp_obvod?: string | null
           status?: Database["public"]["Enums"]["student_status"]
@@ -6602,6 +6665,16 @@ export type Database = {
         Args: { p_application_id: string; p_decision_id: number }
         Returns: string
       }
+      enrollment_msmt_predvyplneni: {
+        Args: {
+          p_app: Database["public"]["Tables"]["enrollment_applications"]["Row"]
+        }
+        Returns: {
+          izop: string
+          kod_zahajeni: string
+          odhl: string
+        }[]
+      }
       enrollment_record_decision: {
         Args: {
           p_application_id: string
@@ -6900,6 +6973,18 @@ export type Database = {
         Returns: boolean
       }
       has_role: { Args: { p_role: string }; Returns: boolean }
+      hledej_skolu: {
+        Args: { p_druh?: string; p_q: string }
+        Returns: {
+          druh: string
+          izo: string
+          nazev: string
+          obec: string
+          red_izo: string
+          ulice: string
+          zanikla_k: string
+        }[]
+      }
       immutable_unaccent: { Args: { "": string }; Returns: string }
       is_director: { Args: never; Returns: boolean }
       is_director_or_vp: { Args: never; Returns: boolean }

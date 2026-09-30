@@ -27,7 +27,7 @@ type Row = {
   id: string; first_name: string; last_name: string; status: string
   birth_date: string | null; birth_number: string | null; kod_zaka_msmt: string | null
   msmt_odhl: string | null; msmt_izop: string | null; kod_zahajeni: string | null
-  citizenship: string | null; predchozi_skola_izo: string | null
+  citizenship: string | null; predchozi_skola_nazev: string | null
   msmt_sz: string; msmt_zz: string; msmt_nadani: string; msmt_zvj: string
 }
 
@@ -58,7 +58,7 @@ export default async function UdajeZakuPage({
 
   const { data: raw, error } = await supabase
     .from('students')
-    .select('id, first_name, last_name, status, birth_date, birth_number, kod_zaka_msmt, msmt_odhl, msmt_izop, kod_zahajeni, citizenship, predchozi_skola_izo, msmt_sz, msmt_zz, msmt_nadani, msmt_zvj')
+    .select('id, first_name, last_name, status, birth_date, birth_number, kod_zaka_msmt, msmt_odhl, msmt_izop, kod_zahajeni, citizenship, predchozi_skola_nazev, msmt_sz, msmt_zz, msmt_nadani, msmt_zvj')
     .in('status', ['active', 'withdrawn'])
     .lte('enrollment_date', sber.obdobiDo)
     .or(`withdrawal_date.is.null,withdrawal_date.gte.${sber.obdobiOd}`)
@@ -70,6 +70,14 @@ export default async function UdajeZakuPage({
   }
 
   const rows = (raw ?? []) as Row[]
+
+  // Název školy k vyplněnému IZOP (lokální rejstřík, migrace 138).
+  const izopy = [...new Set(rows.map((s) => s.msmt_izop).filter((v): v is string => !!v && /^\d{9}$/.test(v)))]
+  const { data: skoly } = izopy.length
+    ? await supabase.from('skolsky_rejstrik').select('izo, nazev, obec').in('izo', izopy)
+    : { data: [] }
+  const skolaPodleIzo = new Map((skoly ?? []).map((s) => [s.izo, [s.nazev, s.obec].filter(Boolean).join(', ')]))
+
   const zaci: (UdajeZaka & { dosavadniSkola: string | null; kompletni: boolean })[] = rows.map((s) => {
     const rc = zkontrolujRodneCislo(s.birth_number)
     const stpr = stprKod(s.citizenship)
@@ -82,11 +90,11 @@ export default async function UdajeZakuPage({
       birth_number: rc.formatovane ?? s.birth_number,
       msmt_odhl: s.msmt_odhl,
       msmt_izop: s.msmt_izop,
+      izop_skola: s.msmt_izop ? skolaPodleIzo.get(s.msmt_izop) ?? null : null,
       kod_zahajeni: s.kod_zahajeni,
       stpr,
       citizenship: s.citizenship,
-      // predchozi_skola_izo obsahuje u žáků ze zápisu NÁZEV dosavadní školy.
-      dosavadniSkola: s.predchozi_skola_izo && !/^\d{9}$/.test(s.predchozi_skola_izo) ? s.predchozi_skola_izo : null,
+      dosavadniSkola: s.predchozi_skola_nazev,
       kompletni: rc.stav === 'ok' && !!s.msmt_odhl && !!s.msmt_izop && !!s.kod_zahajeni && !!stpr,
     }
   })
@@ -167,22 +175,35 @@ export default async function UdajeZakuPage({
         </p>
       </div>
 
-      {/* Nabídky hodnot (datalist) — kódy z přijatých souborů MŠMT a metodiky */}
+      {/* Nabídky hodnot (datalist) — číselníky MŠMT RAPD / RAZD. ODHL přestupu =
+          ročník, ze kterého žák odchází (na začátku roku dokončený, během roku rozběhnutý). */}
       <datalist id="msmt-odhl">
-        <option value="010">nástup z mateřské školy (1. ročník)</option>
-        <option value="101">ze ZŠ — žák 2. ročníku</option>
-        <option value="102">ze ZŠ — žák 3. ročníku</option>
-        <option value="103">ze ZŠ — žák 4. ročníku</option>
-        <option value="104">ze ZŠ — žák 5. ročníku</option>
+        <option value="010">mateřská škola</option>
+        <option value="101">ZŠ — z 1. ročníku</option>
+        <option value="102">ZŠ — z 2. ročníku</option>
+        <option value="103">ZŠ — z 3. ročníku</option>
+        <option value="104">ZŠ — z 4. ročníku</option>
+        <option value="105">ZŠ — z 5. ročníku</option>
+        <option value="106">ZŠ — z 6. ročníku</option>
+        <option value="107">ZŠ — z 7. ročníku</option>
+        <option value="108">ZŠ — z 8. ročníku</option>
+        <option value="109">ZŠ — z 9. ročníku</option>
+        <option value="600">zahraniční škola</option>
+        <option value="900">jiné</option>
       </datalist>
       <datalist id="msmt-izop">
         <option value="000000000">dosud nechodil do žádné školy</option>
         <option value="000000203">škola v ČR, která už neexistuje</option>
       </datalist>
       <datalist id="msmt-kod-zah">
-        <option value="1">řádný nástup do 1. ročníku</option>
-        <option value="2">nástup po odkladu</option>
-        <option value="E">přestup z jiné ZŠ</option>
+        <option value="1">1. ročník v řádném termínu</option>
+        <option value="2">1. ročník po jednoletém odkladu</option>
+        <option value="3">1. ročník po dvouletém odkladu</option>
+        <option value="4">jiné</option>
+        <option value="E">přestup z jiné školy</option>
+        <option value="H">převedení z jiné školy (zánik, sloučení)</option>
+        <option value="P">souběžné vzdělávání (střídavá péče)</option>
+        <option value="U">přijetí uprchlíka z Ukrajiny</option>
       </datalist>
 
       <div className="rounded-lg border border-gray-200 bg-white overflow-x-auto">

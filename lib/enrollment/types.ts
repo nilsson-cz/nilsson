@@ -157,6 +157,30 @@ export interface ValidovanaAdresa {
   country: string            // ISO 3166-1 alpha-2, default 'CZ'
 }
 
+// ── Předchozí škola (IZOP do matriky, migrace 138/139) ──────────────────
+
+export type PredchoziSkolaVolba = 'rejstrik' | 'nechodilo' | 'zahranici' | 'nenalezeno'
+
+/** Druh školy v rejstříku: A00 = mateřská, B00 = základní. */
+export type SkolaDruh = 'A00' | 'B00'
+
+export interface SkolaZRejstriku {
+  izo: string
+  red_izo: string
+  druh: string
+  nazev: string
+  obec: string | null
+  ulice: string | null
+  zanikla_k: string | null
+}
+
+export interface PredchoziSkola {
+  volba: PredchoziSkolaVolba | ''
+  izo: string        // jen volba 'rejstrik'
+  nazev: string      // název z rejstříku, nebo ruční (zahraničí / nenalezeno)
+  stat: string       // ISO alpha-2, jen volba 'zahranici'
+}
+
 // ── Údaje o dítěti (dotazník) ───────────────────────────────────────────
 
 export interface DiteFormData {

@@ -12,7 +12,10 @@ import type {
   VekovaKlasifikace,
   EnrollmentSpecifickePotreby,
   EnrollmentPrestupDoporuceni,
+  SkolaDruh,
+  SkolaZRejstriku,
 } from '@/lib/enrollment/types'
+import { predchoziSkolaUpdate, type PredchoziSkolaInput } from '@/lib/enrollment/predchozi-skola'
 
 // ---------------------------------------------------------------------------
 // Výsledkové typy
@@ -103,6 +106,23 @@ export async function validateEnrollmentAddress(input: {
   }
 
   return { success: true, data: data as ValidaceAdresyVysledek }
+}
+
+// ---------------------------------------------------------------------------
+// 2b) Našeptávač předchozí školy (hledej_skolu, migrace 138)
+// ---------------------------------------------------------------------------
+
+export async function hledejSkolu(
+  q: string,
+  druh: SkolaDruh | null,
+): Promise<EnrollmentResult<SkolaZRejstriku[]>> {
+  const { supabase, user } = await requireUser()
+  if (!user) return { success: false, error: 'Nejste přihlášeni.' }
+  if (q.trim().length < 2) return { success: true, data: [] }
+
+  const { data, error } = await supabase.rpc('hledej_skolu', { p_q: q.trim(), p_druh: druh ?? undefined })
+  if (error) return { success: false, error: 'Hledání školy selhalo. Zkuste to znovu.' }
+  return { success: true, data: data ?? [] }
 }
 
 // ---------------------------------------------------------------------------
@@ -208,6 +228,10 @@ export interface SaveDiteInput {
   soucasna_trida?: string | null
   individualni_vzdelavani?: boolean | null
   prestup_doporuceni_stav?: EnrollmentPrestupDoporuceni | null
+  // Předchozí škola (migrace 139) — posílá jen krok, který ji obsahuje
+  // (zápis: Zdraví a doplňující, přestup: Přestup). Název jde do
+  // dosavadni_skola (zápis) / soucasna_skola (přestup).
+  predchozi_skola?: PredchoziSkolaInput
 }
 
 export async function saveEnrollmentDite(
@@ -252,6 +276,13 @@ export async function saveEnrollmentDite(
   })
   const k = Array.isArray(klas) && klas.length > 0 ? klas[0] : null
 
+  let predchozi: Database['public']['Tables']['enrollment_applications']['Update'] = {}
+  if (input.predchozi_skola) {
+    const ps = await predchoziSkolaUpdate(supabase, appId, input.predchozi_skola)
+    if (!ps.ok) return { success: false, error: ps.error }
+    predchozi = ps.update
+  }
+
   const { error } = await supabase
     .from('enrollment_applications')
     .update({
@@ -267,14 +298,15 @@ export async function saveEnrollmentDite(
       melo_odklad: input.melo_odklad,
       zdravotni_omezeni: input.zdravotni_omezeni?.trim() || null,
       dalsi_informace: input.dalsi_informace?.trim() || null,
-      dosavadni_skola: input.dosavadni_skola?.trim() || null,
+      ...(input.dosavadni_skola !== undefined ? { dosavadni_skola: input.dosavadni_skola?.trim() || null } : {}),
       specificke_potreby: input.specificke_potreby,
       budouci_rocnik: input.budouci_rocnik ?? null,
       prestup_k_datu: input.prestup_k_datu || null,
-      soucasna_skola: input.soucasna_skola?.trim() || null,
+      ...(input.soucasna_skola !== undefined ? { soucasna_skola: input.soucasna_skola?.trim() || null } : {}),
       soucasna_trida: input.soucasna_trida?.trim() || null,
       individualni_vzdelavani: input.individualni_vzdelavani ?? null,
       prestup_doporuceni_stav: input.prestup_doporuceni_stav || null,
+      ...predchozi,
       // Věková klasifikace
       ...(k
         ? {
@@ -573,6 +605,13 @@ export async function submitEnrollmentApplication(
     chybi.push('platné rodné číslo dítěte')
   }
   if (!app.dite_trvale_bydliste_ruian_kod) chybi.push('ověřené trvalé bydliště dítěte')
+  // Předchozí škola — matrika MŠMT vyžaduje IZOP u každého žáka (R2).
+  const skolaPopis = app.typ === 'prestup' ? 'současnou školu' : 'mateřskou školu'
+  const skolaNazev = app.typ === 'prestup' ? app.soucasna_skola : app.dosavadni_skola
+  if (!app.predchozi_skola_volba) chybi.push(skolaPopis)
+  else if (app.predchozi_skola_volba === 'rejstrik' && !app.predchozi_skola_izo) chybi.push(`${skolaPopis} ze seznamu`)
+  else if (app.predchozi_skola_volba === 'zahranici' && !app.predchozi_skola_stat) chybi.push('stát zahraniční školy')
+  else if (app.predchozi_skola_volba === 'nenalezeno' && !skolaNazev?.trim()) chybi.push(`název ${app.typ === 'prestup' ? 'současné školy' : 'mateřské školy'}`)
   if (app.vekova_kategorie === 'prilis_mlade' && !app.prilis_mlade_potvrzeno) {
     return { success: false, error: 'Dítě je pro tento školní rok příliš mladé. Kontaktujte prosím školu.' }
   }

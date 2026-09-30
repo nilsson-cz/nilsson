@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
 
   // --- Žáci v období sběru (vč. odešlých) ---
   // ODHL/IZOP z msmt_odhl / msmt_izop (migrace 130) — predchozi_vzdelavani je
-  // volná poznámka, predchozi_skola_izo obsahuje název školy ze zápisu.
+  // volná poznámka, predchozi_skola_nazev je název školy ze zápisu (migrace 139).
   const { data: students, error } = await supabase
     .from('students')
     .select(`

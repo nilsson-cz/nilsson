@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AddressField from './AddressField'
 import SecondGuardianInvite, { type CoGuardian } from './SecondGuardianInvite'
+import SkolaPicker from '@/components/skoly/SkolaPicker'
 import {
   saveEnrollmentDite,
   saveEnrollmentDiteAdresa,
@@ -19,7 +20,10 @@ import {
   type EnrollmentSpecifickePotreby,
   type ValidovanaAdresa,
   type VekovaKlasifikace,
+  type PredchoziSkola,
+  type PredchoziSkolaVolba,
 } from '@/lib/enrollment/types'
+import { countryName } from '@/lib/countries'
 import { zkontrolujRodneCislo, pohlaviZRodnehoCisla, jeCeskeObcanstvi } from '@/lib/rodne-cislo'
 
 // ── Typy vstupních dat z DB ─────────────────────────────────────────────
@@ -67,6 +71,10 @@ interface AppData {
   soucasna_trida: string | null
   individualni_vzdelavani: boolean | null
   prestup_doporuceni_stav: string | null
+  // předchozí škola (migrace 139)
+  predchozi_skola_volba: string | null
+  predchozi_skola_izo: string | null
+  predchozi_skola_stat: string | null
 }
 
 interface OwnerData {
@@ -191,16 +199,23 @@ export default function EnrollmentWizard({
     lekar: app.lekar || '',
     zdravotni_omezeni: app.zdravotni_omezeni || '',
     dalsi_informace: app.dalsi_informace || '',
-    dosavadni_skola: app.dosavadni_skola || '',
     specificke_potreby: app.specificke_potreby || 'ne',
   })
 
   const [prestup, setPrestup] = useState({
     prestup_k_datu: app.prestup_k_datu || '',
-    soucasna_skola: app.soucasna_skola || '',
     soucasna_trida: app.soucasna_trida || '',
     individualni_vzdelavani: app.individualni_vzdelavani ?? false,
     prestup_doporuceni_stav: (app.prestup_doporuceni_stav as any) || '',
+  })
+
+  // Předchozí škola: zápis = MŠ (krok Zdraví), přestup = ZŠ (krok Přestup).
+  // IZO 000000000 / 999999xxx jsou kódy, ne škola — ve stavu je IZO jen u rejstříku.
+  const [skola, setSkola] = useState<PredchoziSkola>({
+    volba: (app.predchozi_skola_volba as PredchoziSkolaVolba | null) ?? '',
+    izo: app.predchozi_skola_volba === 'rejstrik' ? app.predchozi_skola_izo ?? '' : '',
+    nazev: (jePrestup ? app.soucasna_skola : app.dosavadni_skola) ?? '',
+    stat: app.predchozi_skola_stat ?? '',
   })
 
   const [trvale, setTrvale] = useState<ValidovanaAdresa | null>(
@@ -286,11 +301,12 @@ export default function EnrollmentWizard({
           lekar: zdravi.lekar,
           zdravotni_omezeni: zdravi.zdravotni_omezeni,
           dalsi_informace: zdravi.dalsi_informace,
-          dosavadni_skola: zdravi.dosavadni_skola,
           specificke_potreby: zdravi.specificke_potreby,
+          ...((jePrestup ? step.id === 'prestup' : step.id === 'zdravi') ? {
+            predchozi_skola: { volba: skola.volba || null, izo: skola.izo, nazev: skola.nazev, stat: skola.stat },
+          } : {}),
           ...(jePrestup ? {
             prestup_k_datu: prestup.prestup_k_datu || null,
-            soucasna_skola: prestup.soucasna_skola,
             soucasna_trida: prestup.soucasna_trida,
             individualni_vzdelavani: prestup.individualni_vzdelavani,
             prestup_doporuceni_stav: prestup.prestup_doporuceni_stav || null,
@@ -381,11 +397,12 @@ export default function EnrollmentWizard({
           <StepZdravi
             zdravi={zdravi} setZdravi={setZdravi}
             jePrestup={jePrestup} klas={klas}
+            skola={skola} setSkola={setSkola}
             prilisMladePotvrzeno={prilisMladePotvrzeno}
             onPotvrditPrilisMlade={potvrditPrilisMlade}
           />
         )}
-        {step.id === 'prestup' && <StepPrestup prestup={prestup} setPrestup={setPrestup} />}
+        {step.id === 'prestup' && <StepPrestup prestup={prestup} setPrestup={setPrestup} skola={skola} setSkola={setSkola} />}
         {step.id === 'zastupce' && (
           <StepZastupce
             ownerForm={ownerForm} setOwnerForm={setOwnerForm}
@@ -410,7 +427,7 @@ export default function EnrollmentWizard({
         {step.id === 'rekap' && (
           <StepRekap
             dite={dite} zdravi={zdravi} trvale={trvale} bydliJinde={bydliJinde} kontaktni={kontaktni}
-            ownerForm={ownerForm} ownerAdr={ownerAdr} jePrestup={jePrestup} prestup={prestup}
+            ownerForm={ownerForm} ownerAdr={ownerAdr} jePrestup={jePrestup} prestup={prestup} skola={skola}
             coGuardians={coGuardians} klas={klas}
             prilisMlade={!jePrestup && klas?.vekova_kategorie === 'prilis_mlade' && !prilisMladePotvrzeno}
           />
@@ -545,7 +562,7 @@ function StepAdresa({ trvale, setTrvale, bydliJinde, setBydliJinde, kontaktni, s
   )
 }
 
-function StepZdravi({ zdravi, setZdravi, jePrestup, klas, prilisMladePotvrzeno, onPotvrditPrilisMlade }: any) {
+function StepZdravi({ zdravi, setZdravi, jePrestup, klas, prilisMladePotvrzeno, onPotvrditPrilisMlade, skola, setSkola }: any) {
   const set = (k: string, v: any) => setZdravi((z: any) => ({ ...z, [k]: v }))
   return (
     <div className="space-y-4">
@@ -582,6 +599,11 @@ function StepZdravi({ zdravi, setZdravi, jePrestup, klas, prilisMladePotvrzeno, 
         <label className={labelClass}>Další informace pro školu</label>
         <textarea value={zdravi.dalsi_informace} onChange={(e) => set('dalsi_informace', e.target.value)} rows={2} className={`${inputClass} resize-none`} />
       </div>
+      {!jePrestup && (
+        <div className="pt-2 border-t border-(--portal-border)">
+          <SkolaPicker druh="A00" label="Mateřská škola, kterou dítě navštěvuje" value={skola} onChange={setSkola} />
+        </div>
+      )}
     </div>
   )
 }
@@ -631,7 +653,7 @@ function VekovaInfo({ klas, prilisMladePotvrzeno, onPotvrdit }: { klas: VekovaKl
   )
 }
 
-function StepPrestup({ prestup, setPrestup }: any) {
+function StepPrestup({ prestup, setPrestup, skola, setSkola }: any) {
   const set = (k: string, v: any) => setPrestup((p: any) => ({ ...p, [k]: v }))
   return (
     <div className="space-y-4">
@@ -646,8 +668,7 @@ function StepPrestup({ prestup, setPrestup }: any) {
           <input type="text" value={prestup.soucasna_trida} onChange={(e) => set('soucasna_trida', e.target.value)} className={inputClass} />
         </div>
         <div className="sm:col-span-2">
-          <label className={labelClass}>Současná škola</label>
-          <input type="text" value={prestup.soucasna_skola} onChange={(e) => set('soucasna_skola', e.target.value)} className={inputClass} />
+          <SkolaPicker druh="B00" label="Současná škola" value={skola} onChange={setSkola} />
         </div>
         <div>
           <label className={labelClass}>Doporučení k přestupu</label>
@@ -749,7 +770,17 @@ function adrText(a: ValidovanaAdresa | null): string {
   return `${a.ulice ? a.ulice + ' ' : ''}${a.cislo}, ${a.psc} ${a.obec}`
 }
 
-function StepRekap({ dite, zdravi, trvale, bydliJinde, kontaktni, ownerForm, ownerAdr, jePrestup, prestup, coGuardians, prilisMlade }: any) {
+function skolaRekap(s: PredchoziSkola): string {
+  switch (s.volba) {
+    case 'rejstrik': return s.izo ? `${s.nazev} (IZO ${s.izo})` : ''
+    case 'nechodilo': return 'Nechodilo do mateřské školy'
+    case 'zahranici': return [s.nazev, countryName(s.stat)].filter(Boolean).join(', ')
+    case 'nenalezeno': return s.nazev
+    default: return ''
+  }
+}
+
+function StepRekap({ dite, zdravi, trvale, bydliJinde, kontaktni, ownerForm, ownerAdr, jePrestup, prestup, skola, coGuardians, prilisMlade }: any) {
   return (
     <div className="space-y-5">
       <h2 className="text-base font-semibold text-(--portal-text)">Rekapitulace a odeslání</h2>
@@ -766,6 +797,7 @@ function StepRekap({ dite, zdravi, trvale, bydliJinde, kontaktni, ownerForm, own
           <Radek label="Rodné číslo" value={dite.rodne_cislo} />
           <Radek label="Trvalé bydliště" value={adrText(trvale)} />
           {bydliJinde && <Radek label="Kontaktní adresa" value={adrText(kontaktni)} />}
+          {!jePrestup && <Radek label="Mateřská škola" value={skolaRekap(skola)} />}
         </div>
         <div className="px-4 py-3">
           <p className="text-xs font-medium text-(--portal-text-subtle) uppercase tracking-wide mb-1">Zákonný zástupce</p>
@@ -776,7 +808,7 @@ function StepRekap({ dite, zdravi, trvale, bydliJinde, kontaktni, ownerForm, own
         {jePrestup && (
           <div className="px-4 py-3">
             <p className="text-xs font-medium text-(--portal-text-subtle) uppercase tracking-wide mb-1">Přestup</p>
-            <Radek label="Současná škola" value={prestup.soucasna_skola} />
+            <Radek label="Současná škola" value={skolaRekap(skola)} />
             <Radek label="Datum přestupu" value={prestup.prestup_k_datu} />
           </div>
         )}
