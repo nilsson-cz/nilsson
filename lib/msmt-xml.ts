@@ -53,6 +53,7 @@ export const MSMT_KODY = {
   // (obor, druh, forma, délka, způsob), 2 změna organizace vzdělávání (přestup,
   // přeřazení), 5 zkouška, 6 osobní údaje, 7 osobní identifikátor (RČ),
   // 8 změna v přiznání / poskytování podpůrných opatření.
+  KOD_ZMEN_VZDELAVANI: '1',
   KOD_ZMEN_ORGANIZACE: '2',
   KOD_ZMEN_PO: '8',
   KSTPR_CR: '3',            // státní občan ČR (přijaté soubory)
@@ -309,6 +310,90 @@ function refIso(z: ZakMatrika, v: VetaInterval): string {
   return v.ukonceni ? z.withdrawal_date! : toIso(v.zac)
 }
 
+/** Hranice uvnitř vět: den začátku nové věty (ISO) → KOD_ZMEN (RAKZ). */
+type Hranice = Map<string, string>
+
+/**
+ * KOD_ZMEN při souběhu změn: vyšší kód má přednost, výjimkou je 8, které má
+ * nejnižší prioritu (metodika MŠMT, položka KOD_ZMEN).
+ */
+function slozKod(a: string | undefined, b: string): string {
+  if (!a || a === MSMT_KODY.KOD_ZMEN_BEZ) return b
+  if (b === MSMT_KODY.KOD_ZMEN_BEZ) return a
+  if (a === MSMT_KODY.KOD_ZMEN_PO) return b
+  if (b === MSMT_KODY.KOD_ZMEN_PO) return a
+  return Number(a) >= Number(b) ? a : b
+}
+
+function denPred(iso: string): string {
+  const d = isoToDate(iso)
+  return toIso(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, 12))
+}
+
+/**
+ * Změny ročníku, třídy a způsobu plnění PŠD během roku (metodika: nová věta
+ * při každé změně obsahu). Jen místa, kde se hodnota opravdu liší — nový
+ * záznam se stejnou třídou větu nedělí.
+ *   způsob (ZPUSOB) → 1 změna vzdělávání; ročník, třída → 2 přeřazení.
+ */
+function hraniceZaka(z: ZakMatrika): Hranice {
+  const h: Hranice = new Map()
+  const body = new Set<string>()
+  for (const x of [...z.rocniky, ...z.tridy]) {
+    body.add(x.od)
+    if (x.do) body.add(toIso(plusDen(isoToDate(x.do))))
+  }
+  for (const od of body) {
+    const pred = denPred(od)
+    const r0 = kDatu(z.rocniky, pred), r1 = kDatu(z.rocniky, od)
+    const t0 = kDatu(z.tridy, pred), t1 = kDatu(z.tridy, od)
+    let kod: string = MSMT_KODY.KOD_ZMEN_BEZ
+    if (r0 && r1 && r0.zpusob !== r1.zpusob) kod = slozKod(kod, MSMT_KODY.KOD_ZMEN_VZDELAVANI)
+    if (r0 && r1 && r0.rocnik !== r1.rocnik) kod = slozKod(kod, MSMT_KODY.KOD_ZMEN_ORGANIZACE)
+    if (t0 && t1 && t0.nazev !== t1.nazev) kod = slozKod(kod, MSMT_KODY.KOD_ZMEN_ORGANIZACE)
+    if (kod !== MSMT_KODY.KOD_ZMEN_BEZ) h.set(od, kod)
+  }
+  return h
+}
+
+/** Změny údajů souboru „a" (hranice období z lib/msmt-soubor-a.ts). */
+function hraniceA(obdobi: MatrikaAObdobi[]): Hranice {
+  const h: Hranice = new Map()
+  for (const o of obdobi) {
+    const kod = kodZmenyA(kDatu(obdobi, denPred(o.od)), o)
+    if (kod !== MSMT_KODY.KOD_ZMEN_BEZ) h.set(o.od, kod)
+  }
+  return h
+}
+
+/**
+ * Rozdělí větu v hranicích uvnitř ní; první část si nechá příznaky věty
+ * (OML, KOD_ZMEN příchodu), další dostanou KOD_ZMEN hranice. Věta o ukončení
+ * se nedělí; hranice na začátku věty (1. 9., 1. 2., nástup) nic nedělí.
+ */
+function rozdelVetu(v: VetaInterval, hranice: Hranice, rdat: Date): VetaInterval[] {
+  if (v.ukonceni || hranice.size === 0) return [v]
+  const zac = toIso(v.zac)
+  const kon = toIso(v.kon ?? rdat)
+  const body = [...hranice.keys()].filter((od) => od > zac && od <= kon).sort()
+  if (body.length === 0) return [v]
+  const out: VetaInterval[] = []
+  let cur: VetaInterval = { ...v }
+  for (const od of body) {
+    out.push({ ...cur, kon: isoToDate(denPred(od)) })
+    cur = { zac: isoToDate(od), kon: v.kon, oml: false, ukonceni: false, kodZmen: hranice.get(od) }
+  }
+  out.push(cur)
+  return out
+}
+
+/** Věty žáka pro soubor (základní: bez `obdobiA`; „a": s obdobími „a"). */
+function vetyProSoubor(z: ZakMatrika, sber: SberKontext, obdobiA?: MatrikaAObdobi[]): VetaInterval[] {
+  const h = hraniceZaka(z)
+  if (obdobiA) for (const [od, kod] of hraniceA(obdobiA)) h.set(od, slozKod(h.get(od), kod))
+  return vetyZaka(z.enrollment_date, z.withdrawal_date, sber).flatMap((v) => rozdelVetu(v, h, sber.rdat))
+}
+
 // ---------------------------------------------------------------------------
 // Validace — chybějící povinné údaje (generátor je nevymýšlí)
 // ---------------------------------------------------------------------------
@@ -325,7 +410,7 @@ export function chybejiciPolozky(z: ZakMatrika, sber: SberKontext): string[] {
   const stpr = stprKod(z.citizenship)
   if (!stpr) chybi.push(`STPR (občanství „${z.citizenship}" — neznámý kód)`)
   else if (stpr !== '203') chybi.push('KSTPR pro cizince (kód zatím není v IS)')
-  for (const v of vetyZaka(z.enrollment_date, z.withdrawal_date, sber)) {
+  for (const v of vetyProSoubor(z, sber)) {
     const iso = refIso(z, v)
     if (!kDatu(z.rocniky, iso)?.rocnik) { chybi.push(`ROCNIK k ${fmtDate(isoToDate(iso))}`); break }
     if (!kDatu(z.tridy, iso)) { chybi.push(`TRIDA k ${fmtDate(isoToDate(iso))}`); break }
@@ -428,7 +513,7 @@ function polozkyVety(z: ZakMatrika, v: VetaInterval, prvni: boolean): string[] {
 export function generateZakladni(zaci: ZakMatrika[], cfg: XmlConfig): string {
   const lines = hlavicka(cfg, `Z${cfg.izo}_${MSMT_KODY.CAST}`)
   for (const z of zaci) {
-    vetyZaka(z.enrollment_date, z.withdrawal_date, cfg.sber).forEach((v, i) => {
+    vetyProSoubor(z, cfg.sber).forEach((v, i) => {
       lines.push(
         '  <veta>',
         ...uvod(cfg),
@@ -443,30 +528,6 @@ export function generateZakladni(zaci: ZakMatrika[], cfg: XmlConfig): string {
   }
   lines.push('</Vykaz>')
   return lines.join('\n')
-}
-
-/**
- * Rozdělí větu v místech, kde se mění údaje souboru „a" (nové doporučení, změna
- * asistenta ve třídě…) — metodika: nová věta při každé změně obsahu, věty na sebe
- * plynule navazují. Věta o ukončení se nedělí.
- */
-function rozdelVetuA(v: VetaInterval, obdobi: MatrikaAObdobi[], rdat: Date): VetaInterval[] {
-  if (v.ukonceni) return [v]
-  const zac = toIso(v.zac)
-  const kon = toIso(v.kon ?? rdat)
-  const body = obdobi.map((o) => o.od).filter((od) => od > zac && od <= kon).sort()
-  if (body.length === 0) return [v]
-  const out: VetaInterval[] = []
-  let cur: VetaInterval = { ...v }
-  for (const od of body) {
-    const d = isoToDate(od)
-    const predIso = toIso(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, 12))
-    out.push({ ...cur, kon: isoToDate(predIso) })
-    cur = { zac: d, kon: v.kon, oml: false, ukonceni: false,
-      kodZmen: kodZmenyA(kDatu(obdobi, predIso), kDatu(obdobi, od)) }
-  }
-  out.push(cur)
-  return out
 }
 
 /**
@@ -495,8 +556,7 @@ export function generateSouborA(zaci: ZakMatrikaA[], cfg: XmlConfig): string {
   const lines = hlavicka(cfg, `Z${cfg.izo}_${MSMT_KODY.CAST}a`)
   const b = (x: boolean) => (x ? '1' : '0')
   for (const z of zaci) {
-    const vety = vetyZaka(z.enrollment_date, z.withdrawal_date, cfg.sber)
-      .flatMap((v) => rozdelVetuA(v, z.matrikaA, cfg.sber.rdat))
+    const vety = vetyProSoubor(z, cfg.sber, z.matrikaA)
     vety.forEach((v, i) => {
       const a = kDatu(z.matrikaA, refIso(z, v)) ?? z.matrikaA[0]
       lines.push(
@@ -517,7 +577,7 @@ export function generateSouborA(zaci: ZakMatrikaA[], cfg: XmlConfig): string {
         el('PRODL_DV', a.prodl_dv),
         el('UPR_VYST', b(a.upr_vyst)),
         el('ID_ZNEV', a.id_znev),
-        // Změna údajů „a" uprostřed věty: KOD_ZMEN 8 / 2 (kodZmenyA).
+        // Změna uprostřed věty: KOD_ZMEN 1 / 2 / 8 (vetyProSoubor).
         ...polozkyVety(z, v, i === 0),
         '  </veta>',
       )
