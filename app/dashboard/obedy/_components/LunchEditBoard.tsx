@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { staffSetLunchOrder } from '@/app/actions/lunch-dashboard'
+import { staffSetLunchException, staffSetLunchOrder } from '@/app/actions/lunch-dashboard'
 
 // Edit mód denního přehledu obědů (jen ředitel/zástupce, otevřené okno).
 // Celý roster třídy s přepínači; zaškrtnutí = objednat, odškrtnutí = zrušit.
@@ -15,6 +15,8 @@ type EditableRow = {
   trida: string | null
   ordered: boolean
   auto_cancelled: boolean
+  blocked_reason: string | null
+  has_exception: boolean
 }
 
 export default function LunchEditBoard({
@@ -40,6 +42,18 @@ export default function LunchEditBoard({
     })
   }
 
+  // Třída má na ten den pravidlo „bez oběda" → místo objednávky se přepíná výjimka.
+  function toggleException(row: EditableRow) {
+    setError(null)
+    setBusyId(row.student_id)
+    startTransition(async () => {
+      const res = await staffSetLunchException(row.student_id, datum, !row.has_exception)
+      if (!res.success) setError(res.error)
+      setBusyId(null)
+      router.refresh()
+    })
+  }
+
   return (
     <div className="space-y-4">
       {error && (
@@ -59,6 +73,28 @@ export default function LunchEditBoard({
           <ul className="divide-y divide-stone-100 dark:divide-stone-800">
             {rows.map((r) => {
               const isBusy = busyId === r.student_id && pending
+              if (r.blocked_reason) {
+                return (
+                  <li key={r.student_id} className="flex items-center justify-between gap-3 px-4 py-2">
+                    <span className="text-sm text-stone-800 dark:text-stone-100">
+                      {r.last_name} {r.first_name}
+                      <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">
+                        {r.has_exception ? '(výjimka — na oběd jde)' : `(${r.blocked_reason})`}
+                      </span>
+                    </span>
+                    <label className="inline-flex shrink-0 items-center gap-2 cursor-pointer select-none">
+                      <span className="text-xs text-stone-400 dark:text-stone-500">výjimka</span>
+                      <input
+                        type="checkbox"
+                        checked={r.has_exception}
+                        disabled={isBusy}
+                        onChange={() => toggleException(r)}
+                        className="h-5 w-5 rounded border-stone-300 dark:border-stone-600 text-amber-600 focus:ring-amber-500 disabled:opacity-40 cursor-pointer"
+                      />
+                    </label>
+                  </li>
+                )
+              }
               return (
                 <li key={r.student_id} className="flex items-center justify-between px-4 py-2">
                   <span className="text-sm text-stone-800 dark:text-stone-100">

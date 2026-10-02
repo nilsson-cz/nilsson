@@ -14,7 +14,7 @@ export type BlokPriznak = { typ_kod: string; osoba_staff_id: string | null; pozn
  * Zápis jednoho bloku na denní stránce třídnice (Fáze „třídnice po blocích").
  * Předvyplněno z rozvrhu (název, čas, obsazení). Průvodce odškrtne nepřítomné
  * a napíše krátce, co se dělo → potvrdí blok (RPC potvrdit_blok). Zapisovat smí
- * jen obsazený na bloku nebo ředitel (vynucuje DB); ostatní vidí read-only stav.
+ * kterýkoli zaměstnanec kromě role readonly (vynucuje DB, migrace 141).
  *
  * Příznaky bloku (např. Hospitace) se editují nezávisle na potvrzení — ukládají
  * se okamžitě přes RPC nastavit_blok_priznak / zrusit_blok_priznak (viz PriznakyBlok).
@@ -111,7 +111,7 @@ export default function DenBlokZapis({
       <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-stone-700 dark:bg-stone-900">
         {header}
         <p className="mt-1 text-xs text-gray-500 dark:text-stone-400">
-          {potvrzeno ? 'Zapsáno.' : 'Zapíše obsazený na bloku:'} <span className="text-gray-600 dark:text-stone-300">{jmenaObsazeni}</span>
+          {potvrzeno ? 'Zapsáno.' : 'Obsazení:'} <span className="text-gray-600 dark:text-stone-300">{jmenaObsazeni}</span>
         </p>
         {obsahDefault && <p className="mt-2 text-sm text-gray-700 dark:text-stone-300 whitespace-pre-wrap">{obsahDefault}</p>}
         {priznakyBlok}

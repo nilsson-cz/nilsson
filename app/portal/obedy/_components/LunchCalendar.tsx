@@ -71,6 +71,8 @@ export default function LunchCalendar({
 
   function toggleDay(day: LunchDay) {
     if (!day.is_school_day || !day.ordering_open) return
+    // Pravidlo školy: třída v tento den na oběd nechodí → objednat nelze (zrušit ano).
+    if (day.blocked_reason && !day.ordered) return
     if (busyDates.has(day.menu_date)) return
 
     const next = !day.ordered
@@ -103,6 +105,15 @@ export default function LunchCalendar({
 
   const orderedCount = days.filter((d) => d.ordered && !d.auto_cancelled).length
   const blanks = leadingBlanks(year, month)
+
+  // Dny, kdy třída na oběd nechodí (pravidlo školy) — seskupené podle důvodu.
+  const blockedByReason = new Map<string, number[]>()
+  for (const d of days) {
+    if (!d.blocked_reason) continue
+    const arr = blockedByReason.get(d.blocked_reason) ?? []
+    arr.push(Number(d.menu_date.slice(8, 10)))
+    blockedByReason.set(d.blocked_reason, arr)
+  }
 
   return (
     <div className="space-y-4">
@@ -177,6 +188,18 @@ export default function LunchCalendar({
         </div>
       </div>
 
+      {blockedByReason.size > 0 && (
+        <div className="rounded-lg border border-(--portal-border) bg-(--portal-surface) px-4 py-2.5 text-xs text-(--portal-text-muted) space-y-0.5">
+          {[...blockedByReason.entries()].map(([reason, nums]) => (
+            <p key={reason}>
+              <span className="font-medium text-(--portal-text)">{reason}</span>{' '}
+              — bez oběda: {nums.map((n) => `${n}. ${month}.`).join(', ')}
+            </p>
+          ))}
+          <p className="text-(--portal-text-subtle)">V tyto dny se oběd neobjednává ani neúčtuje.</p>
+        </div>
+      )}
+
       {/* Souhrn + legenda */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-(--portal-text-subtle)">
         <span>
@@ -186,7 +209,7 @@ export default function LunchCalendar({
         </span>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <Legend swatch="bg-(--portal-accent)" label="objednáno" />
-          <Legend swatch="ring-1 ring-inset ring-amber-400" label="odhlášeno omluvenkou" />
+          <Legend swatch="ring-1 ring-inset ring-amber-400" label="odhlášeno (omluvenka / třída bez oběda)" />
           <Legend swatch="opacity-40 bg-(--portal-surface-hover)" label="uzavřeno / neškolní den" />
         </div>
       </div>
@@ -227,7 +250,7 @@ function DayCell({
         type="button"
         disabled={!clickable || busy}
         onClick={() => onToggle(day)}
-        title={auto ? 'Objednáno, ale odhlášeno omluvenkou/ředitelským volnem — neúčtuje se.' : clickable ? 'Kliknutím zrušíte' : 'Po uzávěrce — nelze měnit'}
+        title={day.blocked_reason ? `${day.blocked_reason} — oběd je odhlášen, neúčtuje se.` : auto ? 'Objednáno, ale odhlášeno omluvenkou/ředitelským volnem — neúčtuje se.' : clickable ? 'Kliknutím zrušíte' : 'Po uzávěrce — nelze měnit'}
         className={`${base} font-medium text-white bg-(--portal-accent)
           ${auto ? 'ring-2 ring-inset ring-amber-400' : ''}
           ${clickable && !busy ? 'hover:opacity-90 cursor-pointer' : 'opacity-70 cursor-default'}`}
@@ -237,6 +260,16 @@ function DayCell({
           {auto ? '⚠' : '✓'}
         </span>
       </button>
+    )
+  }
+
+  // Neobjednáno a třída v tento den na oběd nechodí → nelze objednat
+  if (day.blocked_reason) {
+    return (
+      <div className={`${base} text-(--portal-text-subtle) opacity-50 ring-1 ring-inset ring-amber-400`} title={day.blocked_reason}>
+        {dayNum}
+        <span className="absolute bottom-1 right-1 text-[9px] leading-none">✕</span>
+      </div>
     )
   }
 

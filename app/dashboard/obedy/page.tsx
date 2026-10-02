@@ -9,6 +9,8 @@ import LunchEditBoard from './_components/LunchEditBoard'
 //   počet, který jde v ranní SMS jídelně.
 // - Editace (ředitel/zástupce, jen v otevřeném okně): mód „upravit" rozbalí celý
 //   roster třídy s přepínači → zápis přes lunch_staff_set_order (uzávěrka 22:00 D-1).
+//   Má-li třída na ten den pravidlo „bez oběda" (migrace 142), místo přepínače
+//   je u žáka výjimka (lunch_staff_set_exception).
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +28,8 @@ type EditableRow = {
   trida: string | null
   ordered: boolean
   auto_cancelled: boolean
+  blocked_reason: string | null
+  has_exception: boolean
 }
 
 const NO_CLASS = 'Bez třídy'

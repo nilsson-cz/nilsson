@@ -41,3 +41,30 @@ export async function staffSetLunchOrder(
   revalidatePath('/dashboard/obedy')
   return { success: true }
 }
+
+/**
+ * Výjimka z pravidla třídy (migrace 142): dítě v den, kdy jeho třída na oběd
+ * nechodí, na oběd jde. Zapnutí rovnou objedná oběd; roli i uzávěrku hlídá RPC.
+ */
+export async function staffSetLunchException(
+  studentId: string,
+  menuDate: string,
+  on: boolean,
+): Promise<LunchStaffResult> {
+  const supabase = await createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Nejste přihlášeni.' }
+
+  const { error } = await supabase.rpc('lunch_staff_set_exception', {
+    p_student_id: studentId,
+    p_menu_date: menuDate,
+    p_on: on,
+  })
+  if (error) {
+    console.error('[staffSetLunchException]', error)
+    return { success: false, error: cleanRpcError(error.message) }
+  }
+
+  revalidatePath('/dashboard/obedy')
+  return { success: true }
+}

@@ -12,6 +12,8 @@ export type LunchDay = {
   ordering_open: boolean
   ordered: boolean
   auto_cancelled: boolean
+  /** Pravidlo školy „třída v tento den na oběd nechodí" (migrace 142); null = bez omezení. */
+  blocked_reason: string | null
 }
 
 export type LunchActionResult<T> =

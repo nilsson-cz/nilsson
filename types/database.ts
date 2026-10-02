@@ -2610,6 +2610,117 @@ export type Database = {
           },
         ]
       }
+      lunch_block_exceptions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          menu_date: string
+          student_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          menu_date: string
+          student_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          menu_date?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lunch_block_exceptions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lunch_group_date_blocks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          date_from: string
+          date_to: string
+          group_id: string
+          id: string
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          date_from: string
+          date_to: string
+          group_id: string
+          id?: string
+          reason: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          date_from?: string
+          date_to?: string
+          group_id?: string
+          id?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lunch_group_date_blocks_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lunch_group_weekday_blocks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          ended_at: string | null
+          ended_by: string | null
+          group_id: string
+          id: string
+          isodow: number
+          valid_from: string
+          valid_to: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          ended_at?: string | null
+          ended_by?: string | null
+          group_id: string
+          id?: string
+          isodow: number
+          valid_from: string
+          valid_to?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          ended_at?: string | null
+          ended_by?: string | null
+          group_id?: string
+          id?: string
+          isodow?: number
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lunch_group_weekday_blocks_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lunch_menu_days: {
         Row: {
           id: string
@@ -6523,6 +6634,7 @@ export type Database = {
       }
       can_read_student: { Args: { p_student_id: string }; Returns: boolean }
       can_read_student_ext: { Args: { p_student_id: string }; Returns: boolean }
+      can_write_tridnice: { Args: never; Returns: boolean }
       current_guardian_id: { Args: never; Returns: string }
       current_staff_id: { Args: never; Returns: string }
       current_staff_role: {
@@ -6999,12 +7111,41 @@ export type Database = {
         Args: { p_birth_date: string; p_ref_date: string }
         Returns: string
       }
+      lunch_block_dates_add: {
+        Args: {
+          p_date_from: string
+          p_date_to: string
+          p_group_ids: string[]
+          p_reason: string
+        }
+        Returns: number
+      }
+      lunch_block_dates_end: { Args: { p_id: string }; Returns: undefined }
+      lunch_block_preview: {
+        Args: {
+          p_date_from: string
+          p_date_to?: string
+          p_group_ids: string[]
+          p_isodow?: number
+        }
+        Returns: {
+          orders: number
+          students: number
+        }[]
+      }
+      lunch_block_weekday_set: {
+        Args: { p_active: boolean; p_group_id: string; p_isodow: number }
+        Returns: undefined
+      }
+      lunch_blocks_min_date: { Args: never; Returns: string }
       lunch_cutoff_ts: { Args: { p_date: string }; Returns: string }
       lunch_day_editable: {
         Args: { p_date: string }
         Returns: {
           auto_cancelled: boolean
+          blocked_reason: string
           first_name: string
+          has_exception: boolean
           last_name: string
           ordered: boolean
           student_id: string
@@ -7050,11 +7191,16 @@ export type Database = {
           ss_kod: string
         }[]
       }
+      lunch_group_block_reason: {
+        Args: { p_date: string; p_student_id: string }
+        Returns: string
+      }
       lunch_is_school_day: { Args: { p_date: string }; Returns: boolean }
       lunch_month: {
         Args: { p_month: number; p_student_id: string; p_year: number }
         Returns: {
           auto_cancelled: boolean
+          blocked_reason: string
           is_school_day: boolean
           menu_date: string
           ordered: boolean
@@ -7080,9 +7226,17 @@ export type Database = {
         Args: { p_menu_date: string; p_ordered: boolean; p_student_id: string }
         Returns: undefined
       }
+      lunch_staff_set_exception: {
+        Args: { p_menu_date: string; p_on: boolean; p_student_id: string }
+        Returns: undefined
+      }
       lunch_staff_set_order: {
         Args: { p_menu_date: string; p_ordered: boolean; p_student_id: string }
         Returns: undefined
+      }
+      lunch_student_blocked: {
+        Args: { p_date: string; p_student_id: string }
+        Returns: boolean
       }
       matrika_future_payment_obligations: {
         Args: { p_last_day: string; p_student_id: string }

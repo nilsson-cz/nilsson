@@ -71,6 +71,22 @@ export default async function LunchAdminPage() {
 
       <LunchPricesForm schoolYear={schoolYear} initial={initialPrices} />
 
+      {/* Pravidla — dny, kdy třída na oběd nechodí */}
+      <section className="rounded-xl border border-gray-200 dark:border-stone-700 px-4 py-3.5 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-stone-100">Pravidla — dny bez oběda</h2>
+          <p className="text-xs text-gray-500 dark:text-stone-400">
+            Dny v týdnu a termíny (expedice), kdy třída na oběd nechodí. Přebijí objednávku rodiče.
+          </p>
+        </div>
+        <Link
+          href="/dashboard/sprava-skoly/obedy/pravidla"
+          className="shrink-0 rounded-lg bg-gray-900 dark:bg-stone-100 px-3 py-1.5 text-sm font-medium text-white dark:text-stone-900"
+        >
+          Otevřít →
+        </Link>
+      </section>
+
       {/* Měsíční vyúčtování */}
       <section className="rounded-xl border border-gray-200 dark:border-stone-700 px-4 py-3.5 flex items-center justify-between gap-3">
         <div>

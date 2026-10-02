@@ -4,7 +4,8 @@
  * Zobrazí naplánované bloky dne pro třídu (z rozvrhu, předvyplněné) a umožní je
  * zapsat/potvrdit po blocích (Fáze „třídnice po blocích", 2026-08-02).
  * Den zůstává jedním kontejnerovým tridni_kniha_zaznamy (SVP/typ/legislativa);
- * obsah bloku žije na rozvrh_blok.obsah. Zapisovat smí obsazený nebo ředitel.
+ * obsah bloku žije na rozvrh_blok.obsah. Zapisovat smí kterýkoli zaměstnanec
+ * (kromě role readonly) — migrace 141; dřív jen obsazený na bloku nebo ředitel.
  */
 
 import Link from 'next/link'
@@ -42,7 +43,8 @@ export default async function TridniceDenPage({
   const { data: { user } } = await supabase.auth.getUser()
   const { data: me } = await supabase.from('staff').select('id, role').eq('user_id', user!.id).maybeSingle()
   const myId = (me as { id: string; role?: string } | null)?.id ?? null
-  const isDirector = (me as { role?: string } | null)?.role === 'director'
+  // Zápis bloku smí kterýkoli zaměstnanec kromě readonly (vynucuje DB, migrace 141).
+  const canWriteTridnice = Boolean(myId) && (me as { role?: string } | null)?.role !== 'readonly'
 
   const { data: groupsRaw } = await supabase
     .from('groups').select('id, name').eq('school_year', schoolYear).order('name')
@@ -82,7 +84,6 @@ export default async function TridniceDenPage({
     let groupSet = new Set<string>()
     const obsByBlok = new Map<string, ZapisObsazeni[]>()
     const priznakyByBlok = new Map<string, BlokPriznak[]>()
-    const mineBlok = new Set<string>()
     if (blokIds.length > 0) {
       const [{ data: skupinyRaw }, { data: obsRaw }, { data: priznakyRaw }] = await Promise.all([
         supabase.from('rozvrh_blok_skupiny').select('blok_id, group_id').in('blok_id', blokIds).eq('group_id', selectedGroupId),
@@ -94,7 +95,6 @@ export default async function TridniceDenPage({
         const arr = obsByBlok.get(o.blok_id) ?? []
         arr.push({ staff_id: o.staff_id, jmeno: staffMap.get(o.staff_id) ?? 'Neznámý', zapocitat_ppc: o.zapocitat_ppc })
         obsByBlok.set(o.blok_id, arr)
-        if (myId && o.staff_id === myId) mineBlok.add(o.blok_id)
       }
       for (const p of (priznakyRaw ?? []) as any[]) {
         const arr = priznakyByBlok.get(p.blok_id) ?? []
@@ -109,7 +109,7 @@ export default async function TridniceDenPage({
         id: b.id, cas_od: b.cas_od, cas_do: b.cas_do, nazev: b.nazev, typ_bloku: b.typ_bloku as TypBloku,
         obsah: b.obsah ?? null, potvrzeno_at: b.potvrzeno_at ?? null,
         obsazeni: obsByBlok.get(b.id) ?? [],
-        canWrite: isDirector || mineBlok.has(b.id),
+        canWrite: canWriteTridnice,
         priznaky: priznakyByBlok.get(b.id) ?? [],
       }))
 

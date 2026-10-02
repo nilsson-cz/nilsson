@@ -303,7 +303,7 @@ export async function setBlokStav(blokId: string, stav: string): Promise<Result>
 // --- Fáze 2: potvrzení bloku zápisem do třídnice (K1) ------------------------
 
 /**
- * Potvrdí blok (aktivní zápis do třídnice) — smí obsazený zaměstnanec i ředitel.
+ * Potvrdí blok (aktivní zápis do třídnice) — smí kterýkoli zaměstnanec (migrace 141).
  * Autorizace, založení/napojení třídnicového záznamu i korekce přítomnosti
  * běží v DB funkci potvrdit_blok() (SECURITY DEFINER) — viz migrace 062.
  * absent_ids = staff, kteří na bloku nebyli (vyřadí se z PPČ, nemažou se).
@@ -341,7 +341,7 @@ export async function zrusitPotvrzeniBlok(blokId: string): Promise<Result> {
 
 /**
  * Nastaví/aktualizuje příznak (např. hospitace) na bloku. Upsert přes RPC
- * nastavit_blok_priznak (SECURITY DEFINER, autorizace obsazený/ředitel).
+ * nastavit_blok_priznak (SECURITY DEFINER, autorizace kterýkoli zaměstnanec — migrace 141).
  * Nezávislé na potvrzení bloku. osoba_id/poznamka dle metadat typu (může být null).
  */
 export async function setBlokPriznak(input: {
