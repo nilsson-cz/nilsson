@@ -71,8 +71,8 @@ function formatDate(dateStr: string) {
 async function fetchEventBalance(ss: string): Promise<EventBalance | null> {
   const supabase = await createSupabaseServerClient()
 
-  // SS kód je globálně jedinečný na dávku (prefix + rrrrmm + pořadí),
-  // takže filtrujeme jen podle něj.
+  // SS kód je globálně jedinečný na dávku (prefix + rrrrmm + pořadí;
+  // družina: '30' + školní rok, migrace 144), takže filtrujeme jen podle něj.
   const { data: obsRaw } = await supabase
     .from('payment_obligations')
     .select(`
