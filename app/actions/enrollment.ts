@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import type { Database } from '@/types/database'
-import { notifyDiscord } from '@/lib/discord'
+import { notifyDiscordMessage } from '@/lib/discord'
 import { sendGuardianInvite } from '@/lib/enrollment/send-guardian-invite'
 import { zkontrolujRodneCislo, pohlaviZRodnehoCisla, jeCeskeObcanstvi } from '@/lib/rodne-cislo'
 import type {
@@ -639,12 +639,16 @@ export async function submitEnrollmentApplication(
     return { success: false, error: 'Odeslání žádosti selhalo při zakládání spisu. Zkuste to znovu.' }
   }
 
-  // Discord notifikace škole (neblokující)
-  void notifyDiscord({
-    title: `Nová žádost o ${app.typ === 'zapis' ? 'zápis' : 'přestup'}`,
-    description: `${app.dite_jmeno} ${app.dite_prijmeni} (nar. ${app.datum_narozeni})`,
-    color: 0x0f6e56,
-    timestamp: new Date().toISOString(),
+  // Discord notifikace škole (neblokující) — kanál Administrativa.
+  // Bez DISCORD_ADMINISTRATIVA_WEBHOOK_URL spadne na výchozí webhook (Omluvenky).
+  void notifyDiscordMessage({
+    url: process.env.DISCORD_ADMINISTRATIVA_WEBHOOK_URL || undefined,
+    embeds: [{
+      title: `Nová žádost o ${app.typ === 'zapis' ? 'zápis' : 'přestup'}`,
+      description: `${app.dite_jmeno} ${app.dite_prijmeni} (nar. ${app.datum_narozeni})`,
+      color: 0x0f6e56,
+      timestamp: new Date().toISOString(),
+    }],
   }).catch(() => {})
 
   revalidatePath(`/zapis/${appId}`)

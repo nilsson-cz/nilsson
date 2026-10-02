@@ -13,6 +13,31 @@ const inputCls =
 
 type Typ = 'cely' | 'cast'
 
+const DNY = ['neděle', 'pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota']
+const MESICE = [
+  'ledna', 'února', 'března', 'dubna', 'května', 'června',
+  'července', 'srpna', 'září', 'října', 'listopadu', 'prosince',
+]
+
+// Nativní <input type="date"> zobrazuje datum podle jazyka zařízení (v anglickém
+// prohlížeči měsíc/den/rok), ne podle stránky. Proto pod polem ukazujeme zvolené
+// datum slovy česky — rodič hned vidí, který den opravdu zadal.
+// Skládáno ručně (ne toLocaleDateString), ať se server a prohlížeč nerozejdou.
+function datumSlovy(iso: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  if (!m) return null
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  const dt = new Date(Date.UTC(y, mo - 1, d))
+  if (dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null
+  return `${DNY[dt.getUTCDay()]} ${d}. ${MESICE[mo - 1]} ${y}`
+}
+
+function DatumSlovy({ iso }: { iso: string }) {
+  const text = datumSlovy(iso)
+  if (!text) return null
+  return <p className="mt-1 text-xs text-gray-500" aria-live="polite">{text}</p>
+}
+
 export default function AbsenceTerminFields({ today }: { today: string }) {
   const [typ, setTyp] = useState<Typ>('cely')
   const [dateFrom, setDateFrom] = useState(today)
@@ -62,6 +87,7 @@ export default function AbsenceTerminFields({ today }: { today: string }) {
               onChange={(e) => setDateFrom(e.target.value)}
               className={inputCls}
             />
+            <DatumSlovy iso={dateFrom} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -76,6 +102,7 @@ export default function AbsenceTerminFields({ today }: { today: string }) {
               onChange={(e) => setDateTo(e.target.value)}
               className={inputCls}
             />
+            <DatumSlovy iso={dateTo} />
           </div>
         </div>
       ) : (
@@ -104,6 +131,7 @@ export default function AbsenceTerminFields({ today }: { today: string }) {
               onChange={(e) => setDateFrom(e.target.value)}
               className={inputCls}
             />
+            <DatumSlovy iso={dateFrom} />
             {/* Částečná = jeden den → date_to zrcadlí date_from */}
             <input type="hidden" name="date_to" value={dateFrom} />
           </div>
