@@ -58,11 +58,17 @@ export default async function ZapisDetailPage({
     .neq('role_v_zadosti', 'vlastnik')
     .order('poradi', { ascending: true })
 
+  // Název dříve zvolené spádové školy (v přihlášce je jen IZO)
+  const { data: spadova } = app.spadova_skola_izo
+    ? await supabase.from('skolsky_rejstrik').select('nazev').eq('izo', app.spadova_skola_izo).maybeSingle()
+    : { data: null }
+
   return (
     <EnrollmentWizard
       app={app as any}
       owner={owner as any}
       coGuardians={(coGuardians as any) ?? []}
+      spadovaNazev={spadova?.nazev ?? null}
     />
   )
 }

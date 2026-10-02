@@ -98,6 +98,12 @@ export interface EnrollmentApplicationDetail {
   predchozi_skola_izo: string | null
   predchozi_skola_stat: string | null
 
+  // spádová škola (jen zápis, migrace 146)
+  spadova_skola_izo: string | null
+  spadova_skola_zdroj: string | null
+  spadova_skola_navrh: string[]
+  dite_trvale_bydliste_ruian_kod: string | null
+
   created_at: string
 }
 

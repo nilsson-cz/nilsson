@@ -1770,6 +1770,9 @@ export type Database = {
           rodne_cislo: string | null
           soucasna_skola: string | null
           soucasna_trida: string | null
+          spadova_skola_izo: string | null
+          spadova_skola_navrh: string[]
+          spadova_skola_zdroj: string | null
           specificke_potreby: Database["public"]["Enums"]["enrollment_specificke_potreby"]
           spis_id: string | null
           statni_obcanstvi: string | null
@@ -1832,6 +1835,9 @@ export type Database = {
           rodne_cislo?: string | null
           soucasna_skola?: string | null
           soucasna_trida?: string | null
+          spadova_skola_izo?: string | null
+          spadova_skola_navrh?: string[]
+          spadova_skola_zdroj?: string | null
           specificke_potreby?: Database["public"]["Enums"]["enrollment_specificke_potreby"]
           spis_id?: string | null
           statni_obcanstvi?: string | null
@@ -1894,6 +1900,9 @@ export type Database = {
           rodne_cislo?: string | null
           soucasna_skola?: string | null
           soucasna_trida?: string | null
+          spadova_skola_izo?: string | null
+          spadova_skola_navrh?: string[]
+          spadova_skola_zdroj?: string | null
           specificke_potreby?: Database["public"]["Enums"]["enrollment_specificke_potreby"]
           spis_id?: string | null
           statni_obcanstvi?: string | null
@@ -3943,6 +3952,7 @@ export type Database = {
           cast_obce: string | null
           druh: string
           hledani: string
+          ico: string | null
           izo: string
           kod_ruian: number | null
           kraj: string | null
@@ -3950,6 +3960,7 @@ export type Database = {
           obec: string | null
           psc: string | null
           red_izo: string
+          reditel: string | null
           snapshot: string
           ulice: string | null
           updated_at: string
@@ -3960,6 +3971,7 @@ export type Database = {
           cast_obce?: string | null
           druh: string
           hledani: string
+          ico?: string | null
           izo: string
           kod_ruian?: number | null
           kraj?: string | null
@@ -3967,6 +3979,7 @@ export type Database = {
           obec?: string | null
           psc?: string | null
           red_izo: string
+          reditel?: string | null
           snapshot: string
           ulice?: string | null
           updated_at?: string
@@ -3977,6 +3990,7 @@ export type Database = {
           cast_obce?: string | null
           druh?: string
           hledani?: string
+          ico?: string | null
           izo?: string
           kod_ruian?: number | null
           kraj?: string | null
@@ -3984,11 +3998,60 @@ export type Database = {
           obec?: string | null
           psc?: string | null
           red_izo?: string
+          reditel?: string | null
           snapshot?: string
           ulice?: string | null
           updated_at?: string
           zahajeni?: string | null
           zanikla_k?: string | null
+        }
+        Relationships: []
+      }
+      spadove_obvody: {
+        Row: {
+          izo: string
+          kod_obce: string
+          ruian_kod: number
+          snapshot: string
+        }
+        Insert: {
+          izo: string
+          kod_obce: string
+          ruian_kod: number
+          snapshot: string
+        }
+        Update: {
+          izo?: string
+          kod_obce?: string
+          ruian_kod?: number
+          snapshot?: string
+        }
+        Relationships: []
+      }
+      spadove_obvody_obce: {
+        Row: {
+          bodu: number
+          kod_obce: string
+          nazev: string
+          snapshot: string
+          sparovano: number
+          updated_at: string
+        }
+        Insert: {
+          bodu: number
+          kod_obce: string
+          nazev: string
+          snapshot: string
+          sparovano: number
+          updated_at?: string
+        }
+        Update: {
+          bodu?: number
+          kod_obce?: string
+          nazev?: string
+          snapshot?: string
+          sparovano?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -7332,6 +7395,19 @@ export type Database = {
       set_staff_consent: {
         Args: { p_definition_id: string; p_status: string }
         Returns: string
+      }
+      spadova_skola: {
+        Args: { p_ruian_kod: string }
+        Returns: {
+          izo: string
+          nazev: string
+          obec: string
+          psc: string
+          reditel: string
+          snapshot: string
+          stav: string
+          ulice: string
+        }[]
       }
       staff_can_access_student: {
         Args: { p_student_id: string }

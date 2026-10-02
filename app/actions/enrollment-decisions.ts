@@ -12,6 +12,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 import type { EnrollmentRozhodnuti } from '@/lib/enrollment/rozhodnuti'
 import type { EnrollmentResult } from './enrollment'
 import { predchoziSkolaUpdate, type PredchoziSkolaInput } from '@/lib/enrollment/predchozi-skola'
+import { spadovaSkolaUpdate } from '@/lib/enrollment/spadova-skola'
 
 export interface RecordDecisionInput {
   applicationId: string
@@ -95,6 +96,41 @@ export async function upravPredchoziSkoluPrihlasky(
 
   const { error } = await supabase.from('enrollment_applications').update(ps.update).eq('id', applicationId)
   if (error) return { success: false, error: 'Uložení předchozí školy selhalo.' }
+
+  revalidatePath(`/dashboard/zapis/${applicationId}`)
+  return { success: true }
+}
+
+/**
+ * Ředitel doplní / opraví spádovou školu přihlášky k zápisu (adresát oznámení
+ * o přijetí). izo = null → neznámá. Jde i po přijetí — oznámení se posílá až pak.
+ */
+export async function upravSpadovouSkoluPrihlasky(
+  applicationId: string,
+  izo: string | null,
+): Promise<EnrollmentResult> {
+  const supabase = await createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Nejste přihlášeni.' }
+  const { data: jeReditel } = await supabase.rpc('is_director')
+  if (!jeReditel) return { success: false, error: 'Spádovou školu může upravit jen ředitel.' }
+
+  const { data: app } = await supabase
+    .from('enrollment_applications')
+    .select('typ, dite_trvale_bydliste_ruian_kod')
+    .eq('id', applicationId)
+    .maybeSingle()
+  if (!app) return { success: false, error: 'Žádost nebyla nalezena.' }
+  if (app.typ !== 'zapis') return { success: false, error: 'Spádová škola se eviduje jen u zápisu.' }
+
+  const sp = await spadovaSkolaUpdate(supabase, app.dite_trvale_bydliste_ruian_kod, {
+    zdroj: izo ? 'reditel' : 'nevim',
+    izo,
+  })
+  if (!sp.ok) return { success: false, error: sp.error }
+
+  const { error } = await supabase.from('enrollment_applications').update(sp.update).eq('id', applicationId)
+  if (error) return { success: false, error: 'Uložení spádové školy selhalo.' }
 
   revalidatePath(`/dashboard/zapis/${applicationId}`)
   return { success: true }

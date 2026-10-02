@@ -19,6 +19,8 @@ import { countryName } from '@/lib/countries'
 import DecisionForm from './_components/DecisionForm'
 import DokumentyPanel from './_components/DokumentyPanel'
 import PredchoziSkolaEditor from './_components/PredchoziSkolaEditor'
+import SpadovaSkolaEditor from './_components/SpadovaSkolaEditor'
+import { adresatZRejstriku } from '@/lib/enrollment/spadova-skola'
 
 export const metadata = { title: 'Detail žádosti — IS Nilsson' }
 export const dynamic = 'force-dynamic'
@@ -105,10 +107,44 @@ export default async function ZapisDetailPage({
     ...dostupneDokumenty(app.typ, posledniRozhodnuti),
     ...predRozhodnutimDokumenty(app.typ, app.stav as EnrollmentStav),
   ]
+  // Školy z rejstříku: spádová (+ návrh mapy) a dosavadní — pro zobrazení
+  // a předvyplnění adresáta oznámení.
+  const izaSkol = [
+    app.spadova_skola_izo,
+    ...(app.spadova_skola_navrh ?? []),
+    app.predchozi_skola_volba === 'rejstrik' ? app.predchozi_skola_izo : null,
+  ].filter((v): v is string => !!v)
+  const { data: skolyRaw } = izaSkol.length
+    ? await supabase.from('skolsky_rejstrik').select('izo, nazev, ulice, psc, obec, reditel').in('izo', izaSkol)
+    : { data: [] }
+  const skolaPodleIzo = new Map((skolyRaw ?? []).map((s) => [s.izo, s]))
+  const spadova = app.spadova_skola_izo ? skolaPodleIzo.get(app.spadova_skola_izo) ?? null : null
+  const dosavadni = app.typ === 'prestup' && app.predchozi_skola_volba === 'rejstrik' && app.predchozi_skola_izo
+    ? skolaPodleIzo.get(app.predchozi_skola_izo) ?? null
+    : null
+  const spadovaNavrh = (app.spadova_skola_navrh ?? [])
+    .map((izo) => skolaPodleIzo.get(izo))
+    .filter((s): s is NonNullable<typeof s> => !!s)
+  const ZDROJ_SPADOVE: Record<string, string> = {
+    mapa: 'potvrzeno rodičem podle mapy spádovosti',
+    rodic: 'vybral rodič',
+    reditel: 'doplnil ředitel',
+  }
+  const mapaNabizi = spadovaNavrh.map((s) => s.nazev).join(', ')
+  const spadovaText = spadova
+    ? `${spadova.nazev} (IZO ${spadova.izo}) — ${ZDROJ_SPADOVE[app.spadova_skola_zdroj ?? ''] ?? ''}${
+        app.spadova_skola_zdroj === 'rodic' && mapaNabizi ? `; mapa nabízela: ${mapaNabizi}` : ''
+      }`
+    : app.spadova_skola_zdroj === 'nevim'
+      ? `neznámá${mapaNabizi ? ` — mapa nabízí: ${mapaNabizi}` : ''}`
+      : '—'
+
   // Prefill pro odklad: nástup posunutý o rok proti roku zápisu.
   const rokZapisu = odvodRokZapisuZDatumu(app.created_at)
   const dokumentyPrefill = {
     dosavadniSkola: app.soucasna_skola || app.dosavadni_skola || '',
+    adresatSpadova: spadova ? adresatZRejstriku(spadova) : null,
+    adresatDosavadni: dosavadni ? adresatZRejstriku(dosavadni) : null,
     cilovySkolniRok: decisions[0]?.cilovy_school_year || `${rokZapisu + 1}/${rokZapisu + 2}`,
     datumNastupuText: decisions[0]?.datum_nastupu
       ? formatDate(decisions[0].datum_nastupu)
@@ -215,6 +251,9 @@ export default async function ZapisDetailPage({
         <Radek label="Specifické potřeby" value={app.specificke_potreby} />
         <Radek label="Budoucí ročník" value={app.budouci_rocnik} />
         {app.typ !== 'prestup' && skolaRadek('Mateřská škola', 'A00', app.dosavadni_skola)}
+        {app.typ === 'zapis' && (
+          <SpadovaSkolaEditor applicationId={app.id} text={spadovaText} navrh={spadovaNavrh.map((s) => ({ izo: s.izo, nazev: s.nazev }))} />
+        )}
         <Radek label="Další informace" value={app.dalsi_informace} />
       </div>
 

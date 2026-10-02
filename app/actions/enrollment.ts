@@ -13,9 +13,11 @@ import type {
   EnrollmentSpecifickePotreby,
   EnrollmentPrestupDoporuceni,
   SkolaDruh,
+  SpadovaSkolaNavrh,
   SkolaZRejstriku,
 } from '@/lib/enrollment/types'
 import { predchoziSkolaUpdate, type PredchoziSkolaInput } from '@/lib/enrollment/predchozi-skola'
+import { navrhSpadoveSkoly, spadovaSkolaUpdate, type SpadovaSkolaInput } from '@/lib/enrollment/spadova-skola'
 
 // ---------------------------------------------------------------------------
 // Výsledkové typy
@@ -123,6 +125,18 @@ export async function hledejSkolu(
   const { data, error } = await supabase.rpc('hledej_skolu', { p_q: q.trim(), p_druh: druh ?? undefined })
   if (error) return { success: false, error: 'Hledání školy selhalo. Zkuste to znovu.' }
   return { success: true, data: data ?? [] }
+}
+
+// ---------------------------------------------------------------------------
+// 2c) Návrh spádové školy pro ověřenou adresu (spadova_skola, migrace 145)
+// ---------------------------------------------------------------------------
+
+export async function navrhniSpadovouSkolu(
+  ruianKod: string,
+): Promise<EnrollmentResult<SpadovaSkolaNavrh>> {
+  const { supabase, user } = await requireUser()
+  if (!user) return { success: false, error: 'Nejste přihlášeni.' }
+  return { success: true, data: await navrhSpadoveSkoly(supabase, ruianKod) }
 }
 
 // ---------------------------------------------------------------------------
@@ -399,6 +413,8 @@ export interface SaveDiteAdresaInput {
   }
   bydli_jinde: boolean
   kontaktni?: AdresaKontaktniInput | null
+  // Spádová škola (jen zápis, migrace 146) — podle trvalého bydliště.
+  spadova?: SpadovaSkolaInput
 }
 
 export async function saveEnrollmentDiteAdresa(
@@ -417,6 +433,13 @@ export async function saveEnrollmentDiteAdresa(
   }
   if (input.bydli_jinde && !kontaktniValidni(input.kontaktni)) {
     return { success: false, error: 'Kontaktní adresa musí být kompletní (v ČR ověřená v registru), nebo odškrtněte „dítě bydlí jinde".' }
+  }
+
+  let spadova: Database['public']['Tables']['enrollment_applications']['Update'] = {}
+  if (input.spadova) {
+    const sp = await spadovaSkolaUpdate(supabase, t.ruian_kod, input.spadova)
+    if (!sp.ok) return { success: false, error: sp.error }
+    spadova = sp.update
   }
 
   const now = new Date().toISOString()
@@ -439,6 +462,7 @@ export async function saveEnrollmentDiteAdresa(
       dite_kontaktni_adresa_ruian_kod: kc.ruian_kod,
       dite_kontaktni_adresa_validated_at: kc.validated_at,
       dite_kontaktni_adresa_country: kc.country,
+      ...spadova,
     })
     .eq('id', appId)
 
@@ -605,6 +629,11 @@ export async function submitEnrollmentApplication(
     chybi.push('platné rodné číslo dítěte')
   }
   if (!app.dite_trvale_bydliste_ruian_kod) chybi.push('ověřené trvalé bydliště dítěte')
+  // Spádová škola (jen zápis) — adresát oznámení o přijetí; „nevím“ stačí.
+  if (app.typ === 'zapis') {
+    if (!app.spadova_skola_zdroj) chybi.push('spádovou školu (krok Adresa dítěte)')
+    else if (app.spadova_skola_zdroj !== 'nevim' && !app.spadova_skola_izo) chybi.push('spádovou školu ze seznamu')
+  }
   // Předchozí škola — matrika MŠMT vyžaduje IZOP u každého žáka (R2).
   const skolaPopis = app.typ === 'prestup' ? 'současnou školu' : 'mateřskou školu'
   const skolaNazev = app.typ === 'prestup' ? app.soucasna_skola : app.dosavadni_skola

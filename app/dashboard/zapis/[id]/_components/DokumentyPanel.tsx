@@ -5,8 +5,17 @@ import type { DokumentNabidka, EnrollmentDokumentDruh } from '@/lib/enrollment/d
 
 const OSLOVENI_OPTIONS = ['Vážená paní ředitelko', 'Vážený pane řediteli']
 
+export interface AdresatPrefill {
+  skola: string
+  reditel: string
+  osloveni: string
+}
+
 export interface DokumentyPrefill {
   dosavadniSkola: string
+  // Adresáti oznámení předvyplnění ze školského rejstříku (null = neznáme IZO)
+  adresatSpadova: AdresatPrefill | null
+  adresatDosavadni: AdresatPrefill | null
   cilovySkolniRok: string
   datumNastupuText: string
   skolniRok: string
@@ -113,15 +122,19 @@ function OznameniRadek({
   applicationId,
   nabidka,
   prefillSkola,
+  prefillAdresat,
 }: {
   applicationId: string
   nabidka: DokumentNabidka
   prefillSkola: string
+  prefillAdresat: AdresatPrefill | null
 }) {
   const [otevreno, setOtevreno] = useState(false)
-  const [skola, setSkola] = useState(prefillSkola)
-  const [reditel, setReditel] = useState('')
-  const [osloveni, setOsloveni] = useState(OSLOVENI_OPTIONS[0])
+  const [skola, setSkola] = useState(prefillAdresat?.skola || prefillSkola)
+  const [reditel, setReditel] = useState(prefillAdresat?.reditel ?? '')
+  const [osloveni, setOsloveni] = useState(
+    prefillAdresat && OSLOVENI_OPTIONS.includes(prefillAdresat.osloveni) ? prefillAdresat.osloveni : OSLOVENI_OPTIONS[0],
+  )
 
   function stahnout() {
     const q = new URLSearchParams({ skola, reditel, osloveni })
@@ -519,6 +532,7 @@ export default function DokumentyPanel({
                   applicationId={applicationId}
                   nabidka={n}
                   prefillSkola={n.adresatKind === 'dosavadni' ? prefill.dosavadniSkola : ''}
+                  prefillAdresat={n.adresatKind === 'dosavadni' ? prefill.adresatDosavadni : prefill.adresatSpadova}
                 />
               )
             case 'prijeti':

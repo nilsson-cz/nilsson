@@ -22,7 +22,10 @@
  *   - Škola ze snapshotu: upsert, snapshot = datumVystupu, zanikla_k = NULL.
  *   - Škola v DB, která ve snapshotu chybí: zanikla_k = datumVystupu (nic se nemaže —
  *     otevřená data obsahují jen aktivní školy a matrika potřebuje i zaniklé).
- *   - Jména ředitelů, e-maily a zřizovatele se neimportují.
+ *   - Importuje se IČO a jméno ředitele/ky (veřejný rejstřík; adresát oznámení
+ *     spádové škole, migrace 145). E-maily, adresa ředitele a zřizovatelé ne.
+ *     Doplnění nových sloupců = znovu pustit poslední snapshot (stejné datum
+ *     se nepřeskakuje).
  */
 
 import { readFileSync, existsSync } from 'node:fs'
@@ -51,6 +54,8 @@ interface RsszSoucast {
 
 interface RsszOsoba {
   redIzo: string
+  ico: string | null
+  reditel: { nazevOsoby: string | null } | null
   kraj: string | null
   uplnyNazev: string
   adresa: RsszAdresa | null
@@ -78,7 +83,7 @@ if (existsSync('.env.local')) process.loadEnvFile('.env.local')
 
 /** lower + bez diakritiky — musí odpovídat lower(immutable_unaccent(q)) v hledej_skolu. */
 function normalizuj(s: string): string {
-  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
+  return s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
 function formatUlice(a: RsszAdresa): string | null {
@@ -110,6 +115,8 @@ function prevod(soubor: RsszSoubor): Radek[] {
         red_izo: po.redIzo,
         druh: s.druh,
         nazev: po.uplnyNazev,
+        ico: po.ico?.trim() || null,
+        reditel: po.reditel?.nazevOsoby?.trim() || null,
         obec: a?.obec ?? null,
         cast_obce: a?.castObce ?? null,
         ulice,

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import AddressField from './AddressField'
 import SecondGuardianInvite, { type CoGuardian } from './SecondGuardianInvite'
 import SkolaPicker from '@/components/skoly/SkolaPicker'
+import SpadovaSkolaPicker from './SpadovaSkolaPicker'
 import {
   saveEnrollmentDite,
   saveEnrollmentDiteAdresa,
@@ -22,6 +23,8 @@ import {
   type VekovaKlasifikace,
   type PredchoziSkola,
   type PredchoziSkolaVolba,
+  type SpadovaSkola,
+  type SpadovaSkolaZdroj,
 } from '@/lib/enrollment/types'
 import { countryName } from '@/lib/countries'
 import { zkontrolujRodneCislo, pohlaviZRodnehoCisla, jeCeskeObcanstvi } from '@/lib/rodne-cislo'
@@ -75,6 +78,9 @@ interface AppData {
   predchozi_skola_volba: string | null
   predchozi_skola_izo: string | null
   predchozi_skola_stat: string | null
+  // spádová škola (jen zápis, migrace 146)
+  spadova_skola_izo: string | null
+  spadova_skola_zdroj: string | null
 }
 
 interface OwnerData {
@@ -158,11 +164,12 @@ function RodneCisloHint({ rc, datumNarozeni, pohlavi, povinne }: {
 type StepId = 'dite' | 'adresa' | 'zdravi' | 'prestup' | 'zastupce' | 'druhy' | 'rekap'
 
 export default function EnrollmentWizard({
-  app, owner, coGuardians,
+  app, owner, coGuardians, spadovaNazev,
 }: {
   app: AppData
   owner: OwnerData
   coGuardians: CoGuardian[]
+  spadovaNazev: string | null   // název školy k app.spadova_skola_izo (z rejstříku)
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -224,6 +231,16 @@ export default function EnrollmentWizard({
       app.dite_trvale_bydliste_ruian_kod)
   )
   const [bydliJinde, setBydliJinde] = useState(app.dite_bydli_jinde)
+  // Spádová škola podle trvalého bydliště (jen zápis); změna adresy výběr zruší.
+  const [spadova, setSpadova] = useState<SpadovaSkola>({
+    zdroj: (app.spadova_skola_zdroj as SpadovaSkolaZdroj | null) ?? '',
+    izo: app.spadova_skola_izo ?? '',
+    nazev: spadovaNazev ?? '',
+  })
+  const zmenTrvale = (a: ValidovanaAdresa | null) => {
+    if (a?.ruian_kod !== trvale?.ruian_kod) setSpadova({ zdroj: '', izo: '', nazev: '' })
+    setTrvale(a)
+  }
   const [kontaktni, setKontaktni] = useState<ValidovanaAdresa | null>(
     adrKontaktniZDb(app.dite_kontaktni_adresa_obec, app.dite_kontaktni_adresa_ulice,
       app.dite_kontaktni_adresa_cislo, app.dite_kontaktni_adresa_psc,
@@ -287,12 +304,16 @@ export default function EnrollmentWizard({
       } else if (step.id === 'adresa') {
         if (!trvale) { setError('Ověřte prosím trvalé bydliště dítěte v registru adres.'); return }
         if (bydliJinde && !kontaktni) { setError('Ověřte kontaktní adresu, nebo odškrtněte „dítě bydlí jinde".'); return }
+        if (!jePrestup && (!spadova.zdroj || (spadova.zdroj !== 'nevim' && !spadova.izo))) {
+          setError('Vyberte prosím spádovou školu, nebo zvolte „Nevím“.'); return
+        }
         res = await saveEnrollmentDiteAdresa(app.id, {
           trvale: { obec: trvale.obec, ulice: trvale.ulice, cislo: trvale.cislo, psc: trvale.psc, ruian_kod: trvale.ruian_kod! },
           bydli_jinde: bydliJinde,
           kontaktni: bydliJinde && kontaktni
             ? { obec: kontaktni.obec, ulice: kontaktni.ulice, cislo: kontaktni.cislo, psc: kontaktni.psc, ruian_kod: kontaktni.ruian_kod, country: kontaktni.country }
             : null,
+          ...(jePrestup ? {} : { spadova: { zdroj: spadova.zdroj || null, izo: spadova.izo } }),
         })
       } else if (step.id === 'zdravi' || step.id === 'prestup') {
         res = await saveEnrollmentDite(app.id, {
@@ -388,9 +409,10 @@ export default function EnrollmentWizard({
         {step.id === 'dite' && <StepDite dite={dite} setDite={setDite} jePrestup={jePrestup} />}
         {step.id === 'adresa' && (
           <StepAdresa
-            trvale={trvale} setTrvale={setTrvale}
+            trvale={trvale} setTrvale={zmenTrvale}
             bydliJinde={bydliJinde} setBydliJinde={setBydliJinde}
             kontaktni={kontaktni} setKontaktni={setKontaktni}
+            jePrestup={jePrestup} spadova={spadova} setSpadova={setSpadova}
           />
         )}
         {step.id === 'zdravi' && (
@@ -427,7 +449,7 @@ export default function EnrollmentWizard({
         {step.id === 'rekap' && (
           <StepRekap
             dite={dite} zdravi={zdravi} trvale={trvale} bydliJinde={bydliJinde} kontaktni={kontaktni}
-            ownerForm={ownerForm} ownerAdr={ownerAdr} jePrestup={jePrestup} prestup={prestup} skola={skola}
+            ownerForm={ownerForm} ownerAdr={ownerAdr} jePrestup={jePrestup} prestup={prestup} skola={skola} spadova={spadova}
             coGuardians={coGuardians} klas={klas}
             prilisMlade={!jePrestup && klas?.vekova_kategorie === 'prilis_mlade' && !prilisMladePotvrzeno}
           />
@@ -542,7 +564,7 @@ function StepDite({ dite, setDite, jePrestup }: any) {
   )
 }
 
-function StepAdresa({ trvale, setTrvale, bydliJinde, setBydliJinde, kontaktni, setKontaktni }: any) {
+function StepAdresa({ trvale, setTrvale, bydliJinde, setBydliJinde, kontaktni, setKontaktni, jePrestup, spadova, setSpadova }: any) {
   return (
     <div className="space-y-5">
       <h2 className="text-base font-semibold text-(--portal-text)">Adresa dítěte</h2>
@@ -551,6 +573,11 @@ function StepAdresa({ trvale, setTrvale, bydliJinde, setBydliJinde, kontaktni, s
         hint="Musí být ověřeno proti registru adres (RÚIAN) — je podkladem pro spádovost."
         value={trvale} onChange={setTrvale} required
       />
+      {!jePrestup && trvale?.ruian_kod && (
+        <div className="pt-2 border-t border-(--portal-border)">
+          <SpadovaSkolaPicker ruianKod={trvale.ruian_kod} value={spadova} onChange={setSpadova} />
+        </div>
+      )}
       <label className="flex items-center gap-2 text-sm text-gray-700 pt-2 border-t border-(--portal-border)">
         <input type="checkbox" checked={bydliJinde} onChange={(e) => setBydliJinde(e.target.checked)} className="rounded border-gray-300" />
         Dítě fakticky bydlí na jiné adrese (kontaktní adresa)
@@ -780,7 +807,7 @@ function skolaRekap(s: PredchoziSkola): string {
   }
 }
 
-function StepRekap({ dite, zdravi, trvale, bydliJinde, kontaktni, ownerForm, ownerAdr, jePrestup, prestup, skola, coGuardians, prilisMlade }: any) {
+function StepRekap({ dite, zdravi, trvale, bydliJinde, kontaktni, ownerForm, ownerAdr, jePrestup, prestup, skola, spadova, coGuardians, prilisMlade }: any) {
   return (
     <div className="space-y-5">
       <h2 className="text-base font-semibold text-(--portal-text)">Rekapitulace a odeslání</h2>
@@ -797,6 +824,7 @@ function StepRekap({ dite, zdravi, trvale, bydliJinde, kontaktni, ownerForm, own
           <Radek label="Rodné číslo" value={dite.rodne_cislo} />
           <Radek label="Trvalé bydliště" value={adrText(trvale)} />
           {bydliJinde && <Radek label="Kontaktní adresa" value={adrText(kontaktni)} />}
+          {!jePrestup && <Radek label="Spádová škola" value={spadova.zdroj === 'nevim' ? 'Nevím' : spadova.nazev} />}
           {!jePrestup && <Radek label="Mateřská škola" value={skolaRekap(skola)} />}
         </div>
         <div className="px-4 py-3">

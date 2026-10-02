@@ -181,6 +181,32 @@ export interface PredchoziSkola {
   stat: string       // ISO alpha-2, jen volba 'zahranici'
 }
 
+// ── Spádová škola (zápis; migrace 145/146) ──────────────────────────────
+
+export type SpadovaSkolaZdroj = 'mapa' | 'rodic' | 'nevim' | 'reditel'
+
+export interface SpadovaSkolaZMapy {
+  izo: string
+  nazev: string
+  ulice: string | null
+  obec: string | null
+  psc: string | null
+  reditel: string | null
+}
+
+/** Výsledek RPC spadova_skola pro adresní místo. */
+export interface SpadovaSkolaNavrh {
+  stav: 'nalezena' | 'vice' | 'adresa_nesparovana' | 'obec_bez_dat'
+  skoly: SpadovaSkolaZMapy[]
+  snapshot: string | null   // datum importu mapy spádovosti
+}
+
+export interface SpadovaSkola {
+  zdroj: SpadovaSkolaZdroj | ''
+  izo: string
+  nazev: string
+}
+
 // ── Údaje o dítěti (dotazník) ───────────────────────────────────────────
 
 export interface DiteFormData {
