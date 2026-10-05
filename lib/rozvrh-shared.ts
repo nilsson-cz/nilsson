@@ -23,6 +23,9 @@ export type SablonaBlok = {
   valid_from: string
   valid_to: string | null
   rozvrh_sablona_obsazeni: ObsazeniRow[]
+  /** Spojené bloky (migrace 149): vlastník šablony a připojené třídy. */
+  group_id?: string
+  pripojene?: string[]
 }
 
 export const DNY_V_TYDNU: { value: number; label: string; zkratka: string }[] = [
@@ -101,4 +104,7 @@ export type KonkretniBlok = {
   stav: StavBloku
   potvrzeno_at: string | null
   obsazeni: KonkretniObsazeni[]
+  /** Spojené bloky (migrace 149): třída, které blok patří, a připojené třídy. */
+  vlastnik_group_id?: string | null
+  pripojene?: string[]
 }

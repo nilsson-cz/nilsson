@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   addSablonaObsazeni,
@@ -16,7 +16,16 @@ import {
   type PoziceNaBloku,
 } from '@/lib/rozvrh-shared'
 
-export default function BlokRow({ blok, staff }: { blok: SablonaBlok; staff: StaffOption[] }) {
+/**
+ * Blok stálé šablony. `readOnly` = blok jiné třídy, ke kterému je vybraná třída
+ * připojená (spojený blok, migrace 149) — obsazení a smazání řídí vlastník.
+ */
+export default function BlokRow({ blok, staff, readOnly = false, spojeni }: {
+  blok: SablonaBlok
+  staff: StaffOption[]
+  readOnly?: boolean
+  spojeni?: ReactNode
+}) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [novyStaff, setNovyStaff] = useState('')
@@ -73,6 +82,7 @@ export default function BlokRow({ blok, staff }: { blok: SablonaBlok; staff: Sta
               <span className="text-xs text-amber-600">do {blok.valid_to}</span>
             )}
           </div>
+          {spojeni}
 
           {/* Obsazení */}
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -81,7 +91,7 @@ export default function BlokRow({ blok, staff }: { blok: SablonaBlok; staff: Sta
               <span key={o.id} className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                 {o.staff ? `${o.staff.first_name} ${o.staff.last_name}` : 'Neznámý'}
                 <span className="text-blue-400">· {POZICE_LABEL[o.pozice_na_bloku]}</span>
-                <button
+                {!readOnly && <button
                   type="button"
                   onClick={() => run(() => removeSablonaObsazeni(o.id))}
                   disabled={pending}
@@ -89,13 +99,13 @@ export default function BlokRow({ blok, staff }: { blok: SablonaBlok; staff: Sta
                   aria-label="Odebrat"
                 >
                   ×
-                </button>
+                </button>}
               </span>
             ))}
           </div>
 
           {/* Přidat obsazení */}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          {!readOnly && <div className="mt-2 flex flex-wrap items-center gap-2">
             <select
               value={novyStaff}
               onChange={(e) => setNovyStaff(e.target.value)}
@@ -124,19 +134,19 @@ export default function BlokRow({ blok, staff }: { blok: SablonaBlok; staff: Sta
             >
               Přidat
             </button>
-          </div>
+          </div>}
 
           {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
         </div>
 
-        <button
+        {!readOnly && <button
           type="button"
           onClick={handleDeleteBlok}
           disabled={pending}
           className="shrink-0 text-xs font-medium text-gray-400 hover:text-red-600 disabled:opacity-50"
         >
           Smazat blok
-        </button>
+        </button>}
       </div>
     </div>
   )

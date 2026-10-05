@@ -8,6 +8,7 @@
  * Low-noise pravidla (K11):
  *   - běží jen v PRACOVNÍ den (Po–Pá, ne svátek/prázdniny) — jinak no-op;
  *   - pinguje jen bloky s obsazením, stav <> 'zruseno', potvrzeno_at IS NULL,
+ *     a jen plánované obsazení (zdroj 'rozvrh', zapocitat_ppc — migrace 148),
  *     po termínu (datum < dnes) v okně posledních 14 dnů;
  *   - jeden souhrn na osobu, adresné <@id> z staff_discord (kdo nemá → jen jménem);
  *   - grace „další pracovní den" vzniká přirozeně: běží jen Po–Pá, takže
@@ -107,11 +108,15 @@ export async function GET(req: NextRequest) {
   }
   const blokById = new Map(bloky.map((b) => [b.id, b]))
 
-  // Obsazení těchto bloků → jen obsazené bloky pingáme.
+  // Obsazení těchto bloků → jen obsazené bloky pingáme. Jen plánovaní (zdroj
+  // 'rozvrh') a neodebraní při zápisu — přidaní v třídnici připomínku nedostávají
+  // (migrace 148, rozhodnutí provozu 2026-10-05).
   const { data: obsRaw } = await supabase
     .from('rozvrh_obsazeni')
     .select('blok_id, staff_id')
     .in('blok_id', [...blokById.keys()])
+    .eq('zdroj', 'rozvrh')
+    .eq('zapocitat_ppc', true)
   const obs = (obsRaw ?? []) as { blok_id: string; staff_id: string }[]
   if (obs.length === 0) {
     return NextResponse.json({ nudged: 0, note: 'nepotvrzené bloky nikdo nezajišťoval' })

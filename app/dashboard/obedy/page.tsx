@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { getNedochazejiciPsd } from '@/lib/zpusob-psd-server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import LunchEditBoard from './_components/LunchEditBoard'
@@ -100,7 +101,14 @@ export default async function ObedyDashboardPage({
   if (editMode) {
     const { data, error } = await supabase.rpc('lunch_day_editable', { p_date: datum })
     if (error) loadError = error.message
-    else editRows = (data as EditableRow[]) ?? []
+    else {
+      // Žáci § 38 / § 41 do školy nechodí → v editaci je nenabízíme. Kdo ale
+      // objednávku na ten den má (portál rodiče se nemění), zůstává vidět, aby
+      // součet odpovídal SMS jídelně.
+      const vse = (data as EditableRow[]) ?? []
+      const jePsd = await getNedochazejiciPsd(supabase, vse.map((r) => r.student_id), datum, datum)
+      editRows = vse.filter((r) => r.ordered || !jePsd(r.student_id, datum))
+    }
   } else {
     const { data, error } = await supabase.rpc('lunch_day_roster', { p_date: datum })
     if (error) loadError = error.message

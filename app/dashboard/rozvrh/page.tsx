@@ -10,6 +10,7 @@ import { CURRENT_SCHOOL_YEAR, SCHOOL_YEAR_OPTIONS } from '@/lib/config'
 import { DNY_V_TYDNU, casHM, TYP_BLOKU_LABEL, POZICE_LABEL, type StaffOption, type SablonaBlok, type ObsazeniRow } from '@/lib/rozvrh-shared'
 import AddBlokForm from './_components/AddBlokForm'
 import BlokRow from './_components/BlokRow'
+import SpojeniTrid from '@/components/rozvrh/SpojeniTrid'
 
 export const metadata = { title: 'Rozvrh — IS Nilsson' }
 
@@ -58,14 +59,27 @@ export default async function RozvrhPage({
   // Dva prosté dotazy + join v JS (nezávislé na PostgREST embed).
   const blokyByDen = new Map<number, SablonaBlok[]>()
   if (selectedGroupId) {
+    // Vlastní bloky třídy + bloky jiných tříd, ke kterým je třída připojená (migrace 149).
+    const { data: pripRaw } = await supabase
+      .from('rozvrh_blok_sablona_pripojene').select('blok_sablona_id').eq('group_id', selectedGroupId)
+    const pripojeneKMym = (pripRaw ?? []).map((p) => p.blok_sablona_id)
     const { data: blokyRaw } = await supabase
       .from('rozvrh_blok_sablona')
-      .select('id, den_v_tydnu, cas_od, cas_do, nazev, typ_bloku, valid_from, valid_to')
-      .eq('group_id', selectedGroupId)
+      .select('id, group_id, den_v_tydnu, cas_od, cas_do, nazev, typ_bloku, valid_from, valid_to')
+      .or(pripojeneKMym.length > 0
+        ? `group_id.eq.${selectedGroupId},id.in.(${pripojeneKMym.join(',')})`
+        : `group_id.eq.${selectedGroupId}`)
       .eq('school_year', schoolYear)
       .order('den_v_tydnu')
       .order('cas_od')
     const bloky = (blokyRaw ?? []) as Omit<SablonaBlok, 'rozvrh_sablona_obsazeni'>[]
+
+    const pripojeneBySablona = new Map<string, string[]>()
+    if (bloky.length > 0) {
+      const { data } = await supabase
+        .from('rozvrh_blok_sablona_pripojene').select('blok_sablona_id, group_id').in('blok_sablona_id', bloky.map((b) => b.id))
+      for (const p of data ?? []) pripojeneBySablona.set(p.blok_sablona_id, [...(pripojeneBySablona.get(p.blok_sablona_id) ?? []), p.group_id])
+    }
 
     const blokIds = bloky.map((b) => b.id)
     let obsazeniRaw: { id: string; blok_sablona_id: string; staff_id: string; pozice_na_bloku: 'vede' | 'asistuje' }[] = []
@@ -94,7 +108,7 @@ export default async function RozvrhPage({
     }
 
     for (const b of bloky) {
-      const full: SablonaBlok = { ...b, rozvrh_sablona_obsazeni: obsByBlok.get(b.id) ?? [] }
+      const full: SablonaBlok = { ...b, rozvrh_sablona_obsazeni: obsByBlok.get(b.id) ?? [], pripojene: pripojeneBySablona.get(b.id) ?? [] }
       const arr = blokyByDen.get(b.den_v_tydnu) ?? []
       arr.push(full)
       blokyByDen.set(b.den_v_tydnu, arr)
@@ -167,7 +181,22 @@ export default async function RozvrhPage({
                     <p className="text-xs text-gray-400 pl-1">— žádné bloky —</p>
                   ) : (
                     <div className="space-y-2">
-                      {bloky.map((b) => <BlokRow key={b.id} blok={b} staff={staff} />)}
+                      {bloky.map((b) => (
+                        <BlokRow key={b.id} blok={b} staff={staff}
+                          readOnly={b.group_id !== selectedGroupId}
+                          spojeni={
+                            <SpojeniTrid
+                              kind="sablona"
+                              id={b.id}
+                              currentGroupId={selectedGroupId!}
+                              vlastnikGroupId={b.group_id ?? selectedGroupId!}
+                              pripojeneIds={b.pripojene ?? []}
+                              groups={groups}
+                              canWrite
+                            />
+                          }
+                        />
+                      ))}
                     </div>
                   )}
                 </div>

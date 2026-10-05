@@ -56,3 +56,13 @@ export function paragrafZpusobu(kod: string): ParagrafPsd | null {
 export function educationModeLabel(mode: string): string {
   return EDUCATION_MODE[mode as EducationMode]?.label ?? mode
 }
+
+/**
+ * Žák s tímto kódem fyzicky dochází do školy → patří do Docházky.
+ * § 38 (21–25) a § 41 (30) do školy nechodí, v Docházce se nezobrazují.
+ * Neznámý kód (mimo RASD) bereme jako docházku — raději žáka ukázat než ztratit.
+ */
+export function dochaziDoSkoly(kod: string): boolean {
+  const p = paragrafZpusobu(kod)
+  return p !== '38' && p !== '41'
+}

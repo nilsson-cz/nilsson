@@ -3182,6 +3182,7 @@ export type Database = {
           stav: string
           tridni_zaznam_id: string | null
           typ_bloku: string
+          vlastnik_group_id: string | null
         }
         Insert: {
           cas_do: string
@@ -3198,6 +3199,7 @@ export type Database = {
           stav?: string
           tridni_zaznam_id?: string | null
           typ_bloku?: string
+          vlastnik_group_id?: string | null
         }
         Update: {
           cas_do?: string
@@ -3214,6 +3216,7 @@ export type Database = {
           stav?: string
           tridni_zaznam_id?: string | null
           typ_bloku?: string
+          vlastnik_group_id?: string | null
         }
         Relationships: [
           {
@@ -3304,6 +3307,27 @@ export type Database = {
             referencedColumns: ["kod"]
           },
         ]
+      }
+      rozvrh_blok_sablona_pripojene: {
+        Row: {
+          blok_sablona_id: string
+          created_at: string
+          created_by: string | null
+          group_id: string
+        }
+        Insert: {
+          blok_sablona_id: string
+          created_at?: string
+          created_by?: string | null
+          group_id: string
+        }
+        Update: {
+          blok_sablona_id?: string
+          created_at?: string
+          created_by?: string | null
+          group_id?: string
+        }
+        Relationships: []
       }
       rozvrh_blok_sablona: {
         Row: {
@@ -3445,6 +3469,7 @@ export type Database = {
           staff_id: string
           supluje_za_staff_id: string | null
           zapocitat_ppc: boolean
+          zdroj: string
         }
         Insert: {
           blok_id: string
@@ -3455,6 +3480,7 @@ export type Database = {
           staff_id: string
           supluje_za_staff_id?: string | null
           zapocitat_ppc?: boolean
+          zdroj?: string
         }
         Update: {
           blok_id?: string
@@ -3465,6 +3491,7 @@ export type Database = {
           staff_id?: string
           supluje_za_staff_id?: string | null
           zapocitat_ppc?: boolean
+          zdroj?: string
         }
         Relationships: [
           {
@@ -7350,7 +7377,12 @@ export type Database = {
         Returns: Json
       }
       potvrdit_blok: {
-        Args: { p_absent_ids?: string[]; p_blok_id: string; p_obsah?: string }
+        Args: {
+          p_absent_ids?: string[]
+          p_added_ids?: string[]
+          p_blok_id: string
+          p_obsah?: string
+        }
         Returns: string
       }
       pregenerovat_rozvrh_prepis: {
@@ -7384,6 +7416,17 @@ export type Database = {
           copied_count: number
         }[]
       }
+      rozpojit_blok: {
+        Args: { p_blok_id: string; p_group_id: string }
+        Returns: undefined
+      }
+      rozpojit_sablonu: {
+        Args: { p_group_id: string; p_sablona_id: string }
+        Returns: {
+          odpojeno_bloku: number
+          ponechano_bloku: number
+        }[]
+      }
       set_consent: {
         Args: {
           p_definition_id: string
@@ -7407,6 +7450,22 @@ export type Database = {
           snapshot: string
           stav: string
           ulice: string
+        }[]
+      }
+      spojit_blok: {
+        Args: { p_blok_id: string; p_group_ids: string[]; p_slouceni_ids?: string[] }
+        Returns: undefined
+      }
+      spojit_sablonu: {
+        Args: {
+          p_group_ids: string[]
+          p_sablona_id: string
+          p_slouceni_sablona_ids?: string[]
+        }
+        Returns: {
+          pripojeno_bloku: number
+          ponechano_bloku: number
+          slouceno_bloku: number
         }[]
       }
       staff_can_access_student: {

@@ -243,6 +243,7 @@ export async function addKonkretniBlok(input: {
       typ_bloku: input.typ_bloku,
       sablona_id: null,
       stav: 'planovano',
+      vlastnik_group_id: input.group_id,
     })
     .select('id')
     .single()
@@ -312,6 +313,8 @@ export async function potvrditBlok(input: {
   blok_id: string
   obsah?: string
   absent_ids?: string[]
+  /** Pedagogové přidaní při zápisu (mimo plánované obsazení) — celá množina. */
+  added_ids?: string[]
 }): Promise<Result & { tridniZaznamId?: string }> {
   if (!input.blok_id) return { error: 'Chybí blok.' }
   const supabase = await createSupabaseServerClient()
@@ -320,6 +323,7 @@ export async function potvrditBlok(input: {
     p_blok_id: input.blok_id,
     p_obsah: input.obsah?.trim() || undefined,
     p_absent_ids: input.absent_ids ?? [],
+    p_added_ids: input.added_ids ?? [],
   })
   if (error) return { error: error.message }
 

@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { potvrditBlok, zrusitPotvrzeniBlok, setBlokPriznak, clearBlokPriznak } from '@/app/actions/rozvrh'
 import { casHM, TYP_BLOKU_LABEL, type TypBloku } from '@/lib/rozvrh-shared'
 
-export type ZapisObsazeni = { staff_id: string; jmeno: string; zapocitat_ppc: boolean }
+/** zdroj: 'rozvrh' = plánované obsazení týdne, 'tridnice' = přidán/a při zápisu (migrace 148). */
+export type ZapisObsazeni = { staff_id: string; jmeno: string; zapocitat_ppc: boolean; zdroj: 'rozvrh' | 'tridnice' }
 export type StaffOption = { id: string; jmeno: string }
 export type PriznakTyp = { kod: string; nazev: string; ikona: string | null; ma_osobu: boolean; ma_poznamku: boolean }
 export type BlokPriznak = { typ_kod: string; osoba_staff_id: string | null; poznamka: string | null }
@@ -15,6 +16,10 @@ export type BlokPriznak = { typ_kod: string; osoba_staff_id: string | null; pozn
  * Předvyplněno z rozvrhu (název, čas, obsazení). Průvodce odškrtne nepřítomné
  * a napíše krátce, co se dělo → potvrdí blok (RPC potvrdit_blok). Zapisovat smí
  * kterýkoli zaměstnanec kromě role readonly (vynucuje DB, migrace 141).
+ *
+ * Pedagogové: předvyplnění (zaškrtnutí) jsou plánovaní z týdenního obsazení;
+ * přidat lze kteréhokoli dalšího pedagoga (`pedagogOptions`) — započte se do PPČ,
+ * ranní připomínku ale nedostává (migrace 148). Suplování se tu neeviduje.
  *
  * Příznaky bloku (např. Hospitace) se editují nezávisle na potvrzení — ukládají
  * se okamžitě přes RPC nastavit_blok_priznak / zrusit_blok_priznak (viz PriznakyBlok).
@@ -32,6 +37,8 @@ export default function DenBlokZapis({
   priznakTypy,
   priznaky,
   staffOptions,
+  pedagogOptions,
+  spojeni,
 }: {
   blokId: string
   nazev: string
@@ -45,15 +52,24 @@ export default function DenBlokZapis({
   priznakTypy: PriznakTyp[]
   priznaky: BlokPriznak[]
   staffOptions: StaffOption[]
+  /** Všichni pedagogové v pracovním poměru k datu bloku (nabídka k přidání). */
+  pedagogOptions: StaffOption[]
+  /** Spojení s dalšími třídami (SpojeniTrid) — vykreslí se pod hlavičkou. */
+  spojeni?: ReactNode
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [editing, setEditing] = useState(false)
   const [obsah, setObsah] = useState(obsahDefault)
-  // Výchozí přítomnost = kdo je zap. do PPČ (po korekci) resp. všichni při prvním zápisu.
-  const [pritomni, setPritomni] = useState<Set<string>>(
-    () => new Set(obsazeni.filter((o) => o.zapocitat_ppc).map((o) => o.staff_id)),
-  )
+  // Plánovaní = týdenní obsazení z rozvrhu; přidaní = při dřívějším zápisu v třídnici.
+  const planovani = obsazeni.filter((o) => o.zdroj !== 'tridnice')
+  const planovaniIds = new Set(planovani.map((o) => o.staff_id))
+  // Výchozí přítomnost = kdo je zap. do PPČ (po korekci) resp. všichni plánovaní
+  // při prvním zápisu + dříve přidaní.
+  const initialPritomni = () => new Set(obsazeni.filter((o) => o.zapocitat_ppc).map((o) => o.staff_id))
+  const [pritomni, setPritomni] = useState<Set<string>>(initialPritomni)
+  const [showDalsi, setShowDalsi] = useState(false)
+  const [hledat, setHledat] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const toggle = (id: string) =>
@@ -65,9 +81,10 @@ export default function DenBlokZapis({
 
   const submit = () => {
     setError(null)
-    const absent_ids = obsazeni.map((o) => o.staff_id).filter((id) => !pritomni.has(id))
+    const absent_ids = planovani.map((o) => o.staff_id).filter((id) => !pritomni.has(id))
+    const added_ids = [...pritomni].filter((id) => !planovaniIds.has(id))
     startTransition(async () => {
-      const res = await potvrditBlok({ blok_id: blokId, obsah, absent_ids })
+      const res = await potvrditBlok({ blok_id: blokId, obsah, absent_ids, added_ids })
       if (res.error) { setError(res.error); return }
       setEditing(false)
       router.refresh()
@@ -92,7 +109,20 @@ export default function DenBlokZapis({
     </div>
   )
 
-  const jmenaObsazeni = obsazeni.map((o) => o.jmeno).join(', ') || '— bez obsazení —'
+  const jmenaObsazeni = obsazeni.filter((o) => o.zapocitat_ppc).map((o) => o.jmeno).join(', ') || '— bez obsazení —'
+
+  // Další pedagogové (mimo plán): zaškrtnutí vždy vidět, ostatní po rozbalení.
+  const dalsi = pedagogOptions.filter((p) => !planovaniIds.has(p.id))
+  const dalsiVybrani = dalsi.filter((p) => pritomni.has(p.id))
+  const q = hledat.trim().toLocaleLowerCase('cs')
+  const dalsiNabidka = dalsi.filter((p) => !pritomni.has(p.id) && (!q || p.jmeno.toLocaleLowerCase('cs').includes(q)))
+  const checkbox = (id: string, jmeno: string, poznamka?: string) => (
+    <label key={id} className="inline-flex items-center gap-1.5 text-sm text-gray-700 dark:text-stone-200">
+      <input type="checkbox" checked={pritomni.has(id)} onChange={() => toggle(id)} className="rounded border-gray-300" />
+      {jmeno}
+      {poznamka && <span className="text-xs text-gray-400">{poznamka}</span>}
+    </label>
+  )
 
   const priznakyBlok = (
     <PriznakyBlok
@@ -110,6 +140,7 @@ export default function DenBlokZapis({
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-stone-700 dark:bg-stone-900">
         {header}
+        {spojeni}
         <p className="mt-1 text-xs text-gray-500 dark:text-stone-400">
           {potvrzeno ? 'Zapsáno.' : 'Obsazení:'} <span className="text-gray-600 dark:text-stone-300">{jmenaObsazeni}</span>
         </p>
@@ -124,6 +155,10 @@ export default function DenBlokZapis({
     return (
       <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 dark:border-emerald-900 dark:bg-emerald-950/20">
         {header}
+        {spojeni}
+        <p className="mt-1 text-xs text-gray-500 dark:text-stone-400">
+          Pedagogové: <span className="text-gray-600 dark:text-stone-300">{jmenaObsazeni}</span>
+        </p>
         {obsahDefault
           ? <p className="mt-2 text-sm text-gray-700 dark:text-stone-300 whitespace-pre-wrap">{obsahDefault}</p>
           : <p className="mt-2 text-xs text-gray-400">Bez poznámky.</p>}
@@ -143,19 +178,38 @@ export default function DenBlokZapis({
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-stone-700 dark:bg-stone-900">
       {header}
+      {spojeni}
 
       <fieldset className="mt-3">
-        <legend className="text-xs text-gray-500 dark:text-stone-400">Kdo tam byl (odškrtni nepřítomné — vyřadí se z výkazu PPČ)</legend>
-        {obsazeni.length === 0 ? (
-          <p className="mt-1 text-xs text-amber-600">⚠ Blok nemá obsazení — nejdřív ho doplní ředitel v rozvrhu.</p>
+        <legend className="text-xs text-gray-500 dark:text-stone-400">Kdo tam byl — zaškrtnutí se započtou do výkazu PPČ</legend>
+        {planovani.length === 0 && dalsiVybrani.length === 0 ? (
+          <p className="mt-1 text-xs text-amber-600">⚠ Blok nemá v rozvrhu obsazení — přidej pedagogy níže.</p>
         ) : (
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-            {obsazeni.map((o) => (
-              <label key={o.staff_id} className="inline-flex items-center gap-1.5 text-sm text-gray-700 dark:text-stone-200">
-                <input type="checkbox" checked={pritomni.has(o.staff_id)} onChange={() => toggle(o.staff_id)} className="rounded border-gray-300" />
-                {o.jmeno}
-              </label>
-            ))}
+            {planovani.map((o) => checkbox(o.staff_id, o.jmeno))}
+            {dalsiVybrani.map((p) => checkbox(p.id, p.jmeno, 'přidán/a'))}
+          </div>
+        )}
+
+        {dalsi.length > 0 && (
+          <div className="mt-2">
+            <button type="button" onClick={() => setShowDalsi((v) => !v)}
+              className="text-xs font-medium text-gray-500 hover:text-gray-800 dark:text-stone-400 dark:hover:text-stone-200">
+              {showDalsi ? '− skrýt další pedagogy' : '+ další pedagogové'}
+            </button>
+            {showDalsi && (
+              <div className="mt-1.5 rounded-lg border border-gray-100 p-2 dark:border-stone-800">
+                <input type="search" value={hledat} onChange={(e) => setHledat(e.target.value)} placeholder="Hledat jméno…"
+                  className="mb-1.5 w-full rounded-md border border-gray-300 px-2 py-1 text-sm dark:border-stone-700 dark:bg-stone-900" />
+                {dalsiNabidka.length === 0 ? (
+                  <p className="text-xs text-gray-400">Nikdo další.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {dalsiNabidka.map((p) => checkbox(p.id, p.jmeno))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </fieldset>
@@ -175,7 +229,7 @@ export default function DenBlokZapis({
           {pending ? 'Ukládám…' : potvrzeno ? 'Uložit změny' : 'Potvrdit a zapsat'}
         </button>
         {(editing || potvrzeno) && (
-          <button type="button" onClick={() => { setEditing(false); setError(null); setObsah(obsahDefault) }} disabled={pending}
+          <button type="button" onClick={() => { setEditing(false); setError(null); setObsah(obsahDefault); setPritomni(initialPritomni()); setShowDalsi(false); setHledat('') }} disabled={pending}
             className="text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50">Zrušit</button>
         )}
       </div>

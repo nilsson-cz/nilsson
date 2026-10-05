@@ -16,6 +16,7 @@ import GenerateWeekButton from '../_components/GenerateWeekButton'
 import PregenerovatPanel from '../_components/PregenerovatPanel'
 import KonkretniBlokRow from '../_components/KonkretniBlokRow'
 import AddKonkretniBlokForm from '../_components/AddKonkretniBlokForm'
+import SpojeniTrid from '@/components/rozvrh/SpojeniTrid'
 
 export const metadata = { title: 'Rozvrh — týden | IS Nilsson' }
 
@@ -63,7 +64,7 @@ export default async function RozvrhTydenPage({
   if (selectedGroupId) {
     const { data: blokyRaw } = await supabase
       .from('rozvrh_blok')
-      .select('id, datum, cas_od, cas_do, nazev, typ_bloku, stav, potvrzeno_at')
+      .select('id, datum, cas_od, cas_do, nazev, typ_bloku, stav, potvrzeno_at, vlastnik_group_id')
       .gte('datum', monday)
       .lte('datum', friday)
       .order('datum').order('cas_od')
@@ -71,13 +72,16 @@ export default async function RozvrhTydenPage({
     const blokIds = bloky.map((b) => b.id)
 
     let groupSet = new Set<string>()
+    const tridyByBlok = new Map<string, string[]>()
     let obsByBlok = new Map<string, KonkretniObsazeni[]>()
     if (blokIds.length > 0) {
       const [{ data: skupinyRaw }, { data: obsRaw }] = await Promise.all([
-        supabase.from('rozvrh_blok_skupiny').select('blok_id, group_id').in('blok_id', blokIds).eq('group_id', selectedGroupId),
+        supabase.from('rozvrh_blok_skupiny').select('blok_id, group_id').in('blok_id', blokIds),
         supabase.from('rozvrh_obsazeni').select('id, blok_id, staff_id, pozice_na_bloku, je_suplovani, supluje_za_staff_id').in('blok_id', blokIds),
       ])
-      groupSet = new Set<string>(((skupinyRaw ?? []) as any[]).map((r) => r.blok_id))
+      // Všechny třídy bloku (spojené bloky, migrace 149); zobrazujeme bloky vybrané třídy.
+      for (const k of skupinyRaw ?? []) tridyByBlok.set(k.blok_id, [...(tridyByBlok.get(k.blok_id) ?? []), k.group_id])
+      groupSet = new Set<string>((skupinyRaw ?? []).filter((k) => k.group_id === selectedGroupId).map((k) => k.blok_id))
       for (const o of (obsRaw ?? []) as any[]) {
         const st = staffMap.get(o.staff_id)
         const sz = o.supluje_za_staff_id ? staffMap.get(o.supluje_za_staff_id) : null
@@ -97,7 +101,12 @@ export default async function RozvrhTydenPage({
 
     for (const b of bloky) {
       if (!groupSet.has(b.id)) continue // jen bloky vybrané třídy
-      const full: KonkretniBlok = { ...b, obsazeni: obsByBlok.get(b.id) ?? [] }
+      const tridy = tridyByBlok.get(b.id) ?? []
+      const vlastnik = b.vlastnik_group_id ?? [...tridy].sort()[0] ?? selectedGroupId
+      const full: KonkretniBlok = {
+        ...b, obsazeni: obsByBlok.get(b.id) ?? [],
+        vlastnik_group_id: vlastnik, pripojene: tridy.filter((g) => g !== vlastnik),
+      }
       const arr = blokyByDatum.get(b.datum) ?? []
       arr.push(full)
       blokyByDatum.set(b.datum, arr)
@@ -183,7 +192,22 @@ export default async function RozvrhTydenPage({
                     <p className="text-xs text-gray-400 pl-1">— žádné bloky —</p>
                   ) : (
                     <div className="space-y-2">
-                      {bloky.map((b) => <KonkretniBlokRow key={b.id} blok={b} staff={staff} />)}
+                      {bloky.map((b) => (
+                        <KonkretniBlokRow key={b.id} blok={b} staff={staff}
+                          spojeni={
+                            <SpojeniTrid
+                              kind="blok"
+                              id={b.id}
+                              currentGroupId={selectedGroupId!}
+                              vlastnikGroupId={b.vlastnik_group_id ?? selectedGroupId!}
+                              pripojeneIds={b.pripojene ?? []}
+                              groups={groups}
+                              potvrzeno={Boolean(b.potvrzeno_at)}
+                              canWrite={b.stav !== 'zruseno'}
+                            />
+                          }
+                        />
+                      ))}
                     </div>
                   )}
                   {selectedGroupId && (

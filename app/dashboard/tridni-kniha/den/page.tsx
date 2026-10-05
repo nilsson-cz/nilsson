@@ -13,6 +13,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { CURRENT_SCHOOL_YEAR, SCHOOL_YEAR_OPTIONS } from '@/lib/config'
 import { formatDateCZ } from '@/lib/tridni-kniha-missing'
 import { addDaysStr, type TypBloku } from '@/lib/rozvrh-shared'
+import SpojeniTrid from '@/components/rozvrh/SpojeniTrid'
 import DenBlokZapis, { type ZapisObsazeni, type PriznakTyp, type BlokPriznak, type StaffOption } from './_components/DenBlokZapis'
 
 export const metadata = { title: 'Třídnice — zápis dne | IS Nilsson' }
@@ -51,11 +52,16 @@ export default async function TridniceDenPage({
   const groups = (groupsRaw ?? []) as Group[]
   const selectedGroupId = (sp.group && groups.find((g) => g.id === sp.group)?.id) || groups[0]?.id || null
 
-  const { data: staffRawList } = await supabase.from('staff').select('id, first_name, last_name')
+  const { data: staffRawList } = await supabase.from('staff').select('id, first_name, last_name, typ_zamestnance, employment_end')
   const staffMap = new Map<string, string>(((staffRawList ?? []) as any[]).map((s) => [s.id, `${s.first_name} ${s.last_name}`]))
   const staffOptions: StaffOption[] = ((staffRawList ?? []) as any[])
     .map((s) => ({ id: s.id as string, jmeno: `${s.first_name} ${s.last_name}` }))
     .sort((a, b) => a.jmeno.localeCompare(b.jmeno, 'cs'))
+  // Nabídka k přidání na blok: pedagogové v pracovním poměru k datu dne (migrace 148).
+  const aktivniPedagogIds = new Set((staffRawList ?? [])
+    .filter((s) => s.typ_zamestnance === 'pedagogicky' && (!s.employment_end || s.employment_end >= datum))
+    .map((s) => s.id))
+  const pedagogOptions = staffOptions.filter((s) => aktivniPedagogIds.has(s.id))
 
   // Aktivní typy příznaků (číselník) — společné pro všechny bloky dne.
   const { data: typyRaw } = await supabase
@@ -69,6 +75,7 @@ export default async function TridniceDenPage({
     id: string; cas_od: string; cas_do: string; nazev: string; typ_bloku: TypBloku
     obsah: string | null; potvrzeno_at: string | null
     obsazeni: ZapisObsazeni[]; canWrite: boolean; priznaky: BlokPriznak[]
+    vlastnik: string; pripojene: string[]
   }
   let bloky: Blok[] = []
   let containerId: string | null = null
@@ -76,24 +83,27 @@ export default async function TridniceDenPage({
   if (selectedGroupId) {
     const { data: blokyRaw } = await supabase
       .from('rozvrh_blok')
-      .select('id, cas_od, cas_do, nazev, typ_bloku, stav, potvrzeno_at, obsah')
+      .select('id, cas_od, cas_do, nazev, typ_bloku, stav, potvrzeno_at, obsah, vlastnik_group_id')
       .eq('datum', datum).order('cas_od')
     const all = (blokyRaw ?? []) as any[]
     const blokIds = all.map((b) => b.id)
 
     let groupSet = new Set<string>()
+    const tridyByBlok = new Map<string, string[]>()
     const obsByBlok = new Map<string, ZapisObsazeni[]>()
     const priznakyByBlok = new Map<string, BlokPriznak[]>()
     if (blokIds.length > 0) {
       const [{ data: skupinyRaw }, { data: obsRaw }, { data: priznakyRaw }] = await Promise.all([
-        supabase.from('rozvrh_blok_skupiny').select('blok_id, group_id').in('blok_id', blokIds).eq('group_id', selectedGroupId),
-        supabase.from('rozvrh_obsazeni').select('blok_id, staff_id, zapocitat_ppc').in('blok_id', blokIds),
+        supabase.from('rozvrh_blok_skupiny').select('blok_id, group_id').in('blok_id', blokIds),
+        supabase.from('rozvrh_obsazeni').select('blok_id, staff_id, zapocitat_ppc, zdroj').in('blok_id', blokIds),
         supabase.from('rozvrh_blok_priznak').select('blok_id, typ_kod, osoba_staff_id, poznamka').in('blok_id', blokIds),
       ])
-      groupSet = new Set<string>(((skupinyRaw ?? []) as any[]).map((r) => r.blok_id))
+      // Všechny třídy bloku (spojené bloky, migrace 149); zobrazujeme bloky vybrané třídy.
+      for (const k of skupinyRaw ?? []) tridyByBlok.set(k.blok_id, [...(tridyByBlok.get(k.blok_id) ?? []), k.group_id])
+      groupSet = new Set<string>((skupinyRaw ?? []).filter((k) => k.group_id === selectedGroupId).map((k) => k.blok_id))
       for (const o of (obsRaw ?? []) as any[]) {
         const arr = obsByBlok.get(o.blok_id) ?? []
-        arr.push({ staff_id: o.staff_id, jmeno: staffMap.get(o.staff_id) ?? 'Neznámý', zapocitat_ppc: o.zapocitat_ppc })
+        arr.push({ staff_id: o.staff_id, jmeno: staffMap.get(o.staff_id) ?? 'Neznámý', zapocitat_ppc: o.zapocitat_ppc, zdroj: o.zdroj === 'tridnice' ? 'tridnice' : 'rozvrh' })
         obsByBlok.set(o.blok_id, arr)
       }
       for (const p of (priznakyRaw ?? []) as any[]) {
@@ -111,6 +121,11 @@ export default async function TridniceDenPage({
         obsazeni: obsByBlok.get(b.id) ?? [],
         canWrite: canWriteTridnice,
         priznaky: priznakyByBlok.get(b.id) ?? [],
+        ...(() => {
+          const tridy = tridyByBlok.get(b.id) ?? []
+          const vlastnik: string = b.vlastnik_group_id ?? [...tridy].sort()[0] ?? selectedGroupId
+          return { vlastnik, pripojene: tridy.filter((g) => g !== vlastnik) }
+        })(),
       }))
 
     const { data: contRaw } = await supabase
@@ -200,6 +215,19 @@ export default async function TridniceDenPage({
                 priznakTypy={priznakTypy}
                 priznaky={b.priznaky}
                 staffOptions={staffOptions}
+                pedagogOptions={pedagogOptions}
+                spojeni={
+                  <SpojeniTrid
+                    kind="blok"
+                    id={b.id}
+                    currentGroupId={selectedGroupId!}
+                    vlastnikGroupId={b.vlastnik}
+                    pripojeneIds={b.pripojene}
+                    groups={groups}
+                    potvrzeno={Boolean(b.potvrzeno_at)}
+                    canWrite={b.canWrite}
+                  />
+                }
               />
             ))}
           </div>

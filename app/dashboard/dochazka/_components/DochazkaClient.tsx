@@ -47,6 +47,7 @@ export function DochazkaClient({ groups, holidays, initialGroupId, initialDate }
   const [date, setDate] = useState(initialDate)
 
   const [students, setStudents] = useState<StudentInGroup[]>([])
+  const [skrytoPsd, setSkrytoPsd] = useState(0)
   const [rows, setRows] = useState<RowState[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, startSaving] = useTransition()
@@ -72,8 +73,9 @@ export function DochazkaClient({ groups, holidays, initialGroupId, initialDate }
     setSaveResult(null)
 
     Promise.all([getStudentsInGroup(groupId, date), getAttendanceForDate(groupId, date)])
-      .then(([studs, records]) => {
+      .then(([{ students: studs, skrytoPsd: skryto }, records]) => {
         setStudents(studs)
+        setSkrytoPsd(skryto)
         setRows(buildInitialRows(studs, records))
       })
       .catch(err => {
@@ -248,6 +250,12 @@ export function DochazkaClient({ groups, holidays, initialGroupId, initialDate }
                 {saving ? 'Ukládám…' : 'Uložit'}
               </button>
             </div>
+          )}
+
+          {!loading && skrytoPsd > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Skryto {skrytoPsd} {skrytoPsd === 1 ? 'žák vzdělávaný' : 'žáků vzdělávaných'} podle § 38 / § 41 — do školy nedochází, docházka se nevede.
+            </p>
           )}
         </>
       )}

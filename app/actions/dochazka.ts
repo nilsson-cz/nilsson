@@ -17,6 +17,7 @@ import {
 } from '@/lib/dochazka-utils'
 import { listAllHolidays } from '@/lib/school-calendar-server'
 import { getActiveSchoolYear } from '@/lib/school-year'
+import { getNedochazejiciPsd } from '@/lib/zpusob-psd-server'
 
 async function getSupabase() {
   const cookieStore = await cookies()
@@ -110,10 +111,15 @@ export async function getGroupsForUser(schoolYear?: string): Promise<Group[]> {
   return groups.sort((a, b) => a.name.localeCompare(b.name, 'cs'))
 }
 
+/**
+ * Žáci třídy, kteří k danému dni do školy docházejí: aktivní a neplní PŠD
+ * podle § 38 / § 41. `skrytoPsd` = kolik žáků § 38/§ 41 bylo vynecháno
+ * (UI to zmíní, aby nikdo „zmizelého" žáka nehledal).
+ */
 export async function getStudentsInGroup(
   groupId: string,
   date: string,
-): Promise<StudentInGroup[]> {
+): Promise<{ students: StudentInGroup[]; skrytoPsd: number }> {
   const supabase = await getSupabase()
 
   const { data, error } = await supabase
@@ -125,13 +131,20 @@ export async function getStudentsInGroup(
 
   if (error) throw new Error(`getStudentsInGroup: ${error.message}`)
 
-  return (data ?? [])
+  const aktivni = (data ?? [])
     .map(d => d.student as unknown as (StudentInGroup & { status: string }))
     .filter(s => s !== null && s.status === 'active')
+
+  const jePsd = await getNedochazejiciPsd(supabase, aktivni.map(s => s.id), date, date)
+  const students = aktivni
+    .filter(s => !jePsd(s.id, date))
+    .map(({ id, first_name, last_name, kod_zaka }) => ({ id, first_name, last_name, kod_zaka }))
     .sort((a, b) =>
       a.last_name.localeCompare(b.last_name, 'cs') ||
       a.first_name.localeCompare(b.first_name, 'cs'),
     )
+
+  return { students, skrytoPsd: aktivni.length - students.length }
 }
 
 export async function getAttendanceForDate(
@@ -281,8 +294,13 @@ export async function saveBulkRangeAbsence(params: BulkRangeParams): Promise<{
 
   if (workDays.length === 0) return { created: 0, skipped: 0 }
 
+  // Dny, kdy žák plní PŠD podle § 38 / § 41, se nezapisují (do školy nechodí);
+  // započtou se do „přeskočeno".
+  const jePsd = await getNedochazejiciPsd(supabase, params.studentIds, params.dateFrom, params.dateTo)
+  const pozadovano = params.studentIds.length * workDays.length
+
   const records = params.studentIds.flatMap(studentId =>
-    workDays.map(d => ({
+    workDays.filter(d => !jePsd(studentId, d)).map(d => ({
       student_id: studentId,
       date: d,
       status: params.status,
@@ -293,6 +311,8 @@ export async function saveBulkRangeAbsence(params: BulkRangeParams): Promise<{
     })),
   )
 
+  if (records.length === 0) return { created: 0, skipped: pozadovano }
+
   const { data, error } = await supabase
     .from('attendance_records')
     .upsert(records, { onConflict: 'student_id,date', ignoreDuplicates: true })
@@ -302,7 +322,7 @@ export async function saveBulkRangeAbsence(params: BulkRangeParams): Promise<{
 
   const created = data?.length ?? 0
   revalidatePath('/dashboard/dochazka')
-  return { created, skipped: records.length - created }
+  return { created, skipped: pozadovano - created }
 }
 
 export async function getSemesterSummary(groupId: string, schoolYear: string) {

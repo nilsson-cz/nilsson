@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import DochazkaTable from './_components/DochazkaTable'
 import { getActiveSchoolYear } from '@/lib/school-year'
+import { getNedochazejiciPsd } from '@/lib/zpusob-psd-server'
 
 // Docházka družiny (vrstva „realita"). Seznam žáků a jejich očekávaná docházka
 // pro daný den pochází z RPC druzina_den_ocekavani (migrace 079/081): skládá
@@ -89,7 +90,12 @@ export default async function DruzinaDocházkaPage({
   const { data: expectedRaw } = oddeleniId
     ? await supabase.rpc('druzina_den_ocekavani', { p_oddeleni_id: oddeleniId, p_datum: datum })
     : { data: [] }
-  const expected = (expectedRaw as ExpectedRow[]) ?? []
+  // Žáci § 38 / § 41 do školy nechodí → v docházce družiny je nevedeme
+  // (portál rodiče se tím nemění — rozhodnutí provozu 2026-10-05).
+  const expectedVse = (expectedRaw as ExpectedRow[]) ?? []
+  const jePsd = await getNedochazejiciPsd(supabase, expectedVse.map((e) => e.student_id), datum, datum)
+  const expected = expectedVse.filter((e) => !jePsd(e.student_id, datum))
+  const skrytoPsd = expectedVse.length - expected.length
 
   // Existující zápisy reality pro daný den.
   const studentIds = expected.map((e) => e.student_id)
@@ -186,6 +192,12 @@ export default async function DruzinaDocházkaPage({
           canWrite={canWrite}
         />
       </div>
+
+      {skrytoPsd > 0 && (
+        <p className="text-xs text-stone-500">
+          Skryto {skrytoPsd} {skrytoPsd === 1 ? 'žák vzdělávaný' : 'žáků vzdělávaných'} podle § 38 / § 41 — do školy nedochází, docházka se nevede.
+        </p>
+      )}
     </div>
   )
 }

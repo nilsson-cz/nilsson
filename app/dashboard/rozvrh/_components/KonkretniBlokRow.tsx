@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { addObsazeni, removeObsazeni, setBlokStav } from '@/app/actions/rozvrh'
 import {
@@ -8,7 +8,7 @@ import {
   type KonkretniBlok, type StaffOption, type PoziceNaBloku, type TypBloku,
 } from '@/lib/rozvrh-shared'
 
-export default function KonkretniBlokRow({ blok, staff }: { blok: KonkretniBlok; staff: StaffOption[] }) {
+export default function KonkretniBlokRow({ blok, staff, spojeni }: { blok: KonkretniBlok; staff: StaffOption[]; spojeni?: ReactNode }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [novyStaff, setNovyStaff] = useState('')
@@ -57,6 +57,7 @@ export default function KonkretniBlokRow({ blok, staff }: { blok: KonkretniBlok;
             {zruseno && <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300">Zrušeno</span>}
             {blok.potvrzeno_at && <span className="text-xs font-medium text-emerald-600">✓ zapsáno</span>}
           </div>
+          {spojeni}
 
           {!zruseno && (
             <>

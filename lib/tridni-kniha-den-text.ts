@@ -7,7 +7,10 @@
 //  - app/actions/tridni-kniha.ts → vstup pro AI párování ŠVP (Haiku)
 //  - app/dashboard/tridni-kniha/[id]/page.tsx → časová osa obsahu bloků na detailu dne
 //
-// Vazba blok → den: rozvrh_blok.tridni_zaznam_id (plní ji RPC potvrdit_blok, migrace 065).
+// Vazba blok → den: zapsané (potvrzené) bloky téhož dne, které patří třídě kontejneru
+// (rozvrh_blok_skupiny). Spojený blok více tříd (migrace 149) se tak objeví v textu
+// dne každé třídy; po odpojení třídy z něj zmizí. rozvrh_blok.tridni_zaznam_id
+// ukazuje jen na kontejner vlastníka — zůstává jako záloha pro záznamy bez třídy.
 
 export interface BlokObsah {
   cas_od: string;
@@ -25,21 +28,40 @@ function cas(t: string): string {
 }
 
 /**
- * Načte bloky napojené na daný denní záznam (mimo zrušené), seřazené dle času.
- * cast `supabase`→`any` — rozvrh_blok.tridni_zaznam_id není v generovaných typech.
+ * Načte zapsané bloky denního záznamu (mimo zrušené), seřazené dle času.
+ * cast `supabase`→`any` — sdílený helper volaný s různě typovanými klienty.
  */
 export async function nactiBlokyProZaznam(
   supabase: any,
   zaznamId: string,
 ): Promise<BlokObsah[]> {
-  const { data } = await supabase
-    .from('rozvrh_blok')
-    .select('cas_od, cas_do, nazev, obsah, stav')
-    .eq('tridni_zaznam_id', zaznamId)
-    .order('cas_od');
+  type Row = { id: string; cas_od: string; cas_do: string; nazev: string; obsah: string | null; stav: string; potvrzeno_at: string | null };
+  const cols = 'id, cas_od, cas_do, nazev, obsah, stav, potvrzeno_at';
 
-  return ((data ?? []) as any[])
+  const { data: zaznam } = await supabase
+    .from('tridni_kniha_zaznamy').select('datum, group_id').eq('id', zaznamId).maybeSingle();
+
+  // Záloha: přímý odkaz (kontejner vlastníka; i záznamy bez třídy).
+  const { data: prime } = await supabase.from('rozvrh_blok').select(cols).eq('tridni_zaznam_id', zaznamId);
+  const bloky = new Map<string, Row>(((prime ?? []) as Row[]).map((b) => [b.id, b]));
+
+  if (zaznam?.group_id) {
+    // Zapsané bloky dne + přímo napojené → ponechat jen ty, které třídě patří
+    // (blok, od něhož byla třída odpojena, do jejího textu nepatří).
+    const { data: dne } = await supabase
+      .from('rozvrh_blok').select(cols).eq('datum', zaznam.datum).not('potvrzeno_at', 'is', null);
+    for (const b of (dne ?? []) as Row[]) bloky.set(b.id, b);
+    const ids = [...bloky.keys()];
+    const { data: skup } = ids.length > 0
+      ? await supabase.from('rozvrh_blok_skupiny').select('blok_id').in('blok_id', ids).eq('group_id', zaznam.group_id)
+      : { data: [] };
+    const patri = new Set(((skup ?? []) as { blok_id: string }[]).map((k) => k.blok_id));
+    for (const id of ids) if (!patri.has(id)) bloky.delete(id);
+  }
+
+  return [...bloky.values()]
     .filter((b) => b.stav !== 'zruseno')
+    .sort((a, b) => a.cas_od.localeCompare(b.cas_od))
     .map((b) => ({
       cas_od: b.cas_od,
       cas_do: b.cas_do,
