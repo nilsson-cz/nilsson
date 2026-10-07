@@ -9,6 +9,7 @@ import {
   getDenniDukazForStudent,
   getCurrentSchoolYearAndSemester,
 } from '@/lib/mapa-pokroku'
+import { getActiveSchoolYear } from '@/lib/school-year'
 import { EditForm } from './_components/EditForm'
 
 type Props = {
@@ -19,14 +20,14 @@ type Props = {
 export default async function EditPage({ params, searchParams }: Props) {
   const { studentId } = await params
   const sp = await searchParams
-  const { schoolYear: defaultYear, semester: defaultSemester } =
-    getCurrentSchoolYearAndSemester()
+  const { semester: defaultSemester } = getCurrentSchoolYearAndSemester()
 
-  const schoolYear = sp.year ?? defaultYear
+  // Bez ?year= platí aktivní rok z DB configu (jako přehled), ne kalendář.
+  const schoolYear = sp.year ?? (await getActiveSchoolYear())
   const semester = (parseInt(sp.semester ?? String(defaultSemester)) ||
     defaultSemester) as 1 | 2
 
-  const student = await getStudentInfo(studentId)
+  const student = await getStudentInfo(studentId, schoolYear)
   if (!student) notFound()
 
   const [vstupyByPredmet, denniDukaz, poznamky] = await Promise.all([

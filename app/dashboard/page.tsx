@@ -16,6 +16,7 @@ import StudentSearchWidget from '@/components/dashboard/StudentSearchWidget'
 import { getActiveSchoolYear } from '@/lib/school-year'
 import { getMissingTKDays } from '@/lib/tridni-kniha-missing'
 import { getEnrollmentPendingDecisionCount } from '@/lib/enrollment/dashboard-queries'
+import { NAV_ITEMS, type NavItem } from '@/components/nav/nav-items'
 
 type AlertGroup = {
   alert_type: string
@@ -492,6 +493,52 @@ function PaymentsWidget({ unmatchedCount }: { unmatchedCount: number }) {
   )
 }
 
+// Rychlé odkazy ředitele — často užívané agendy ze Správy školy. Ikony a barvy
+// z jednoho zdroje pravdy (nav-items); label lze pro dashboard zkrátit/upřesnit.
+const DIRECTOR_QUICK_LINKS: { href: string; label?: string }[] = [
+  { href: '/dashboard/rozvrh' },
+  { href: '/dashboard/mapa-pokroku' },
+  { href: '/dashboard/druzina' },
+  { href: '/dashboard/verejne-finance' },
+  { href: '/dashboard/sprava-skoly/obedy', label: 'Obědy – nastavení' },
+  { href: '/dashboard/vp', label: 'Výchovné poradenství' },
+]
+
+function QuickLinksWidget() {
+  const byHref = new Map(NAV_ITEMS.map((i) => [i.href, i]))
+  const links = DIRECTOR_QUICK_LINKS.flatMap(({ href, label }) => {
+    const item: NavItem | undefined = byHref.get(href)
+    return item ? [{ ...item, label: label ?? item.label }] : []
+  })
+
+  return (
+    <WidgetCard>
+      <WidgetHeader
+        title="Rychlé odkazy"
+        action={
+          <Link href="/dashboard/sprava-skoly" className="text-xs text-stone-400 hover:text-stone-600 dark:hover:text-stone-300">
+            Správa školy →
+          </Link>
+        }
+      />
+      <div className="grid grid-cols-1 gap-1">
+        {links.map((l) => (
+          <Link
+            key={l.href}
+            href={l.href}
+            className="flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors"
+          >
+            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg [&>svg]:w-4 [&>svg]:h-4 ${l.tint ?? 'bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300'}`}>
+              {l.icon}
+            </span>
+            <span className="text-sm font-medium text-stone-700 dark:text-stone-300 truncate">{l.label}</span>
+          </Link>
+        ))}
+      </div>
+    </WidgetCard>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage() {
@@ -551,6 +598,7 @@ export default async function DashboardPage() {
         <BulletinWidget posts={bulletinPosts} />
         <PendingOmluvenkyWidget omluvenky={pendingOmluvenky} />
         {isDirectorOrVP && <PaymentsWidget unmatchedCount={unmatchedCount} />}
+        {isDirector && <QuickLinksWidget />}
       </div>
     </div>
   )
