@@ -1297,6 +1297,44 @@ export type Database = {
         }
         Relationships: []
       }
+      druzina_oddeleni_provoz: {
+        Row: {
+          cas_do: string
+          cas_od: string
+          created_at: string
+          den_v_tydnu: number
+          id: string
+          oddeleni_id: string
+          updated_at: string
+        }
+        Insert: {
+          cas_do: string
+          cas_od: string
+          created_at?: string
+          den_v_tydnu: number
+          id?: string
+          oddeleni_id: string
+          updated_at?: string
+        }
+        Update: {
+          cas_do?: string
+          cas_od?: string
+          created_at?: string
+          den_v_tydnu?: number
+          id?: string
+          oddeleni_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "druzina_oddeleni_provoz_oddeleni_id_fkey"
+            columns: ["oddeleni_id"]
+            isOneToOne: false
+            referencedRelation: "druzina_oddeleni"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       druzina_prihlaska_vyzvedavajici: {
         Row: {
           created_at: string
@@ -4411,6 +4449,69 @@ export type Database = {
           },
         ]
       }
+      staff_uvazky_k_datu: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          hodiny_rijen: number | null
+          id: string
+          interni: boolean
+          nepritomen: boolean
+          poznamka: string | null
+          pozice: string
+          rdat: string
+          staff_id: string
+          updated_at: string
+          uvazek: number | null
+          zena: boolean
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          hodiny_rijen?: number | null
+          id?: string
+          interni: boolean
+          nepritomen?: boolean
+          poznamka?: string | null
+          pozice: string
+          rdat: string
+          staff_id: string
+          updated_at?: string
+          uvazek?: number | null
+          zena: boolean
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          hodiny_rijen?: number | null
+          id?: string
+          interni?: boolean
+          nepritomen?: boolean
+          poznamka?: string | null
+          pozice?: string
+          rdat?: string
+          staff_id?: string
+          updated_at?: string
+          uvazek?: number | null
+          zena?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_uvazky_k_datu_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_uvazky_k_datu_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_contracts: {
         Row: {
           contract_type: Database["public"]["Enums"]["contract_type"]
@@ -4780,9 +4881,11 @@ export type Database = {
           msmt_izop: string | null
           msmt_jaz_podp: boolean
           msmt_jaz_prip: boolean
+          msmt_kstpr: string | null
           msmt_nadani: string
           msmt_odhl: string | null
           msmt_sz: string
+          msmt_stitek: string | null
           msmt_zvj: string
           msmt_zz: string
           nationality: string | null
@@ -4825,9 +4928,11 @@ export type Database = {
           msmt_izop?: string | null
           msmt_jaz_podp?: boolean
           msmt_jaz_prip?: boolean
+          msmt_kstpr?: string | null
           msmt_nadani?: string
           msmt_odhl?: string | null
           msmt_sz?: string
+          msmt_stitek?: string | null
           msmt_zvj?: string
           msmt_zz?: string
           nationality?: string | null
@@ -4870,9 +4975,11 @@ export type Database = {
           msmt_izop?: string | null
           msmt_jaz_podp?: boolean
           msmt_jaz_prip?: boolean
+          msmt_kstpr?: string | null
           msmt_nadani?: string
           msmt_odhl?: string | null
           msmt_sz?: string
+          msmt_stitek?: string | null
           msmt_zvj?: string
           msmt_zz?: string
           nationality?: string | null
@@ -6463,6 +6570,44 @@ export type Database = {
           {
             foreignKeyName: "vykaz_ppc_uzaverka_locked_by_fkey"
             columns: ["locked_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vykaz_z201: {
+        Row: {
+          hodnoty: Json | null
+          kontroly: Json | null
+          prepisy: Json
+          rok: number
+          updated_at: string
+          zmrazeno_at: string | null
+          zmrazeno_by: string | null
+        }
+        Insert: {
+          hodnoty?: Json | null
+          kontroly?: Json | null
+          prepisy?: Json
+          rok: number
+          updated_at?: string
+          zmrazeno_at?: string | null
+          zmrazeno_by?: string | null
+        }
+        Update: {
+          hodnoty?: Json | null
+          kontroly?: Json | null
+          prepisy?: Json
+          rok?: number
+          updated_at?: string
+          zmrazeno_at?: string | null
+          zmrazeno_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vykaz_z201_zmrazeno_by_fkey"
+            columns: ["zmrazeno_by"]
             isOneToOne: false
             referencedRelation: "staff"
             referencedColumns: ["id"]

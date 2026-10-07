@@ -3,6 +3,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { revalidatePath } from 'next/cache'
 import { zkontrolujRodneCislo } from '@/lib/rodne-cislo'
+import { RAKO_CIZINEC } from '@/lib/msmt-pobyt'
 
 type Vysledek = { success: true; hodnota: string | null } | { error: string }
 
@@ -152,4 +153,36 @@ export async function updateMsmtPole(studentId: string, pole: MsmtPole, raw: str
 
   revalidate()
   return { success: true, hodnota }
+}
+
+/**
+ * Uloží druh pobytu cizince (KSTPR, číselník RAKO) a číslo vízového štítku
+ * (STITEK, jen u dočasné ochrany D). Migrace 150. Prázdný KSTPR → NULL;
+ * u jiného kódu než D se štítek maže. Oprávnění: pouze director.
+ */
+export async function updateMsmtPobyt(
+  studentId: string,
+  kstprRaw: string,
+  stitekRaw: string,
+): Promise<{ success: true; kstpr: string | null; stitek: string | null } | { error: string }> {
+  const supabase = await createSupabaseServerClient()
+  const zakaz = await jenReditel(supabase)
+  if (zakaz) return { error: zakaz }
+
+  const kstpr = kstprRaw.trim().toUpperCase() || null
+  if (kstpr && !(RAKO_CIZINEC as string[]).includes(kstpr)) {
+    return { error: 'Neplatný kód druhu pobytu (RAKO)' }
+  }
+  const stitekVstup = stitekRaw.replace(/\s/g, '')
+  const stitek = kstpr === 'D' ? (stitekVstup || null) : null
+  if (stitek && !/^\d{9}$/.test(stitek)) return { error: 'Číslo vízového štítku má 9 číslic' }
+
+  const { error } = await supabase
+    .from('students')
+    .update({ msmt_kstpr: kstpr, msmt_stitek: stitek })
+    .eq('id', studentId)
+  if (error) return { error: error.message }
+
+  revalidate()
+  return { success: true, kstpr, stitek }
 }

@@ -8,6 +8,9 @@
 // Sekce „Soubor „a“ — údaje, které vyplňuje škola“: SZ, ZZ, NADANI, ZVJ
 //   (students.msmt_*, migrace 132); u žáka s doporučením ŠPZ jsou SZ/ZZ/NADANI
 //   zamčené (export je bere z ID_ZNEV — lib/msmt-soubor-a.ts).
+// Sekce „Pobyt cizinců“: KSTPR (RAKO) a STITEK (vízový štítek u dočasné
+//   ochrany) — students.msmt_kstpr / msmt_stitek, migrace 150; občan ČR má
+//   KSTPR odvozené (lib/msmt-pobyt.ts). Používá i výkaz Z 2-01 (oddíl XXI).
 // KOD_ZAKA pro soubor „a" se jen zobrazuje — náhodné neduplicitní pětimístné
 // číslo přidělené jednou pro vždy (trigger, migrace 131).
 // Výběr žáků = stejný jako export pro zvolený sběr (vč. odešlých v období).
@@ -18,6 +21,8 @@ import { parseSber } from '@/lib/msmt-sber'
 import { stprKod } from '@/lib/msmt-xml'
 import { UdajeZakaRow, type UdajeZaka } from './_components/UdajeZakaRow'
 import { SvpJazykRow, type SvpJazykZaka } from './_components/SvpJazykRow'
+import { PobytCizinceRow, type PobytCizince } from './_components/PobytCizinceRow'
+import { chybejiciPobyt, jeObcanCr } from '@/lib/msmt-pobyt'
 
 export const metadata = {
   title: 'Údaje žáků pro MŠMT | Nilsson',
@@ -29,6 +34,7 @@ type Row = {
   msmt_odhl: string | null; msmt_izop: string | null; kod_zahajeni: string | null
   citizenship: string | null; predchozi_skola_nazev: string | null
   msmt_sz: string; msmt_zz: string; msmt_nadani: string; msmt_zvj: string
+  msmt_kstpr: string | null; msmt_stitek: string | null
 }
 
 export default async function UdajeZakuPage({
@@ -58,7 +64,7 @@ export default async function UdajeZakuPage({
 
   const { data: raw, error } = await supabase
     .from('students')
-    .select('id, first_name, last_name, status, birth_date, birth_number, kod_zaka_msmt, msmt_odhl, msmt_izop, kod_zahajeni, citizenship, predchozi_skola_nazev, msmt_sz, msmt_zz, msmt_nadani, msmt_zvj')
+    .select('id, first_name, last_name, status, birth_date, birth_number, kod_zaka_msmt, msmt_odhl, msmt_izop, kod_zahajeni, citizenship, predchozi_skola_nazev, msmt_sz, msmt_zz, msmt_nadani, msmt_zvj, msmt_kstpr, msmt_stitek')
     .in('status', ['active', 'withdrawn'])
     .lte('enrollment_date', sber.obdobiDo)
     .or(`withdrawal_date.is.null,withdrawal_date.gte.${sber.obdobiOd}`)
@@ -95,7 +101,8 @@ export default async function UdajeZakuPage({
       stpr,
       citizenship: s.citizenship,
       dosavadniSkola: s.predchozi_skola_nazev,
-      kompletni: rc.stav === 'ok' && !!s.msmt_odhl && !!s.msmt_izop && !!s.kod_zahajeni && !!stpr,
+      kompletni: rc.stav === 'ok' && !!s.msmt_odhl && !!s.msmt_izop && !!s.kod_zahajeni && !!stpr
+        && chybejiciPobyt(s.citizenship, s.msmt_kstpr, s.msmt_stitek).length === 0,
     }
   })
 
@@ -127,6 +134,19 @@ export default async function UdajeZakuPage({
     msmt_sz: s.msmt_sz, msmt_zz: s.msmt_zz, msmt_nadani: s.msmt_nadani, msmt_zvj: s.msmt_zvj,
   }))
   const svpVyplneno = svp.filter((z) => z.msmt_sz !== '0' || z.msmt_zz !== '0' || z.msmt_nadani !== '0' || z.msmt_zvj !== '1').length
+
+  // Cizinci (a žáci s neznámým občanstvím) — druh pobytu a vízový štítek.
+  const cizinci: PobytCizince[] = rows
+    .filter((s) => !jeObcanCr(s.citizenship))
+    .map((s) => ({
+      id: s.id,
+      jmeno: `${s.last_name} ${s.first_name}`,
+      odesel: s.status === 'withdrawn',
+      citizenship: s.citizenship,
+      stpr: stprKod(s.citizenship),
+      msmt_kstpr: s.msmt_kstpr,
+      msmt_stitek: s.msmt_stitek,
+    }))
 
   const total = zaci.length
   const hotovo = zaci.filter((z) => z.kompletni).length
@@ -229,6 +249,37 @@ export default async function UdajeZakuPage({
           </tbody>
         </table>
       </div>
+
+      {/* Pobyt cizinců — KSTPR / STITEK (migrace 150) */}
+      <div className="mt-10 mb-4">
+        <h2 className="text-base font-semibold text-gray-900">Pobyt cizinců</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          U žáka s jiným než českým občanstvím matrika vyžaduje druh pobytu (KSTPR), u dočasné
+          ochrany i devítimístné číslo vízového štítku (STITEK). Použije se i ve výkazu Z 2-01.
+          Občanům ČR se nic nevyplňuje.
+        </p>
+      </div>
+
+      {cizinci.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-gray-300 py-6 text-center text-sm text-gray-400">
+          V období sběru nejsou žádní žáci s cizím občanstvím.
+        </div>
+      ) : (
+        <div className="rounded-lg border border-gray-200 bg-white overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                {['Žák', 'Občanství', 'Druh pobytu (KSTPR)', 'Vízový štítek'].map((h) => (
+                  <th key={h} className="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {cizinci.map((z) => <PobytCizinceRow key={z.id} zak={z} />)}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Soubor „a“ — údaje, které vyplňuje škola (migrace 132) */}
       <div className="mt-10 mb-4">

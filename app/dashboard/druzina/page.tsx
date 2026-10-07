@@ -4,6 +4,7 @@ import Link from 'next/link'
 
 import { getActiveSchoolYear, getVisibleSchoolYears } from '@/lib/school-year'
 import OddeleniManager, { type OddeleniItem } from './_components/OddeleniManager'
+import { kratkyCas } from '@/lib/druzina-provoz'
 
 export default async function DruzinaPage() {
   const supabase = await createSupabaseServerClient()
@@ -60,7 +61,20 @@ export default async function DruzinaPage() {
         .order('name', { ascending: true }),
       getVisibleSchoolYears(),
     ])
-    oddeleni = (oddeleniRaw as OddeleniItem[]) ?? []
+    const zaklad = (oddeleniRaw ?? []) as Omit<OddeleniItem, 'provoz'>[]
+    // Provozní doba oddělení (migrace 150) — výkaz Z 2-01 ř. 0101b.
+    const { data: provozRaw } = zaklad.length
+      ? await supabase
+          .from('druzina_oddeleni_provoz')
+          .select('oddeleni_id, den_v_tydnu, cas_od, cas_do')
+          .in('oddeleni_id', zaklad.map((o) => o.id))
+      : { data: [] }
+    oddeleni = zaklad.map((o) => ({
+      ...o,
+      provoz: (provozRaw ?? [])
+        .filter((p) => p.oddeleni_id === o.id)
+        .map((p) => ({ den: p.den_v_tydnu, od: kratkyCas(p.cas_od), do: kratkyCas(p.cas_do) })),
+    }))
     visibleYears = years
   }
 

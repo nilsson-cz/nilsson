@@ -539,6 +539,15 @@ export const NAV_ITEMS: NavItem[] = [
     tint: T.violet,
   },
   {
+    href: '/dashboard/sprava-skoly/uvazky',
+    label: 'Úvazky v družině',
+    icon: Icons.clipboard,
+    roles: ['director'],
+    primaryFor: [],
+    desc: 'Úvazky vychovatelů k 31. 10. — podklad výkazu Z 2-01',
+    tint: T.violet,
+  },
+  {
     href: '/dashboard/vykaz-ku',
     label: 'Měsíční výkaz pro KÚ',
     icon: Icons.vykazKu,

@@ -74,6 +74,7 @@ type StudentRow = {
   id: string; first_name: string; last_name: string; kod_zaka: string
   kod_zaka_msmt: string | null; birth_number: string | null; birth_date: string
   enrollment_date: string; withdrawal_date: string | null; citizenship: string | null
+  msmt_kstpr: string | null; msmt_stitek: string | null
   obec_bydliste_kod: string | null; okres_bydliste_kod: string | null
   msmt_odhl: string | null; msmt_izop: string | null; kod_zahajeni: string | null
   delka_programu: number | null; cizi_jazyky: unknown; zdroj_financovani: string | null
@@ -138,7 +139,7 @@ export async function GET(request: NextRequest) {
     .from('students')
     .select(`
       id, first_name, last_name, kod_zaka, kod_zaka_msmt, birth_number, birth_date,
-      enrollment_date, withdrawal_date, citizenship, obec_bydliste_kod,
+      enrollment_date, withdrawal_date, citizenship, msmt_kstpr, msmt_stitek, obec_bydliste_kod,
       okres_bydliste_kod, msmt_odhl, msmt_izop, kod_zahajeni,
       delka_programu, cizi_jazyky, zdroj_financovani, sp_obvod
     `)
@@ -208,6 +209,8 @@ export async function GET(request: NextRequest) {
       kod_zaka_msmt: s.kod_zaka_msmt,
       birth_date: s.birth_date,
       citizenship: s.citizenship,
+      msmt_kstpr: s.msmt_kstpr,
+      msmt_stitek: s.msmt_stitek,
       obec_kod: s.obec_bydliste_kod,
       okres_kod: okresMsmt(s.okres_bydliste_kod),
       sp_obvod: s.sp_obvod,

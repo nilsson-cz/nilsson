@@ -7,6 +7,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { chybaDne, type ProvozDen } from '@/lib/druzina-provoz'
 
 export type OddeleniResult =
   | { success: true; id: string }
@@ -62,4 +63,54 @@ export async function createDruzinaOddeleni(input: {
 
   revalidatePath('/dashboard/druzina')
   return { success: true, id: oddeleniId }
+}
+
+/**
+ * Uloží provozní dobu oddělení (druzina_oddeleni_provoz, migrace 150) — celý
+ * týden najednou: dny v seznamu se uloží, ostatní dny se smažou (bez provozu).
+ * Výkaz Z 2-01 z ní počítá týdenní rozsah provozu (ř. 0101b). Director-only.
+ */
+export async function saveOddeleniProvoz(
+  oddeleniId: string,
+  dny: ProvozDen[],
+): Promise<{ success: true } | { success: false; error: string }> {
+  const supabase = await createSupabaseServerClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Nejste přihlášeni.' }
+
+  const { data: isDir } = await supabase.rpc('is_director')
+  if (!isDir) return { success: false, error: 'Provozní dobu může nastavit jen ředitel.' }
+
+  const videne = new Set<number>()
+  for (const d of dny) {
+    if (!Number.isInteger(d.den) || d.den < 1 || d.den > 5 || videne.has(d.den)) {
+      return { success: false, error: 'Neplatný den v týdnu.' }
+    }
+    videne.add(d.den)
+    const chyba = chybaDne(d)
+    if (chyba) return { success: false, error: chyba }
+  }
+
+  const { error: delErr } = await supabase
+    .from('druzina_oddeleni_provoz')
+    .delete()
+    .eq('oddeleni_id', oddeleniId)
+  if (delErr) {
+    console.error('[saveOddeleniProvoz] delete', delErr)
+    return { success: false, error: 'Nepodařilo se uložit provozní dobu.' }
+  }
+
+  if (dny.length > 0) {
+    const { error } = await supabase
+      .from('druzina_oddeleni_provoz')
+      .insert(dny.map((d) => ({ oddeleni_id: oddeleniId, den_v_tydnu: d.den, cas_od: d.od, cas_do: d.do })))
+    if (error) {
+      console.error('[saveOddeleniProvoz] insert', error)
+      return { success: false, error: 'Nepodařilo se uložit provozní dobu.' }
+    }
+  }
+
+  revalidatePath('/dashboard/druzina')
+  return { success: true }
 }

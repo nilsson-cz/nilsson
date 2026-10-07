@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { zkontrolujRodneCislo } from '@/lib/rodne-cislo'
 import { stprKod } from '@/lib/msmt-xml'
+import { chybejiciPobyt } from '@/lib/msmt-pobyt'
 import { StahnoutXml } from './_components/StahnoutXml'
 import { msmtEnv } from '@/lib/msmt-env'
 import { nactiDataSouboruA, obdobiA, jeRelevantniProA, kontrolaDoporuceni } from '@/lib/msmt-soubor-a'
@@ -79,11 +80,11 @@ export default async function MsmtPage({
   const { data: udajeRaw } = students.length
     ? await supabase
         .from('students')
-        .select('id, msmt_odhl, msmt_izop, kod_zahajeni, citizenship')
+        .select('id, msmt_odhl, msmt_izop, kod_zahajeni, citizenship, msmt_kstpr, msmt_stitek')
         .in('id', students.map((s) => s.id))
     : { data: [] }
   const udaje = new Map(
-    ((udajeRaw ?? []) as { id: string; msmt_odhl: string | null; msmt_izop: string | null; kod_zahajeni: string | null; citizenship: string | null }[])
+    ((udajeRaw ?? []) as { id: string; msmt_odhl: string | null; msmt_izop: string | null; kod_zahajeni: string | null; citizenship: string | null; msmt_kstpr: string | null; msmt_stitek: string | null }[])
       .map((u) => [u.id, u]),
   )
   const totalStudents  = students.length
@@ -91,6 +92,7 @@ export default async function MsmtPage({
     const u = udaje.get(s.id)
     return zkontrolujRodneCislo(s.birth_number).stav === 'ok'
       && !!u?.msmt_odhl && !!u?.msmt_izop && !!u?.kod_zahajeni && !!stprKod(u?.citizenship)
+      && chybejiciPobyt(u?.citizenship, u?.msmt_kstpr, u?.msmt_stitek).length === 0
   }).length
   const allCodesFilled = filledCodes === totalStudents && totalStudents > 0
 
@@ -154,6 +156,18 @@ export default async function MsmtPage({
         </p>
       </div>
 
+      {/* Výkonové výkazy (mimo matriku) */}
+      <Link
+        href="/dashboard/msmt/z201"
+        className="mb-5 flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm hover:bg-gray-50"
+      >
+        <span>
+          <span className="font-medium text-gray-800">Z 2-01 — výkaz o školní družině</span>
+          <span className="block text-xs text-gray-500">Stav k 31. 10., vyplňuje se ve sberdat.uiv.cz</span>
+        </span>
+        <span className="text-gray-400">→</span>
+      </Link>
+
       {/* Volba sběru */}
       <div className="mb-5 flex flex-wrap items-center gap-1.5">
         {nabidka.map((n) => (
@@ -200,7 +214,7 @@ export default async function MsmtPage({
         <ul className="space-y-2.5">
           <PrereqRow
             ok={allCodesFilled}
-            label={`Kompletní údaje žáků (RČ, ODHL, IZOP, KOD_ZAH): ${filledCodes} / ${totalStudents}`}
+            label={`Kompletní údaje žáků (RČ, ODHL, IZOP, KOD_ZAH, pobyt cizinců): ${filledCodes} / ${totalStudents}`}
             actionHref={`/dashboard/msmt/udaje-zaku?${q}`}
             actionLabel={allCodesFilled ? 'Zobrazit →' : 'Doplnit →'}
           />

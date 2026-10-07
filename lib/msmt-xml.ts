@@ -31,6 +31,7 @@
 
 import type { SberKontext } from './msmt-sber'
 import { jeCeskeObcanstvi } from './rodne-cislo'
+import { chybejiciPobyt, kstprZaka, stitekZaka } from './msmt-pobyt'
 import type { VetaB } from './msmt-soubor-b'
 
 // ---------------------------------------------------------------------------
@@ -56,7 +57,6 @@ export const MSMT_KODY = {
   KOD_ZMEN_VZDELAVANI: '1',
   KOD_ZMEN_ORGANIZACE: '2',
   KOD_ZMEN_PO: '8',
-  KSTPR_CR: '3',            // státní občan ČR (přijaté soubory)
   JAZ1_DEFAULT: '02',       // přijaté soubory: všichni žáci 02 / A
   P_JAZ1_DEFAULT: 'A',
 } as const
@@ -96,6 +96,8 @@ export interface ZakMatrika {
   kod_zaka_msmt: string | null
   birth_date: string              // ISO
   citizenship: string | null      // RAST, '203' = ČR
+  msmt_kstpr: string | null       // KSTPR cizince (RAKO) — students.msmt_kstpr, migrace 150
+  msmt_stitek: string | null      // STITEK (jen KSTPR = D) — students.msmt_stitek
   obec_kod: string | null         // OBECB (RAUJ)
   okres_kod: string | null        // OKRESB (RAOR, např. CZ0426)
   sp_obvod: string | null
@@ -409,7 +411,7 @@ export function chybejiciPolozky(z: ZakMatrika, sber: SberKontext): string[] {
   if (!z.kod_zahajeni) chybi.push('KOD_ZAH (kód zahájení docházky)')
   const stpr = stprKod(z.citizenship)
   if (!stpr) chybi.push(`STPR (občanství „${z.citizenship}" — neznámý kód)`)
-  else if (stpr !== '203') chybi.push('KSTPR pro cizince (kód zatím není v IS)')
+  chybi.push(...chybejiciPobyt(z.citizenship, z.msmt_kstpr, z.msmt_stitek))
   for (const v of vetyProSoubor(z, sber)) {
     const iso = refIso(z, v)
     if (!kDatu(z.rocniky, iso)?.rocnik) { chybi.push(`ROCNIK k ${fmtDate(isoToDate(iso))}`); break }
@@ -455,11 +457,12 @@ function polozkyZaka(z: ZakMatrika, v: VetaInterval, souborA: boolean): string[]
   const jaz1 = jaz(0) ?? MSMT_KODY.JAZ1_DEFAULT
   const pjaz1 = jaz(0) ? pjaz(0) : MSMT_KODY.P_JAZ1_DEFAULT
 
+  const kstpr = kstprZaka(z.citizenship, z.msmt_kstpr)
   const out = [
     el('POHLAVI', pohlaviZRc(z.rodc)),
     el('DAT_NAROZ', datNaroz(z.birth_date)),
-    el('KSTPR', stprKod(z.citizenship) === '203' ? MSMT_KODY.KSTPR_CR : null),
-    el('STITEK', null),
+    el('KSTPR', kstpr),
+    el('STITEK', stitekZaka(kstpr, z.msmt_stitek)),
     el('STPR', stprKod(z.citizenship)),
   ]
   if (!souborA) out.push(el('OBECB', z.obec_kod))
