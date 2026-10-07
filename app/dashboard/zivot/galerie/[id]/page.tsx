@@ -91,10 +91,24 @@ export default async function GalerieEditPage({
     // Když přehled selže, necháme všechny bez souhlasu (bezpečný default → skryté).
   }
 
+  // Žáci pro picker = všichni aktivní žáci školy v roce galerie. Přímý select
+  // z `students` by pod RLS průvodci vrátil jen jeho třídu → fotky se nedaly
+  // otagovat dětmi z jiných tříd. RPC je SECURITY DEFINER jen pro zaměstnance
+  // (migrace 089) a vrací jen jméno + id, což tagování potřebuje.
+  const { data: activeStudentsRaw } = await supabase.rpc('get_students_in_school_year', {
+    p_school_year: gallery.school_year,
+  })
+  const activeStudents: Student[] = (activeStudentsRaw ?? []).map((s) => ({
+    id: s.id,
+    first_name: s.first_name,
+    last_name: s.last_name,
+    photo_consent: webPhotoConsent.has(s.id),
+  }))
+
   // Existující tagy žáků na fotkách + detaily otagovaných žáků
   const photoIds = photos.map((p) => p.id)
   const tagsByPhoto = new Map<string, string[]>()
-  const studentById = new Map<string, Student>()
+  const studentById = new Map<string, Student>(activeStudents.map((s) => [s.id, s]))
   if (photoIds.length > 0) {
     const { data: tagRows } = await supabase
       .schema('web')
@@ -107,7 +121,8 @@ export default async function GalerieEditPage({
       arr.push(t.student_id)
       tagsByPhoto.set(t.photo_id, arr)
     }
-    const taggedIds = [...new Set(rows.map((t) => t.student_id))]
+    // Dohledat jen otagované mimo picker (např. žák mezitím odešel).
+    const taggedIds = [...new Set(rows.map((t) => t.student_id))].filter((sid) => !studentById.has(sid))
     if (taggedIds.length > 0) {
       const { data: studs } = await supabase
         .from('students')
@@ -117,16 +132,6 @@ export default async function GalerieEditPage({
         studentById.set(s.id, { ...s, photo_consent: webPhotoConsent.has(s.id) })
     }
   }
-
-  // Aktivní žáci pro picker (bez data odchodu), řazení dle jména
-  const { data: activeStudentsRaw } = await supabase
-    .from('students')
-    .select('id, first_name, last_name')
-    .is('withdrawal_date', null)
-    .order('last_name', { ascending: true })
-    .order('first_name', { ascending: true })
-  const activeStudents = ((activeStudentsRaw ?? []) as Array<Omit<Student, 'photo_consent'>>)
-    .map((s) => ({ ...s, photo_consent: webPhotoConsent.has(s.id) }))
 
   const isPublished = gallery.status === 'published'
 
