@@ -45,6 +45,9 @@ export async function addSablonaBlok(input: {
   if (!input.cas_od || !input.cas_do || input.cas_do <= input.cas_od) return { error: 'Čas „do" musí být po čase „od".' }
   if (!TYPY_BLOKU.includes(input.typ_bloku)) return { error: 'Neplatný typ bloku.' }
   if (!input.valid_from) return { error: 'Vyplň platnost od.' }
+  if (input.valid_to && input.valid_to < input.valid_from) {
+    return { error: `„Platí do" (${input.valid_to}) nesmí být dřív než „Platí od" (${input.valid_from}).` }
+  }
 
   const { error } = await supabase.from('rozvrh_blok_sablona').insert({
     group_id: input.group_id,

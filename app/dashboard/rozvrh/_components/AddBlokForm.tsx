@@ -105,7 +105,7 @@ export default function AddBlokForm({
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium text-gray-500">Platí do (volitelné)</span>
-          <input type="date" value={validTo} onChange={(e) => setValidTo(e.target.value)} className={inputCls} />
+          <input type="date" value={validTo} min={validFrom || undefined} onChange={(e) => setValidTo(e.target.value)} className={inputCls} />
         </label>
         <button
           type="button"
