@@ -117,6 +117,19 @@ export default async function TridniKnihaPage({ searchParams }: PageProps) {
   }
   const selectedGroupName = group_id ? groupName.get(group_id) : undefined;
 
+  // Export do PDF (ředitel + readonly). Výchozí období = začátek roku až dnes (max. konec června).
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: meRaw } = user
+    ? await supabase.from('staff').select('role').eq('user_id', user.id).maybeSingle()
+    : { data: null };
+  const mojeRole = (meRaw as { role?: string } | null)?.role;
+  const smiExport = mojeRole === 'director' || mojeRole === 'readonly';
+  const rokOd = Number(schoolYear.slice(0, 4));
+  const exportOd = `${rokOd}-09-01`;
+  const dnes = new Date().toISOString().slice(0, 10);
+  const konecRoku = `${rokOd + 1}-06-30`;
+  const exportDo = dnes < exportOd ? exportOd : dnes > konecRoku ? konecRoku : dnes;
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
 
@@ -151,6 +164,49 @@ export default async function TridniKnihaPage({ searchParams }: PageProps) {
               </Link>
             ))}
           </div>
+
+          {/* Export do PDF (ředitel + readonly) — barevné tlačítko, formulář se rozbalí pod ním */}
+          {smiExport && groups.length > 0 && (
+            <details className="relative">
+              <summary className="list-none [&::-webkit-details-marker]:hidden inline-flex items-center gap-1.5 bg-emerald-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-emerald-700 cursor-pointer select-none transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M6 20h12a2 2 0 002-2V8.414a1 1 0 00-.293-.707l-4.414-4.414A1 1 0 0014.586 3H6a2 2 0 00-2 2v13a2 2 0 002 2z" />
+                </svg>
+                Export PDF
+              </summary>
+              <form
+                method="get"
+                action="/dashboard/tridni-kniha/export"
+                className="absolute right-0 top-full mt-2 z-20 w-72 bg-white border border-emerald-200 rounded-xl shadow-lg p-4 flex flex-col gap-3 text-sm"
+              >
+                <div className="font-medium text-gray-900">Export třídní knihy do PDF</div>
+                <label className="flex flex-col gap-1 text-gray-500">
+                  Třída
+                  <select name="group_id" defaultValue={group_id ?? groups[0].id} className="border border-gray-200 rounded-lg px-2 py-1.5 text-gray-900">
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex gap-2">
+                  <label className="flex flex-col gap-1 text-gray-500 flex-1">
+                    Od
+                    <input type="date" name="od" defaultValue={exportOd} required className="border border-gray-200 rounded-lg px-2 py-1.5 text-gray-900" />
+                  </label>
+                  <label className="flex flex-col gap-1 text-gray-500 flex-1">
+                    Do
+                    <input type="date" name="do" defaultValue={exportDo} required className="border border-gray-200 rounded-lg px-2 py-1.5 text-gray-900" />
+                  </label>
+                </div>
+                <button type="submit" className="bg-emerald-600 text-white font-medium rounded-lg px-4 py-2 hover:bg-emerald-700">
+                  Stáhnout PDF
+                </button>
+                <p className="text-xs text-gray-400">
+                  Strana za každý den se zápisem. Celý rok se generuje i desítky sekund.
+                </p>
+              </form>
+            </details>
+          )}
 
           {!isLocked && (
             <Link
@@ -190,6 +246,7 @@ export default async function TridniKnihaPage({ searchParams }: PageProps) {
           ))}
         </div>
       )}
+
 
       {/* Vyhledávání */}
       <form method="get" action="/dashboard/tridni-kniha" className="mb-6 flex flex-wrap items-center gap-2">
