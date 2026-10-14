@@ -3278,6 +3278,13 @@ export type Database = {
             referencedRelation: "tridni_kniha_zaznamy"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "rozvrh_blok_vlastnik_group_id_fkey"
+            columns: ["vlastnik_group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
         ]
       }
       rozvrh_blok_priznak: {
@@ -3346,27 +3353,6 @@ export type Database = {
           },
         ]
       }
-      rozvrh_blok_sablona_pripojene: {
-        Row: {
-          blok_sablona_id: string
-          created_at: string
-          created_by: string | null
-          group_id: string
-        }
-        Insert: {
-          blok_sablona_id: string
-          created_at?: string
-          created_by?: string | null
-          group_id: string
-        }
-        Update: {
-          blok_sablona_id?: string
-          created_at?: string
-          created_by?: string | null
-          group_id?: string
-        }
-        Relationships: []
-      }
       rozvrh_blok_sablona: {
         Row: {
           cas_do: string
@@ -3420,6 +3406,49 @@ export type Database = {
           },
           {
             foreignKeyName: "rozvrh_blok_sablona_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rozvrh_blok_sablona_pripojene: {
+        Row: {
+          blok_sablona_id: string
+          created_at: string
+          created_by: string | null
+          group_id: string
+        }
+        Insert: {
+          blok_sablona_id: string
+          created_at?: string
+          created_by?: string | null
+          group_id: string
+        }
+        Update: {
+          blok_sablona_id?: string
+          created_at?: string
+          created_by?: string | null
+          group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rozvrh_blok_sablona_pripojene_blok_sablona_id_fkey"
+            columns: ["blok_sablona_id"]
+            isOneToOne: false
+            referencedRelation: "rozvrh_blok_sablona"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rozvrh_blok_sablona_pripojene_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rozvrh_blok_sablona_pripojene_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "groups"
@@ -4457,8 +4486,8 @@ export type Database = {
           id: string
           interni: boolean
           nepritomen: boolean
-          poznamka: string | null
           pozice: string
+          poznamka: string | null
           rdat: string
           staff_id: string
           updated_at: string
@@ -4472,8 +4501,8 @@ export type Database = {
           id?: string
           interni: boolean
           nepritomen?: boolean
-          poznamka?: string | null
           pozice: string
+          poznamka?: string | null
           rdat: string
           staff_id: string
           updated_at?: string
@@ -4487,8 +4516,8 @@ export type Database = {
           id?: string
           interni?: boolean
           nepritomen?: boolean
-          poznamka?: string | null
           pozice?: string
+          poznamka?: string | null
           rdat?: string
           staff_id?: string
           updated_at?: string
@@ -4884,8 +4913,8 @@ export type Database = {
           msmt_kstpr: string | null
           msmt_nadani: string
           msmt_odhl: string | null
-          msmt_sz: string
           msmt_stitek: string | null
+          msmt_sz: string
           msmt_zvj: string
           msmt_zz: string
           nationality: string | null
@@ -4931,8 +4960,8 @@ export type Database = {
           msmt_kstpr?: string | null
           msmt_nadani?: string
           msmt_odhl?: string | null
-          msmt_sz?: string
           msmt_stitek?: string | null
+          msmt_sz?: string
           msmt_zvj?: string
           msmt_zz?: string
           nationality?: string | null
@@ -4978,8 +5007,8 @@ export type Database = {
           msmt_kstpr?: string | null
           msmt_nadani?: string
           msmt_odhl?: string | null
-          msmt_sz?: string
           msmt_stitek?: string | null
+          msmt_sz?: string
           msmt_zvj?: string
           msmt_zz?: string
           nationality?: string | null
@@ -7301,6 +7330,7 @@ export type Database = {
       get_tridni_kniha_for_guardian: {
         Args: { p_datum_do: string; p_datum_od: string; p_school_year: string }
         Returns: {
+          bloky: Json
           cas_do: string
           cas_od: string
           datum: string
@@ -7572,6 +7602,12 @@ export type Database = {
           ponechano_bloku: number
         }[]
       }
+      rozvrh_blok_vlastnik: { Args: { p_blok_id: string }; Returns: string }
+      rozvrh_mesic_zamcen: { Args: { p_datum: string }; Returns: boolean }
+      rozvrh_slouc_blok: {
+        Args: { p_do: string; p_z: string }
+        Returns: undefined
+      }
       set_consent: {
         Args: {
           p_definition_id: string
@@ -7598,7 +7634,11 @@ export type Database = {
         }[]
       }
       spojit_blok: {
-        Args: { p_blok_id: string; p_group_ids: string[]; p_slouceni_ids?: string[] }
+        Args: {
+          p_blok_id: string
+          p_group_ids: string[]
+          p_slouceni_ids?: string[]
+        }
         Returns: undefined
       }
       spojit_sablonu: {
@@ -7608,8 +7648,8 @@ export type Database = {
           p_slouceni_sablona_ids?: string[]
         }
         Returns: {
-          pripojeno_bloku: number
           ponechano_bloku: number
+          pripojeno_bloku: number
           slouceno_bloku: number
         }[]
       }
@@ -7629,6 +7669,10 @@ export type Database = {
           mesic: string
           pocet: number
         }[]
+      }
+      zajistit_kontejnery_bloku: {
+        Args: { p_blok_id: string }
+        Returns: string
       }
       zrusit_blok_priznak: {
         Args: { p_blok_id: string; p_typ_kod: string }

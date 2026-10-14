@@ -166,6 +166,8 @@ export default async function PortalTridnicePage({
         <div className="space-y-3">
           {records.map((zaznam: any) => {
             const vystupy = (zaznam.svp_vystupy ?? []) as any[]
+            // Zápis průvodců po blocích (migrace 152); bloky bez textu se nevypisují.
+            const bloky = ((zaznam.bloky ?? []) as any[]).filter((b) => b.obsah?.trim())
 
             return (
               <div
@@ -203,9 +205,25 @@ export default async function PortalTridnicePage({
                 </div>
 
                 {zaznam.popis && (
-                  <p className="text-sm text-gray-600 dark:text-stone-400 mb-3 leading-relaxed">
+                  <p className="text-sm text-gray-600 dark:text-stone-400 mb-3 leading-relaxed whitespace-pre-wrap">
                     {zaznam.popis}
                   </p>
+                )}
+
+                {bloky.length > 0 && (
+                  <div className="mb-3 space-y-2.5">
+                    {bloky.map((b: any, i: number) => (
+                      <div key={i} className="pl-3 border-l-2 border-gray-100 dark:border-stone-700">
+                        <p className="text-xs text-gray-400 dark:text-stone-500">
+                          {b.cas_od?.slice(0, 5)}{b.cas_do && `–${b.cas_do.slice(0, 5)}`}
+                          <span className="ml-2 font-medium text-gray-700 dark:text-stone-300">{b.nazev}</span>
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-stone-400 mt-0.5 leading-relaxed whitespace-pre-wrap">
+                          {b.obsah}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 )}
 
                 {vystupy.length > 0 && (
