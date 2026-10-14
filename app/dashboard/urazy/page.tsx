@@ -11,6 +11,7 @@ import { CURRENT_SCHOOL_YEAR as SCHOOL_YEAR } from '@/lib/config'
 import { createSupabaseServerClient as createServerClient } from '@/lib/supabase-server'
 import { URAZ_STAV, formatPoradove, zranenyCeleJmeno, type UrazZaznam } from '@/lib/urazy'
 import Link from 'next/link'
+import CsiConnectionCheck from './_components/CsiConnectionCheck'
 
 type Row = Pick<
   UrazZaznam,
@@ -80,6 +81,11 @@ export default async function UrazyPage() {
             <span aria-hidden>+</span> Nový úraz
           </Link>
         </div>
+      </div>
+
+      {/* Ověření připojení k ČŠI (read-only) — potvrzení produkční konfigurace */}
+      <div className="mb-6 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+        <CsiConnectionCheck />
       </div>
 
       {error && (

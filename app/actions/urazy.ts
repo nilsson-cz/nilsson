@@ -20,7 +20,7 @@ import { getStudentAddresses, getGuardianAddresses, formatStreet } from '@/lib/a
 import { CURRENT_SCHOOL_YEAR } from '@/lib/config'
 import { shouldBeZaznam, ciselnikLabel, formatPoradove, CAST_TELA, type UrazZaznam } from '@/lib/urazy'
 import { buildZaznamAnswers, CSI_B02_PRIJATO } from '@/lib/urazy-csi'
-import { CsiUrazApiClient } from '@/lib/urazy-csi-client'
+import { CsiUrazApiClient, loadCsiConfig } from '@/lib/urazy-csi-client'
 import type { Json } from '@/types/database'
 import { Resend } from 'resend'
 import { revalidatePath } from 'next/cache'
@@ -432,6 +432,48 @@ export async function odeslatCsi(id: string): Promise<CsiOdeslaniResult> {
   revalidatePath(`/dashboard/urazy/${id}`)
   revalidatePath('/dashboard/urazy')
   return { success: true, a01id: result.a01ID }
+}
+
+/**
+ * REDIZO testovací „Školy Nilsson" v sandboxu ČŠI. Endpoint je pro test i ostrý
+ * provoz STEJNÝ (potvrzeno ČŠI 2026-10) — prostředí se liší jen školou (REDIZO).
+ * Cokoli jiného než tohle testovací REDIZO považujeme za ostrý provoz.
+ */
+const CSI_TEST_REDIZO = '787878789'
+
+export type CsiPingResult =
+  | { success: true; base: string; redizo: string; sandbox: boolean }
+  | { success: false; base: string | null; redizo: string | null; sandbox: boolean | null; error: string }
+
+/**
+ * Read-only ověření připojení k ČŠI / InspIS DATA (bez odeslání jakéhokoli
+ * záznamu): ověří konfiguraci (env), dosažitelnost (Ping) a platnost přihlášení
+ * (Login). Prostředí (test vs ostrý) rozlišuje podle REDIZO, ne podle URL —
+ * endpoint je pro obojí stejný. POZOR: Login ověří jen login/heslo; cert. klíč
+ * (HashIsKey) a REDIZO se ověří až při odeslání (CreateInline). Director-only.
+ */
+export async function pingCsi(): Promise<CsiPingResult> {
+  const supabase = await createServerClient()
+  const { data: isDir } = await supabase.rpc('is_director')
+  if (!isDir) return { success: false, base: null, redizo: null, sandbox: null, error: 'Jen pro ředitele.' }
+
+  let cfg: ReturnType<typeof loadCsiConfig>
+  try {
+    cfg = loadCsiConfig()
+  } catch (e) {
+    return { success: false, base: null, redizo: null, sandbox: null, error: e instanceof Error ? e.message : 'Chyba konfigurace.' }
+  }
+
+  const sandbox = cfg.redizo === CSI_TEST_REDIZO
+  try {
+    const client = new CsiUrazApiClient(cfg)
+    const reachable = await client.ping()
+    if (!reachable) return { success: false, base: cfg.base, redizo: cfg.redizo, sandbox, error: 'Server ČŠI není dosažitelný (Ping).' }
+    await client.login() // ověří platnost přihlašovacích údajů (login/heslo)
+    return { success: true, base: cfg.base, redizo: cfg.redizo, sandbox }
+  } catch (e) {
+    return { success: false, base: cfg.base, redizo: cfg.redizo, sandbox, error: e instanceof Error ? e.message : 'Chyba připojení.' }
+  }
 }
 
 /** Ruční označení, že ZZ byl informován (např. telefonicky) — bez odeslání e-mailu. */
