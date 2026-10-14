@@ -7362,6 +7362,19 @@ export type Database = {
           zanikla_k: string
         }[]
       }
+      hledej_v_tridnici: {
+        Args: { p_group_id?: string; p_q: string; p_school_year?: string }
+        Returns: {
+          datum: string
+          den_v_tydnu: string
+          group_id: string
+          nazev: string
+          school_year: string
+          shody: Json
+          typ_zaznamu: string
+          zaznam_id: string
+        }[]
+      }
       immutable_unaccent: { Args: { "": string }; Returns: string }
       is_director: { Args: never; Returns: boolean }
       is_director_or_vp: { Args: never; Returns: boolean }

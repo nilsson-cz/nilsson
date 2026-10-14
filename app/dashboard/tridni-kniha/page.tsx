@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { format } from 'date-fns';
 import { cs } from 'date-fns/locale';
 import { CURRENT_SCHOOL_YEAR, SCHOOL_YEAR_OPTIONS } from '@/lib/config';
+import HledaniVysledky, { type HledaniRadek } from './_components/HledaniVysledky';
 
 type TKZaznam = {
   id: string;
@@ -53,14 +54,20 @@ function formatDatum(dateStr: string): string {
 }
 
 interface PageProps {
-  searchParams: Promise<{ rok?: string; group_id?: string }>;
+  searchParams: Promise<{ rok?: string; group_id?: string; q?: string; vse?: string }>;
 }
 
 export default async function TridniKnihaPage({ searchParams }: PageProps) {
   const supabase = await createSupabaseServerClient();
 
-  const { rok, group_id } = await searchParams;
+  const { rok, group_id, q: qRaw, vse } = await searchParams;
   const schoolYear = rok ?? CURRENT_SCHOOL_YEAR;
+  // Vyhledávání (migrace 153): aktivní od 2 znaků; vse=1 → všechny školní roky.
+  const q = (qRaw ?? '').trim().slice(0, 200);
+  const hledani = q.length >= 2;
+  const vseRoky = hledani && vse === '1';
+  // Přepnutí třídy během hledání hledání zachová.
+  const qParam = hledani ? `&q=${encodeURIComponent(q)}${vseRoky ? '&vse=1' : ''}` : '';
 
   let query = supabase
     .from('tridni_kniha_zaznamy')
@@ -91,6 +98,23 @@ export default async function TridniKnihaPage({ searchParams }: PageProps) {
     .order('name');
   const groups = (groupsRaw ?? []) as Group[];
   const groupName = new Map(groups.map((g) => [g.id, g.name]));
+
+  let vysledky: HledaniRadek[] = [];
+  let hledaniError: string | null = null;
+  if (hledani) {
+    const { data, error: e } = await supabase.rpc('hledej_v_tridnici', {
+      p_q: q,
+      p_school_year: vseRoky ? undefined : schoolYear,
+      p_group_id: vseRoky ? undefined : group_id,
+    });
+    if (e) hledaniError = e.message;
+    vysledky = (data ?? []) as unknown as HledaniRadek[];
+    if (vseRoky) {
+      // Štítky tříd i z jiných školních let.
+      const { data: vsechny } = await supabase.from('groups').select('id, name');
+      for (const g of (vsechny ?? []) as Group[]) if (!groupName.has(g.id)) groupName.set(g.id, g.name);
+    }
+  }
   const selectedGroupName = group_id ? groupName.get(group_id) : undefined;
 
   return (
@@ -146,7 +170,7 @@ export default async function TridniKnihaPage({ searchParams }: PageProps) {
       {groups.length > 1 && (
         <div className="flex flex-wrap items-center gap-2 mb-6">
           <Link
-            href={`/dashboard/tridni-kniha?rok=${encodeURIComponent(schoolYear)}`}
+            href={`/dashboard/tridni-kniha?rok=${encodeURIComponent(schoolYear)}${qParam}`}
             className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
               !group_id ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
             }`}
@@ -156,7 +180,7 @@ export default async function TridniKnihaPage({ searchParams }: PageProps) {
           {groups.map((g) => (
             <Link
               key={g.id}
-              href={`/dashboard/tridni-kniha?rok=${encodeURIComponent(schoolYear)}&group_id=${g.id}`}
+              href={`/dashboard/tridni-kniha?rok=${encodeURIComponent(schoolYear)}&group_id=${g.id}${qParam}`}
               className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
                 group_id === g.id ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
               }`}
@@ -167,6 +191,45 @@ export default async function TridniKnihaPage({ searchParams }: PageProps) {
         </div>
       )}
 
+      {/* Vyhledávání */}
+      <form method="get" action="/dashboard/tridni-kniha" className="mb-6 flex flex-wrap items-center gap-2">
+        <input type="hidden" name="rok" value={schoolYear} />
+        {group_id && <input type="hidden" name="group_id" value={group_id} />}
+        <input
+          type="search"
+          name="q"
+          defaultValue={q}
+          placeholder="Hledat v zápisech a ŠVP výstupech…"
+          className="flex-1 min-w-[12rem] text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-gray-400"
+        />
+        <label className="flex items-center gap-1.5 text-sm text-gray-500">
+          <input type="checkbox" name="vse" value="1" defaultChecked={vse === '1'} />
+          všechny školní roky
+        </label>
+        <button type="submit" className="text-sm font-medium border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50">
+          Hledat
+        </button>
+        {hledani && (
+          <Link
+            href={`/dashboard/tridni-kniha?rok=${encodeURIComponent(schoolYear)}${group_id ? `&group_id=${group_id}` : ''}`}
+            className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
+          >
+            zrušit hledání
+          </Link>
+        )}
+      </form>
+
+      {hledani && hledaniError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          Hledání selhalo: {hledaniError}
+        </div>
+      )}
+
+      {hledani && !hledaniError && (
+        <HledaniVysledky q={q} radky={vysledky} groupName={groupName} vseRoky={vseRoky} />
+      )}
+
+      {!hledani && (<>
       {/* Chyba */}
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -267,6 +330,7 @@ export default async function TridniKnihaPage({ searchParams }: PageProps) {
           <span>{zaznamy.filter((z) => z.svp_vazby.length > 0).length} se SVP vazbami</span>
         </div>
       )}
+      </>)}
     </div>
   );
 }
