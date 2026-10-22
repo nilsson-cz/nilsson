@@ -15,6 +15,7 @@ type Slot = {
   ends_at: string | null
   capacity: number
   reserved_count: number
+  group_id: string | null
 }
 
 type Child = {
@@ -22,6 +23,7 @@ type Child = {
   first_name: string
   last_name: string
   alreadyReserved: boolean
+  groupIds: string[]
 }
 
 type Event = {
@@ -55,8 +57,10 @@ export default function TripartitaReservationForm({ event, slots, children }: Pr
   const [error, setError] = useState<string | null>(null)
   const [confirmation, setConfirmation] = useState<ConfirmationData | null>(null)
 
-  const availableSlots = slots.filter(s => s.reserved_count < s.capacity)
   const selectedChild = children.find(c => c.id === selectedChildId)
+  // Termíny pro vybrané dítě: pro všechny třídy + pro jeho třídu
+  const childSlots = slots.filter(s => !s.group_id || (selectedChild?.groupIds.includes(s.group_id) ?? false))
+  const availableSlots = childSlots.filter(s => s.reserved_count < s.capacity)
   const allReserved = children.length > 0 && children.every(c => c.alreadyReserved)
 
   function handleReserve() {
@@ -218,13 +222,17 @@ export default function TripartitaReservationForm({ event, slots, children }: Pr
           <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-2">
             Vyber termín
           </label>
-          {availableSlots.length === 0 ? (
+          {childSlots.length === 0 ? (
+            <p className="text-sm text-stone-400 dark:text-stone-500 py-2">
+              Pro třídu tohoto dítěte zatím nejsou vypsány žádné termíny.
+            </p>
+          ) : availableSlots.length === 0 ? (
             <p className="text-sm text-stone-400 dark:text-stone-500 py-2">
               Všechny termíny jsou obsazeny.
             </p>
           ) : (
             <div className="space-y-2">
-              {slots.map(slot => {
+              {childSlots.map(slot => {
                 const isFull = slot.reserved_count >= slot.capacity
                 const isSelected = selectedSlotId === slot.id
                 return (

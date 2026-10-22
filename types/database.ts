@@ -5490,6 +5490,7 @@ export type Database = {
           created_at: string
           ends_at: string | null
           event_id: string
+          group_id: string | null
           id: string
           label: string
           reserved_count: number
@@ -5500,6 +5501,7 @@ export type Database = {
           created_at?: string
           ends_at?: string | null
           event_id: string
+          group_id?: string | null
           id?: string
           label: string
           reserved_count?: number
@@ -5510,6 +5512,7 @@ export type Database = {
           created_at?: string
           ends_at?: string | null
           event_id?: string
+          group_id?: string | null
           id?: string
           label?: string
           reserved_count?: number
@@ -5521,6 +5524,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "tripartita_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tripartita_slots_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
             referencedColumns: ["id"]
           },
         ]
@@ -7227,6 +7237,13 @@ export type Database = {
           weekday: number
         }[]
       }
+      get_my_children_groups: {
+        Args: never
+        Returns: {
+          group_id: string
+          student_id: string
+        }[]
+      }
       get_my_staff_consents: {
         Args: never
         Returns: {
@@ -7675,6 +7692,10 @@ export type Database = {
         Returns: boolean
       }
       student_is_attending: { Args: { p_student_id: string }; Returns: boolean }
+      tripartita_slot_open_for_student: {
+        Args: { p_group_id: string; p_student_id: string }
+        Returns: boolean
+      }
       usage_db_size: { Args: never; Returns: number }
       vf_lunch_month_counts: {
         Args: { p_from: string; p_to: string }

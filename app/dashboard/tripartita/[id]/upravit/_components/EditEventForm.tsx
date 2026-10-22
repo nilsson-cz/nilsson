@@ -21,6 +21,12 @@ type Slot = {
   ends_at: string | null
   capacity: number
   reserved_count: number
+  group_id: string | null
+}
+
+type Group = {
+  id: string
+  name: string
 }
 
 type Event = {
@@ -34,6 +40,7 @@ type Event = {
 type Props = {
   event: Event
   slots: Slot[]
+  groups: Group[]
 }
 
 function toDatetimeLocal(iso: string | null): string {
@@ -42,7 +49,30 @@ function toDatetimeLocal(iso: string | null): string {
   return iso.slice(0, 16)
 }
 
-export default function EditEventForm({ event, slots: initialSlots }: Props) {
+const selectClass = 'w-full rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 px-3 py-2 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-orange-400'
+
+function GroupSelect({
+  groups,
+  value,
+  onChange,
+}: {
+  groups: Group[]
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <select value={value} onChange={e => onChange(e.target.value)} className={selectClass}>
+      <option value="">Všechny třídy</option>
+      {groups.map(g => (
+        <option key={g.id} value={g.id}>{g.name}</option>
+      ))}
+    </select>
+  )
+}
+
+export default function EditEventForm({ event, slots: initialSlots, groups }: Props) {
+  const groupName = (groupId: string | null) =>
+    groupId ? groups.find(g => g.id === groupId)?.name ?? 'neznámá třída' : null
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -63,6 +93,7 @@ export default function EditEventForm({ event, slots: initialSlots }: Props) {
     starts_at: '',
     ends_at: '',
     capacity: 1,
+    group_id: '',
   })
   const [newSlotError, setNewSlotError] = useState<string | null>(null)
 
@@ -73,6 +104,7 @@ export default function EditEventForm({ event, slots: initialSlots }: Props) {
     starts_at: string
     ends_at: string
     capacity: number
+    group_id: string
   } | null>(null)
 
   // ── Handlers — událost ─────────────────────────────────────────────────────
@@ -109,9 +141,11 @@ export default function EditEventForm({ event, slots: initialSlots }: Props) {
         starts_at: newSlot.starts_at || undefined,
         ends_at: newSlot.ends_at || undefined,
         capacity: newSlot.capacity,
+        group_id: newSlot.group_id || undefined,
       })
       if (result.success) {
-        setNewSlot({ label: '', starts_at: '', ends_at: '', capacity: 1 })
+        // Třídu ponecháme — termíny se typicky zadávají po třídách za sebou
+        setNewSlot(prev => ({ label: '', starts_at: '', ends_at: '', capacity: 1, group_id: prev.group_id }))
         // Reload slotů — Server Action provede revalidatePath, ale jsme na klientu
         // → jednodušší je router.refresh() který znovu načte Server Component wrapper
         router.refresh()
@@ -130,6 +164,7 @@ export default function EditEventForm({ event, slots: initialSlots }: Props) {
       starts_at: toDatetimeLocal(slot.starts_at),
       ends_at: toDatetimeLocal(slot.ends_at),
       capacity: slot.capacity,
+      group_id: slot.group_id ?? '',
     })
   }
 
@@ -145,6 +180,7 @@ export default function EditEventForm({ event, slots: initialSlots }: Props) {
         starts_at: editingSlotData!.starts_at || undefined,
         ends_at: editingSlotData!.ends_at || undefined,
         capacity: editingSlotData!.capacity,
+        group_id: editingSlotData!.group_id || undefined,
       })
       if (result.success) {
         setEditingSlotId(null)
@@ -329,6 +365,16 @@ export default function EditEventForm({ event, slots: initialSlots }: Props) {
                           </p>
                         )}
                       </div>
+                      <div>
+                        <label className="block text-xs font-medium text-stone-500 dark:text-stone-400 mb-1">
+                          Pro třídu
+                        </label>
+                        <GroupSelect
+                          groups={groups}
+                          value={editingSlotData.group_id}
+                          onChange={v => setEditingSlotData(prev => prev ? { ...prev, group_id: v } : prev)}
+                        />
+                      </div>
                     </div>
                     {slotErrors[slot.id] && (
                       <p className="text-xs text-red-600 dark:text-red-400">{slotErrors[slot.id]}</p>
@@ -357,7 +403,7 @@ export default function EditEventForm({ event, slots: initialSlots }: Props) {
                         {slot.label}
                       </p>
                       <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
-                        Kapacita {slot.capacity} · obsazeno {slot.reserved_count}
+                        {groupName(slot.group_id) ?? 'Všechny třídy'} · Kapacita {slot.capacity} · obsazeno {slot.reserved_count}
                         {slot.starts_at && <> · {new Date(slot.starts_at).toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</>}
                       </p>
                       {slotErrors[slot.id] && (
@@ -445,6 +491,16 @@ export default function EditEventForm({ event, slots: initialSlots }: Props) {
                 value={newSlot.capacity}
                 onChange={e => setNewSlot(prev => ({ ...prev, capacity: Math.max(1, parseInt(e.target.value) || 1) }))}
                 className="w-full rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 px-3 py-2.5 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-stone-500 dark:text-stone-400 mb-1">
+                Pro třídu <span className="font-normal">(rodiče jiných tříd termín neuvidí)</span>
+              </label>
+              <GroupSelect
+                groups={groups}
+                value={newSlot.group_id}
+                onChange={v => setNewSlot(prev => ({ ...prev, group_id: v }))}
               />
             </div>
           </div>

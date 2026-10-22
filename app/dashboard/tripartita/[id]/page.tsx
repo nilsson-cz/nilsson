@@ -53,11 +53,22 @@ export default async function TripartitaDetailPage({
   // Načti sloty
   const { data: slotsRaw } = await supabase
     .from('tripartita_slots')
-    .select('id, label, starts_at, ends_at, capacity, reserved_count')
+    .select('id, label, starts_at, ends_at, capacity, reserved_count, group_id')
     .eq('event_id', id)
     .order('starts_at', { ascending: true, nullsFirst: false })
 
   const slots = (slotsRaw as any[]) ?? []
+
+  // Názvy tříd u termínů omezených na třídu
+  const groupIds = [...new Set(slots.map(s => s.group_id).filter(Boolean))] as string[]
+  const groupNames = new Map<string, string>()
+  if (groupIds.length > 0) {
+    const { data: groupsRaw } = await supabase
+      .from('groups')
+      .select('id, name')
+      .in('id', groupIds)
+    for (const g of groupsRaw ?? []) groupNames.set(g.id, g.name)
+  }
 
   // Načti rezervace s joinovanými daty
   const { data: reservationsRaw } = await supabase
@@ -198,6 +209,11 @@ export default async function TripartitaDetailPage({
                       {slot.starts_at && (
                         <span className="text-xs text-stone-400 dark:text-stone-500 shrink-0">
                           {formatDateTime(slot.starts_at)}
+                        </span>
+                      )}
+                      {slot.group_id && (
+                        <span className="text-xs font-medium shrink-0 px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-400">
+                          {groupNames.get(slot.group_id) ?? 'třída'}
                         </span>
                       )}
                     </div>

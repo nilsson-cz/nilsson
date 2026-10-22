@@ -37,14 +37,22 @@ export default async function TripartitaUpravitPage({
 
   const { data: slotsRaw } = await supabase
     .from('tripartita_slots')
-    .select('id, label, starts_at, ends_at, capacity, reserved_count')
+    .select('id, label, starts_at, ends_at, capacity, reserved_count, group_id')
     .eq('event_id', id)
     .order('starts_at', { ascending: true, nullsFirst: false })
+
+  // Třídy školního roku události — pro omezení termínu na třídu
+  const { data: groupsRaw } = await supabase
+    .from('groups')
+    .select('id, name')
+    .eq('school_year', eventRaw.school_year)
+    .order('name')
 
   return (
     <EditEventForm
       event={eventRaw as any}
       slots={(slotsRaw as any[]) ?? []}
+      groups={groupsRaw ?? []}
     />
   )
 }

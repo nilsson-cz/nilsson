@@ -40,6 +40,7 @@ export async function reserveSlot(
   if (result === 'already_reserved') return { success: false, error: 'Toto dítě již má rezervaci na tuto událost.' }
   if (result === 'not_your_child')   return { success: false, error: 'Nemáš oprávnění rezervovat za toto dítě.' }
   if (result === 'event_not_active') return { success: false, error: 'Událost již není aktivní.' }
+  if (result === 'wrong_class')      return { success: false, error: 'Tento termín je vypsán pro jinou třídu.' }
   if (result !== 'ok')               return { success: false, error: 'Neočekávaná chyba rezervace.' }
 
   // Načti data pro email

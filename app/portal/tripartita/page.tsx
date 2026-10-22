@@ -23,6 +23,7 @@ type Slot = {
   ends_at: string | null
   capacity: number
   reserved_count: number
+  group_id: string | null
 }
 
 type Child = {
@@ -30,6 +31,7 @@ type Child = {
   first_name: string
   last_name: string
   alreadyReserved: boolean
+  groupIds: string[]
 }
 
 export default async function PortalTripartitaPage() {
@@ -79,10 +81,10 @@ export default async function PortalTripartitaPage() {
 
   const event = eventRaw as any
 
-  // Načti sloty
+  // Načti sloty — RLS vrátí jen termíny pro všechny + pro třídy vlastních dětí
   const { data: slotsRaw } = await supabase
     .from('tripartita_slots')
-    .select('id, label, starts_at, ends_at, capacity, reserved_count')
+    .select('id, label, starts_at, ends_at, capacity, reserved_count, group_id')
     .eq('event_id', event.id)
     .order('starts_at', { ascending: true, nullsFirst: false })
 
@@ -116,11 +118,19 @@ export default async function PortalTripartitaPage() {
       ((reservationsRaw as any[]) ?? []).map((r: any) => r.student_id)
     )
 
+    // Aktuální třídy dětí — termíny omezené na třídu se nabízí jen jejím dětem
+    const { data: childGroupsRaw } = await supabase.rpc('get_my_children_groups')
+    const groupsByStudent = new Map<string, string[]>()
+    for (const cg of childGroupsRaw ?? []) {
+      groupsByStudent.set(cg.student_id, [...(groupsByStudent.get(cg.student_id) ?? []), cg.group_id])
+    }
+
     children = ((studentsRaw as any[]) ?? []).map((s: any) => ({
       id: s.id,
       first_name: s.first_name,
       last_name: s.last_name,
       alreadyReserved: reservedStudentIds.has(s.id),
+      groupIds: groupsByStudent.get(s.id) ?? [],
     }))
   }
 

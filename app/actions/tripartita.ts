@@ -32,6 +32,7 @@ export type CreateSlotInput = {
   starts_at?: string   // ISO string nebo prázdný string
   ends_at?: string
   capacity: number
+  group_id?: string    // třída; prázdné = termín pro všechny třídy
 }
 
 export type UpdateSlotInput = {
@@ -39,6 +40,7 @@ export type UpdateSlotInput = {
   starts_at?: string
   ends_at?: string
   capacity: number
+  group_id?: string    // třída; prázdné = termín pro všechny třídy
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -132,6 +134,7 @@ export async function createSlot(
       starts_at: parseTimestamp(input.starts_at),
       ends_at: parseTimestamp(input.ends_at),
       capacity: input.capacity,
+      group_id: input.group_id || null,
     })
 
   if (error) return { success: false, error: error.message }
@@ -158,6 +161,7 @@ export async function updateSlot(
       starts_at: parseTimestamp(input.starts_at),
       ends_at: parseTimestamp(input.ends_at),
       capacity: input.capacity,
+      group_id: input.group_id || null,
     })
     .eq('id', slotId)
 
