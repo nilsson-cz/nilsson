@@ -25,6 +25,9 @@ export type ChildPrihlaska = {
     vyzvedavajici: { id: string; jmeno: string; telefon: string }[]
   } | null
   jizPrihlasen: boolean
+  /** Aktivní zápis do družiny — správa vyzvedávajících osob (migrace 166). */
+  enrollmentId: string | null
+  vyzvedavajici: { id: string; jmeno: string; telefon: string }[]
 }
 
 export default async function PortalDruzinaPage() {
@@ -57,6 +60,7 @@ export default async function PortalDruzinaPage() {
 
   let prihlaskyRaw: any[] = []
   let enrollmentsRaw: any[] = []
+  let vyzvedRaw: { enrollment_id: string; id: string; jmeno: string; telefon: string }[] = []
   if (studentIds.length > 0) {
     const { data } = await supabase
       .from('druzina_prihlasky')
@@ -73,19 +77,33 @@ export default async function PortalDruzinaPage() {
 
     const { data: enrData } = await supabase
       .from('druzina_enrollments')
-      .select('student_id')
+      .select('id, student_id')
       .in('student_id', studentIds)
       .eq('school_year', DRUZINA_SCHOOL_YEAR)
       .is('date_to', null)
+      .order('date_from', { ascending: false })
     enrollmentsRaw = enrData ?? []
+
+    if (enrollmentsRaw.length > 0) {
+      const { data: vData } = await supabase.rpc('druzina_vyzvedavajici_portal')
+      vyzvedRaw = vData ?? []
+    }
   }
 
   const items: ChildPrihlaska[] = children.map((student: any) => {
     // Nejnovější (ne-storno) žádost pro dítě a školní rok
     const p = prihlaskyRaw.find((x) => x.student_id === student.id) ?? null
+    // Nejnovější aktivní zápis (řazeno date_from DESC)
+    const enr = enrollmentsRaw.find((e) => e.student_id === student.id) ?? null
     return {
       student,
-      jizPrihlasen: enrollmentsRaw.some((e) => e.student_id === student.id),
+      jizPrihlasen: enr !== null,
+      enrollmentId: enr?.id ?? null,
+      vyzvedavajici: enr
+        ? vyzvedRaw
+            .filter((v) => v.enrollment_id === enr.id)
+            .map((v) => ({ id: v.id, jmeno: v.jmeno, telefon: v.telefon }))
+        : [],
       prihlaska: p
         ? {
             id:                  p.id,

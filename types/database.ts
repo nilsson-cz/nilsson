@@ -1534,6 +1534,7 @@ export type Database = {
           id: string
           jmeno: string
           telefon: string
+          zruseno_at: string | null
         }
         Insert: {
           created_at?: string
@@ -1541,6 +1542,7 @@ export type Database = {
           id?: string
           jmeno: string
           telefon: string
+          zruseno_at?: string | null
         }
         Update: {
           created_at?: string
@@ -1548,6 +1550,7 @@ export type Database = {
           id?: string
           jmeno?: string
           telefon?: string
+          zruseno_at?: string | null
         }
         Relationships: [
           {
@@ -6992,6 +6995,29 @@ export type Database = {
           p_created_by: string
           p_school_year: string
           p_student_id: string
+        }
+        Returns: string
+      }
+      druzina_vyzvedavajici_odebrat: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
+      druzina_vyzvedavajici_portal: {
+        Args: never
+        Returns: {
+          enrollment_id: string
+          id: string
+          jmeno: string
+          student_id: string
+          telefon: string
+        }[]
+      }
+      druzina_vyzvedavajici_ulozit: {
+        Args: {
+          p_enrollment_id: string
+          p_id?: string
+          p_jmeno: string
+          p_telefon: string
         }
         Returns: string
       }

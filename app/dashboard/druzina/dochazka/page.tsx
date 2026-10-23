@@ -44,6 +44,7 @@ type VyzvedavajiciRow = {
   id: string
   enrollment_id: string
   jmeno: string
+  zruseno_at: string | null
 }
 
 export default async function DruzinaDocházkaPage({
@@ -130,18 +131,19 @@ export default async function DruzinaDocházkaPage({
 
   // Seznam pověřených vyzvedávajících osob per zápis (jen director/vychovatel —
   // RLS druzina_vyzvedavajici_select_staff; ostatní personál dostane prázdno).
+  // Včetně osob odebraných rodičem (migrace 166) — kvůli jménu u starších zápisů.
   const enrollmentIds = Array.from(enrollMap.values()).map((e) => e.id)
   const { data: vyzvedRaw } = enrollmentIds.length > 0
     ? await supabase
         .from('druzina_vyzvedavajici')
-        .select('id, enrollment_id, jmeno')
+        .select('id, enrollment_id, jmeno, zruseno_at')
         .in('enrollment_id', enrollmentIds)
         .order('jmeno')
     : { data: [] }
-  const vyzvedByEnrollment = new Map<string, { id: string; jmeno: string }[]>()
+  const vyzvedByEnrollment = new Map<string, { id: string; jmeno: string; aktivni: boolean }[]>()
   for (const v of (vyzvedRaw as VyzvedavajiciRow[]) ?? []) {
     const arr = vyzvedByEnrollment.get(v.enrollment_id) ?? []
-    arr.push({ id: v.id, jmeno: v.jmeno })
+    arr.push({ id: v.id, jmeno: v.jmeno, aktivni: v.zruseno_at === null })
     vyzvedByEnrollment.set(v.enrollment_id, arr)
   }
 

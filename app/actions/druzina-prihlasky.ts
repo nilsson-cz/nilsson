@@ -231,6 +231,55 @@ export async function stornovatDruzinaPrihlasku(prihlaskaId: string): Promise<Ac
 }
 
 // ---------------------------------------------------------------------------
+// GUARDIAN: správa vyzvedávajících osob u aktivního zápisu (migrace 166)
+// Provozní seznam druzina_vyzvedavajici — změny se hned projeví v docházce.
+// ---------------------------------------------------------------------------
+
+export async function ulozitVyzvedavajiciOsobu(input: {
+  enrollmentId: string
+  id?: string
+  jmeno: string
+  telefon: string
+}): Promise<PrihlaskaResult> {
+  const { supabase, guardian } = await getAuthenticatedGuardian()
+  if (!guardian) return { success: false, error: 'Nejste přihlášeni.' }
+
+  if (!input.jmeno.trim() || !input.telefon.trim()) {
+    return { success: false, error: 'Vyplňte jméno i telefon.' }
+  }
+
+  const { data, error } = await supabase.rpc('druzina_vyzvedavajici_ulozit', {
+    p_enrollment_id: input.enrollmentId,
+    p_jmeno:         input.jmeno,
+    p_telefon:       input.telefon,
+    p_id:            input.id,
+  })
+
+  if (error || !data) {
+    console.error('[ulozitVyzvedavajiciOsobu]', error)
+    return { success: false, error: error?.message || 'Uložení osoby selhalo.' }
+  }
+
+  revalidatePath('/portal/druzina')
+  return { success: true, id: data }
+}
+
+export async function odebratVyzvedavajiciOsobu(id: string): Promise<ActionResult> {
+  const { supabase, guardian } = await getAuthenticatedGuardian()
+  if (!guardian) return { success: false, error: 'Nejste přihlášeni.' }
+
+  const { error } = await supabase.rpc('druzina_vyzvedavajici_odebrat', { p_id: id })
+
+  if (error) {
+    console.error('[odebratVyzvedavajiciOsobu]', error)
+    return { success: false, error: error.message || 'Odebrání osoby selhalo.' }
+  }
+
+  revalidatePath('/portal/druzina')
+  return { success: true }
+}
+
+// ---------------------------------------------------------------------------
 // ŘEDITEL: rozhodnutí o jedné žádosti (přijmout/zamítnout)
 // Notifikace o pohledávce se posílá vždy automaticky (bez volby) — viz PRD. Změněno 10.7.2026 po konzultaci
 // ---------------------------------------------------------------------------

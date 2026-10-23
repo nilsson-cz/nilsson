@@ -16,7 +16,8 @@ type DochazkaRecord = {
   vyzvedavajici_id: string | null
 } | null
 
-type Vyzvedavajici = { id: string; jmeno: string }
+/** aktivni = false → rodič osobu odebral; nabízí se jen u zápisu, který ji už má. */
+type Vyzvedavajici = { id: string; jmeno: string; aktivni: boolean }
 
 type Student = {
   id: string
@@ -90,7 +91,8 @@ function prefillOdchodSel(s: Student): string {
   // Bez zápisu → odvození z přihlášky.
   if (s.odchod_sam) return 'sam'
   if (s.odchod_doprovod) {
-    if (s.vyzvedavajici.length >= 1) return `doprovod:${s.vyzvedavajici[0].id}`
+    const prvni = s.vyzvedavajici.find((v) => v.aktivni)
+    if (prvni) return `doprovod:${prvni.id}`
     return 'doprovod'
   }
   return 'zz'
@@ -119,10 +121,11 @@ function odchodOptions(s: Student): { value: string; label: string }[] {
     { value: 'zz', label: 'Zákonný zástupce (osobně)' },
   ]
   for (const v of s.vyzvedavajici) {
-    opts.push({ value: `doprovod:${v.id}`, label: v.jmeno })
+    if (v.aktivni) opts.push({ value: `doprovod:${v.id}`, label: v.jmeno })
+    else if (v.id === s.dochazka?.vyzvedavajici_id) opts.push({ value: `doprovod:${v.id}`, label: `${v.jmeno} (odebrán/a)` })
   }
   // Doprovod povolen přihláškou, ale bez konkrétních jmen — generická volba.
-  if (s.odchod_doprovod && s.vyzvedavajici.length === 0) {
+  if (s.odchod_doprovod && !s.vyzvedavajici.some((v) => v.aktivni)) {
     opts.push({ value: 'doprovod', label: 'Doprovod (osoba neuvedena)' })
   }
   opts.push({ value: 'sam', label: 'Odešlo samo' })

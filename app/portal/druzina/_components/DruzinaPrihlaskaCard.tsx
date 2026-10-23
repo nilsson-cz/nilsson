@@ -10,6 +10,7 @@ import {
   type DnyDochazky,
 } from '@/app/actions/druzina-prihlasky'
 import type { ChildPrihlaska } from '../page'
+import VyzvedavajiciSeznam from './VyzvedavajiciSeznam'
 
 const DNY: { kod: 'po' | 'ut' | 'st' | 'ct' | 'pa'; label: string }[] = [
   { kod: 'po', label: 'Pondělí' },
@@ -133,8 +134,12 @@ export default function DruzinaPrihlaskaCard({ item }: { item: ChildPrihlaska })
 
       {item.jizPrihlasen && !editing && (
         <p className="text-xs text-gray-400">
-          Přihlášení eviduje škola přímo — pro změny (dny docházky, vyzvedávání) kontaktujte družinu.
+          Přihlášení eviduje škola přímo — pro změnu dnů docházky kontaktujte družinu.
         </p>
+      )}
+
+      {item.jizPrihlasen && item.enrollmentId && (
+        <VyzvedavajiciSeznam enrollmentId={item.enrollmentId} osoby={item.vyzvedavajici} />
       )}
 
       {!item.jizPrihlasen && p && p.stav === 'odeslana' && (
