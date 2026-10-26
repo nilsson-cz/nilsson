@@ -260,18 +260,57 @@ function EmptyState({ text }: { text: string }) {
   )
 }
 
+type RunningTripartita = { id: string; name: string }
+
+/**
+ * Aktivní tripartitní události, jejichž poslední termín ještě neskončil
+ * (konec = ends_at, jinak starts_at). Událost bez termínů s časem se ukazuje,
+ * dokud je aktivní — konec nejde určit.
+ */
+async function fetchRunningTripartity(): Promise<RunningTripartita[]> {
+  const supabase = await createSupabaseServerClient()
+  const { data: events } = await supabase
+    .from('tripartita_events')
+    .select('id, name')
+    .eq('active', true)
+    .order('created_at', { ascending: true })
+  if (!events || events.length === 0) return []
+
+  const { data: slots } = await supabase
+    .from('tripartita_slots')
+    .select('event_id, starts_at, ends_at')
+    .in('event_id', events.map((e) => e.id))
+
+  const lastEnd = new Map<string, number>()
+  for (const s of slots ?? []) {
+    const end = s.ends_at ?? s.starts_at
+    if (!end) continue
+    const t = new Date(end).getTime()
+    if (t > (lastEnd.get(s.event_id) ?? 0)) lastEnd.set(s.event_id, t)
+  }
+
+  const now = Date.now()
+  return events.filter((e) => {
+    const end = lastEnd.get(e.id)
+    return end === undefined || end > now
+  })
+}
+
 function AlertsWidget({
   alertGroups,
   total,
   missingTK,
   enrollmentPending,
+  tripartity,
 }: {
   alertGroups: AlertGroup[]
   total: number
   missingTK: number
   enrollmentPending: number
+  tripartity: RunningTripartita[]
 }) {
-  const totalWithExtra = total + (missingTK > 0 ? 1 : 0) + (enrollmentPending > 0 ? 1 : 0)
+  const totalWithExtra =
+    total + (missingTK > 0 ? 1 : 0) + (enrollmentPending > 0 ? 1 : 0) + tripartity.length
 
   return (
     <WidgetCard>
@@ -294,6 +333,14 @@ function AlertsWidget({
         </div>
       ) : (
         <div className="space-y-2">
+          {tripartity.map((t) => (
+            <AlertRow
+              key={t.id}
+              severity="info"
+              label={`Tripartity: ${t.name}`}
+              href={`/dashboard/tripartita/${t.id}`}
+            />
+          ))}
           {enrollmentPending > 0 && (
             <AlertRow
               severity="info"
@@ -548,6 +595,7 @@ export default async function DashboardPage() {
   const bulletinPosts = await fetchBulletinPosts()
   const pendingOmluvenky = await fetchPendingOmluvenky()
   const unmatchedCount = await fetchUnmatchedCount()
+  const runningTripartity = await fetchRunningTripartity()
 
   const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -593,6 +641,7 @@ export default async function DashboardPage() {
           total={totalAlerts}
           missingTK={missingTK}
           enrollmentPending={enrollmentPending}
+          tripartity={runningTripartity}
         />
         <StudentsOverviewWidget count={studentCount} schoolYear={activeYear} />
         <BulletinWidget posts={bulletinPosts} />

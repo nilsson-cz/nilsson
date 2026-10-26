@@ -8,10 +8,13 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { getMissingByClass, getReminderRecipients } from '@/lib/tripartita-prehled'
+import ReminderPanel from './_components/ReminderPanel'
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('cs-CZ', {
+    timeZone: 'Europe/Prague',
     day: 'numeric',
     month: 'numeric',
     year: 'numeric',
@@ -94,6 +97,25 @@ export default async function TripartitaDetailPage({
 
   const reservations = (reservationsRaw as any[]) ?? []
 
+  // Děti bez rezervace po třídách (jen třídy, pro které je vypsaný termín)
+  const missingByClass = await getMissingByClass(supabase, id, event.school_year)
+  const missingCount = missingByClass.reduce((acc, c) => acc + c.students.length, 0)
+
+  // Adresáti e-mailového připomenutí — jen pro ředitele u aktivní události
+  const reminderRecipients = isDirector && event.active && missingCount > 0
+    ? await getReminderRecipients(supabase, id, event.school_year, null)
+    : []
+  const reminderClasses = missingByClass
+    .filter((c) => c.students.length > 0)
+    .map((c) => ({
+      groupId: c.groupId,
+      trida: c.trida,
+      recipients: reminderRecipients.filter((r) => r.groupIds.includes(c.groupId)).length,
+    }))
+  const defaultReminderText =
+    `Dobrý den,\n\nrádi bychom připomněli rezervaci termínu tripartitní schůzky (${event.name}). ` +
+    `Termín si můžete vybrat v rodičovském portálu, dokud jsou volná místa.\n\nDěkujeme.`
+
   // Mapa slot_id → rezervace pro přehledné zobrazení
   const reservationsBySlot = new Map<string, any[]>()
   for (const r of reservations) {
@@ -138,25 +160,39 @@ export default async function TripartitaDetailPage({
               </p>
             )}
           </div>
-          {isDirector && (
-            <Link
-              href={`/dashboard/tripartita/${id}/upravit`}
-              className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400 text-sm font-medium hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              Upravit
-            </Link>
-          )}
+          <div className="shrink-0 flex flex-wrap justify-end gap-2">
+            {reservations.length > 0 && (
+              <a
+                href={`/dashboard/tripartita/${id}/csv`}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400 text-sm font-medium hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Stáhnout CSV
+              </a>
+            )}
+            {isDirector && (
+              <Link
+                href={`/dashboard/tripartita/${id}/upravit`}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400 text-sm font-medium hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Upravit
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Přehled čísel */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
           { label: 'Termínů', value: slots.length },
           { label: 'Rezervací', value: reservations.length },
+          { label: 'Bez rezervace', value: missingCount },
           {
             label: 'Volných míst',
             value: slots.reduce((acc: number, s: any) => acc + Math.max(0, s.capacity - s.reserved_count), 0),
@@ -266,6 +302,61 @@ export default async function TripartitaDetailPage({
           </div>
         )}
       </div>
+
+      {/* Děti bez rezervace po třídách */}
+      {missingByClass.length > 0 && (
+        <div className="mt-5 bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-700 overflow-hidden">
+          <div className="px-5 py-4 border-b border-stone-100 dark:border-stone-800">
+            <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100 uppercase tracking-wide">
+              Bez rezervace ({missingCount})
+            </h2>
+            <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
+              Děti ze tříd, pro které je vypsaný aspoň jeden termín.
+            </p>
+            {isDirector && event.active && missingCount > 0 && (
+              <div className="mt-3">
+                <ReminderPanel
+                  eventId={id}
+                  totalRecipients={reminderRecipients.length}
+                  classes={reminderClasses}
+                  defaultText={defaultReminderText}
+                />
+              </div>
+            )}
+          </div>
+          <div className="divide-y divide-stone-100 dark:divide-stone-800">
+            {missingByClass.map((c) => (
+              <div key={c.groupId} className="px-5 py-4">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <span className="text-sm font-medium text-stone-800 dark:text-stone-200">{c.trida}</span>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                    c.students.length === 0
+                      ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400'
+                      : 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400'
+                  }`}>
+                    {c.students.length === 0
+                      ? 'Všichni rezervováno'
+                      : `${c.total - c.students.length} / ${c.total} rezervováno`}
+                  </span>
+                </div>
+                {c.students.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {c.students.map((s) => (
+                      <Link
+                        key={s.id}
+                        href={`/dashboard/zaci/${s.id}`}
+                        className="text-xs px-2.5 py-1 rounded-lg bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700 transition-colors"
+                      >
+                        {s.name}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
