@@ -8,6 +8,7 @@ import { redirect } from 'next/navigation'
 import { getZivotSession } from '../_lib/session'
 import { getPostBySlug } from '../_lib/wall'
 import { renderMarkdown } from '../_lib/markdown'
+import PhotoGallery from '../_components/PhotoGallery'
 
 export const metadata = { title: 'Ze života školy' }
 
@@ -69,25 +70,7 @@ export default async function ZivotPostPage({
             />
           )}
 
-          {photos.length > 0 && (
-            <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {photos.map((ph) =>
-                ph.url ? (
-                  <li key={ph.id} className="overflow-hidden rounded-lg bg-gray-100">
-                    <div className="aspect-square">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={ph.url}
-                        alt={ph.caption ?? ''}
-                        loading="lazy"
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  </li>
-                ) : null
-              )}
-            </ul>
-          )}
+          <PhotoGallery photos={photos} slug={post.slug} variant="zivot" />
         </section>
       )}
     </div>

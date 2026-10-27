@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getPostBySlug } from '@/app/zivot/_lib/wall'
 import { renderMarkdown } from '@/app/zivot/_lib/markdown'
+import PhotoGallery from '@/app/zivot/_components/PhotoGallery'
 import { CURRENT_SCHOOL_YEAR } from '@/lib/config'
 
 export const metadata = { title: 'Ze života školy — Rodičovský portál' }
@@ -72,25 +73,7 @@ export default async function PortalPostPage({
             />
           )}
 
-          {photos.length > 0 && (
-            <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {photos.map((ph) =>
-                ph.url ? (
-                  <li key={ph.id} className="overflow-hidden rounded-lg bg-(--portal-surface-hover)">
-                    <div className="aspect-square">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={ph.url}
-                        alt={ph.caption ?? ''}
-                        loading="lazy"
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  </li>
-                ) : null
-              )}
-            </ul>
-          )}
+          <PhotoGallery photos={photos} slug={post.slug} variant="portal" />
         </section>
       )}
     </div>
