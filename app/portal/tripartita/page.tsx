@@ -32,7 +32,7 @@ type Child = {
   last_name: string
   alreadyReserved: boolean
   groupIds: string[]
-  reservation: { id: string; slotId: string } | null
+  reservation: { id: string; slotId: string; byOtherGuardian: boolean } | null
 }
 
 export default async function PortalTripartitaPage() {
@@ -108,15 +108,19 @@ export default async function PortalTripartitaPage() {
       .eq('status', 'active')
       .order('last_name')
 
-    // Zjisti které děti už mají rezervaci
+    // Zjisti které děti už mají rezervaci — i tu, kterou udělal druhý rodič
+    // (RLS tr_guardian_select pouští rezervace dětí rodiče, migrace 168)
     const { data: reservationsRaw } = await supabase
       .from('tripartita_reservations')
-      .select('id, student_id, slot_id')
+      .select('id, student_id, slot_id, guardian_id')
       .eq('event_id', event.id)
-      .eq('guardian_id', guardian.id)
+      .in('student_id', studentIds)
 
     const reservationByStudent = new Map(
-      (reservationsRaw ?? []).map((r) => [r.student_id, { id: r.id, slotId: r.slot_id }])
+      (reservationsRaw ?? []).map((r) => [
+        r.student_id,
+        { id: r.id, slotId: r.slot_id, byOtherGuardian: r.guardian_id !== guardian.id },
+      ])
     )
 
     // Aktuální třídy dětí — termíny omezené na třídu se nabízí jen jejím dětem

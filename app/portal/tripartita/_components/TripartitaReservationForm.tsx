@@ -28,7 +28,7 @@ type Child = {
   last_name: string
   alreadyReserved: boolean
   groupIds: string[]
-  reservation: { id: string; slotId: string } | null
+  reservation: { id: string; slotId: string; byOtherGuardian: boolean } | null
 }
 
 type Event = {
@@ -352,6 +352,11 @@ function MyReservations({ kids, slots }: { kids: Child[]; slots: Slot[] }) {
                 <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
                   ✓ {slot?.label ?? 'Rezervováno'}
                 </p>
+                {child.reservation!.byOtherGuardian && (
+                  <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
+                    Rezervováno jiným zákonným zástupcem.
+                  </p>
+                )}
               </div>
               {canCancel ? (
                 <button
