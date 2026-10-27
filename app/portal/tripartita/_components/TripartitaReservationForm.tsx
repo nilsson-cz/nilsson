@@ -6,7 +6,11 @@
  */
 
 import { useState, useTransition } from 'react'
-import { reserveSlot } from '@/app/actions/portal-tripartita'
+import { useRouter } from 'next/navigation'
+import { cancelReservation, reserveSlot } from '@/app/actions/portal-tripartita'
+
+/** Rezervaci lze zrušit nejpozději 7 dní před začátkem termínu (vynucuje i DB). */
+const CANCEL_DAYS_BEFORE = 7
 
 type Slot = {
   id: string
@@ -24,6 +28,7 @@ type Child = {
   last_name: string
   alreadyReserved: boolean
   groupIds: string[]
+  reservation: { id: string; slotId: string } | null
 }
 
 type Event = {
@@ -160,18 +165,7 @@ export default function TripartitaReservationForm({ event, slots, children }: Pr
         </div>
 
         {/* Přehled rezervací */}
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-700 divide-y divide-stone-100 dark:divide-stone-800">
-          {children.map(child => (
-            <div key={child.id} className="px-4 py-3 flex items-center justify-between">
-              <span className="text-sm font-medium text-stone-800 dark:text-stone-200">
-                {child.first_name} {child.last_name}
-              </span>
-              <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                ✓ Rezervováno
-              </span>
-            </div>
-          ))}
-        </div>
+        <MyReservations kids={children} slots={slots} />
       </div>
     )
   }
@@ -182,6 +176,11 @@ export default function TripartitaReservationForm({ event, slots, children }: Pr
     <div className="space-y-4">
       {/* Info o události */}
       <EventInfoCard event={event} />
+
+      {/* Už rezervované děti (se zrušením) */}
+      {children.some(c => c.reservation) && (
+        <MyReservations kids={children} slots={slots} />
+      )}
 
       {/* Formulář */}
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-700 p-5 space-y-5">
@@ -292,6 +291,92 @@ export default function TripartitaReservationForm({ event, slots, children }: Pr
           {isPending ? 'Rezervuje se…' : 'Rezervovat termín'}
         </button>
       </div>
+    </div>
+  )
+}
+
+// ── Pomocná komponenta — moje rezervace + zrušení ─────────────────────────────
+
+function formatDeadline(d: Date): string {
+  return d.toLocaleString('cs-CZ', {
+    timeZone: 'Europe/Prague',
+    day: 'numeric',
+    month: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function MyReservations({ kids, slots }: { kids: Child[]; slots: Slot[] }) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [pendingId, setPendingId] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const reserved = kids.filter(c => c.reservation)
+
+  function handleCancel(child: Child) {
+    const reservation = child.reservation
+    if (!reservation) return
+    if (!confirm(`Opravdu zrušit rezervaci pro ${child.first_name}?`)) return
+    setErrors(prev => { const n = { ...prev }; delete n[child.id]; return n })
+    setPendingId(reservation.id)
+    startTransition(async () => {
+      const result = await cancelReservation(reservation.id)
+      setPendingId(null)
+      if (result.success) {
+        router.refresh()
+      } else {
+        setErrors(prev => ({ ...prev, [child.id]: result.error }))
+      }
+    })
+  }
+
+  return (
+    <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-700 divide-y divide-stone-100 dark:divide-stone-800">
+      {reserved.map(child => {
+        const slot = slots.find(s => s.id === child.reservation!.slotId)
+        const deadline = slot?.starts_at
+          ? new Date(new Date(slot.starts_at).getTime() - CANCEL_DAYS_BEFORE * 24 * 60 * 60 * 1000)
+          : null
+        const canCancel = !deadline || Date.now() <= deadline.getTime()
+        const isThisPending = isPending && pendingId === child.reservation!.id
+
+        return (
+          <div key={child.id} className="px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-stone-800 dark:text-stone-200">
+                  {child.first_name} {child.last_name}
+                </p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  ✓ {slot?.label ?? 'Rezervováno'}
+                </p>
+              </div>
+              {canCancel ? (
+                <button
+                  type="button"
+                  onClick={() => handleCancel(child)}
+                  disabled={isPending}
+                  className="shrink-0 px-3 py-1.5 rounded-lg border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400 text-xs font-medium hover:border-red-200 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50 transition-colors"
+                >
+                  {isThisPending ? 'Ruší se…' : 'Zrušit rezervaci'}
+                </button>
+              ) : null}
+            </div>
+            <p className="text-xs text-stone-400 dark:text-stone-500 mt-1">
+              {deadline
+                ? canCancel
+                  ? `Zrušit lze do ${formatDeadline(deadline)}.`
+                  : `Lhůta pro zrušení uplynula ${formatDeadline(deadline)}. V případě potřeby kontaktujte školu.`
+                : 'Rezervaci můžete zrušit.'}
+            </p>
+            {errors[child.id] && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors[child.id]}</p>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

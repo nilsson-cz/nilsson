@@ -32,6 +32,7 @@ type Child = {
   last_name: string
   alreadyReserved: boolean
   groupIds: string[]
+  reservation: { id: string; slotId: string } | null
 }
 
 export default async function PortalTripartitaPage() {
@@ -110,12 +111,12 @@ export default async function PortalTripartitaPage() {
     // Zjisti které děti už mají rezervaci
     const { data: reservationsRaw } = await supabase
       .from('tripartita_reservations')
-      .select('student_id')
+      .select('id, student_id, slot_id')
       .eq('event_id', event.id)
       .eq('guardian_id', guardian.id)
 
-    const reservedStudentIds = new Set(
-      ((reservationsRaw as any[]) ?? []).map((r: any) => r.student_id)
+    const reservationByStudent = new Map(
+      (reservationsRaw ?? []).map((r) => [r.student_id, { id: r.id, slotId: r.slot_id }])
     )
 
     // Aktuální třídy dětí — termíny omezené na třídu se nabízí jen jejím dětem
@@ -129,8 +130,9 @@ export default async function PortalTripartitaPage() {
       id: s.id,
       first_name: s.first_name,
       last_name: s.last_name,
-      alreadyReserved: reservedStudentIds.has(s.id),
+      alreadyReserved: reservationByStudent.has(s.id),
       groupIds: groupsByStudent.get(s.id) ?? [],
+      reservation: reservationByStudent.get(s.id) ?? null,
     }))
   }
 

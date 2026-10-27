@@ -6911,6 +6911,10 @@ export type Database = {
       }
       can_read_student: { Args: { p_student_id: string }; Returns: boolean }
       can_read_student_ext: { Args: { p_student_id: string }; Returns: boolean }
+      cancel_tripartita_reservation: {
+        Args: { p_reservation_id: string }
+        Returns: string
+      }
       can_write_tridnice: { Args: never; Returns: boolean }
       current_guardian_id: { Args: never; Returns: string }
       current_staff_id: { Args: never; Returns: string }
