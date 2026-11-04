@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
-import { notifyDiscord, embedNovaOmluvenka } from '@/lib/discord'
+import { notifyDiscord, embedNovaOmluvenka, embedOmluvenkaZrusena } from '@/lib/discord'
 import { parseAbsenceWindow } from '@/lib/omluvenky-hodiny'
 
 export type GuardianActionResult =
@@ -119,4 +119,67 @@ export async function createGuardianOmluvenka(
 
   revalidatePath('/portal/omluvenky')
   return { success: true, id: (data as any).id }
+}
+
+// ---------------------------------------------------------------------------
+// cancelGuardianOmluvenka — rodič zruší (nebo zkrátí běžící) omluvenku
+// Pravidla a uzávěrka (22:00 předchozího dne) žijí v RPC (migrace 169).
+// ---------------------------------------------------------------------------
+
+export type CancelOmluvenkaResult =
+  | { success: true; mode: 'cancelled' | 'shortened'; dateTo: string | null }
+  | { success: false; error: string }
+
+const CANCEL_ERRORS: Record<string, string> = {
+  not_found:      'Omluvenka nebyla nalezena.',
+  not_your_child: 'Tuto omluvenku nemůžete zrušit.',
+  invalid_status: 'Zamítnutou nebo už zrušenou omluvenku nelze zrušit.',
+  too_late:       'Omluvenku už nelze zrušit — všechny její dny jsou po uzávěrce (22:00 předchozího dne).',
+}
+
+export async function cancelGuardianOmluvenka(id: string): Promise<CancelOmluvenkaResult> {
+  const { supabase, guardian } = await getAuthenticatedGuardian()
+  if (!supabase || !guardian) {
+    return { success: false, error: 'Nejste přihlášeni.' }
+  }
+
+  // Původní termín pro Discord (načíst PŘED změnou).
+  const { data: before } = await supabase
+    .from('absence_requests')
+    .select('date_from, date_to, students(first_name, last_name)')
+    .eq('id', id)
+    .maybeSingle()
+
+  const { data, error } = await supabase.rpc('guardian_cancel_absence_request', { p_id: id })
+  if (error) {
+    console.error('[cancelGuardianOmluvenka]', error)
+    return { success: false, error: 'Omluvenku se nepodařilo zrušit.' }
+  }
+
+  const res = (data ?? {}) as { result?: string; date_to?: string }
+  if (res.result !== 'cancelled' && res.result !== 'shortened') {
+    return { success: false, error: CANCEL_ERRORS[res.result ?? ''] ?? 'Omluvenku se nepodařilo zrušit.' }
+  }
+
+  const student = (before as { students: { first_name: string; last_name: string } | null } | null)?.students
+  if (before && student) {
+    void notifyDiscord(
+      embedOmluvenkaZrusena({
+        studentName:  `${student.first_name} ${student.last_name}`,
+        dateFrom:     before.date_from,
+        dateTo:       before.date_to,
+        zkracenoDo:   res.result === 'shortened' ? res.date_to ?? null : null,
+        guardianName: `${guardian.first_name} ${guardian.last_name}`,
+      })
+    )
+  }
+
+  revalidatePath('/portal/omluvenky')
+  revalidatePath('/portal/dochazka')
+  revalidatePath('/portal/obedy')
+  return {
+    success: true,
+    mode:    res.result,
+    dateTo:  res.result === 'shortened' ? res.date_to ?? null : null,
+  }
 }

@@ -260,6 +260,8 @@ export type Database = {
       }
       absence_requests: {
         Row: {
+          cancelled_at: string | null
+          cancelled_by_guardian_id: string | null
           created_at: string
           date_from: string
           date_to: string
@@ -267,6 +269,7 @@ export type Database = {
           id: string
           je_castecna: boolean
           note_internal: string | null
+          puvodni_date_to: string | null
           reason: string
           requested_by_guardian_id: string
           reviewed_at: string | null
@@ -277,6 +280,8 @@ export type Database = {
           time_to: string | null
         }
         Insert: {
+          cancelled_at?: string | null
+          cancelled_by_guardian_id?: string | null
           created_at?: string
           date_from: string
           date_to: string
@@ -284,6 +289,7 @@ export type Database = {
           id?: string
           je_castecna?: boolean
           note_internal?: string | null
+          puvodni_date_to?: string | null
           reason: string
           requested_by_guardian_id: string
           reviewed_at?: string | null
@@ -294,6 +300,8 @@ export type Database = {
           time_to?: string | null
         }
         Update: {
+          cancelled_at?: string | null
+          cancelled_by_guardian_id?: string | null
           created_at?: string
           date_from?: string
           date_to?: string
@@ -301,6 +309,7 @@ export type Database = {
           id?: string
           je_castecna?: boolean
           note_internal?: string | null
+          puvodni_date_to?: string | null
           reason?: string
           requested_by_guardian_id?: string
           reviewed_at?: string | null
@@ -311,6 +320,13 @@ export type Database = {
           time_to?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "absence_requests_cancelled_by_guardian_id_fkey"
+            columns: ["cancelled_by_guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "absence_requests_entered_by_staff_id_fkey"
             columns: ["entered_by_staff_id"]
@@ -6911,11 +6927,11 @@ export type Database = {
       }
       can_read_student: { Args: { p_student_id: string }; Returns: boolean }
       can_read_student_ext: { Args: { p_student_id: string }; Returns: boolean }
+      can_write_tridnice: { Args: never; Returns: boolean }
       cancel_tripartita_reservation: {
         Args: { p_reservation_id: string }
         Returns: string
       }
-      can_write_tridnice: { Args: never; Returns: boolean }
       current_guardian_id: { Args: never; Returns: string }
       current_staff_id: { Args: never; Returns: string }
       current_staff_role: {
@@ -7396,6 +7412,7 @@ export type Database = {
         Args: { p_student_id: string }
         Returns: boolean
       }
+      guardian_cancel_absence_request: { Args: { p_id: string }; Returns: Json }
       has_role: { Args: { p_role: string }; Returns: boolean }
       hledej_skolu: {
         Args: { p_druh?: string; p_q: string }

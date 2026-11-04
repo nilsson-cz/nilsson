@@ -40,6 +40,8 @@ export default async function OmluvenkaDetailPage({
       note_internal,
       created_at,
       reviewed_at,
+      cancelled_at,
+      puvodni_date_to,
       student_id,
       students ( id, first_name, last_name, kod_zaka ),
       guardians:requested_by_guardian_id ( first_name, last_name, phone_primary, email ),
@@ -150,13 +152,28 @@ export default async function OmluvenkaDetailPage({
           {reviewer && (
             <div>
               <dt className="text-gray-500 font-medium">
-                {req.status === 'approved' ? 'Schválil/a' : 'Zamítl/a'}
+                {req.status === 'rejected' ? 'Zamítl/a' : 'Schválil/a'}
               </dt>
               <dd className="text-gray-900 mt-0.5">
                 {reviewer.last_name} {reviewer.first_name}
                 <span className="text-gray-400 text-xs block mt-0.5">
                   {new Date(req.reviewed_at).toLocaleString('cs-CZ')}
                 </span>
+              </dd>
+            </div>
+          )}
+          {req.cancelled_at && (
+            <div className="col-span-2">
+              <dt className="text-gray-500 font-medium">
+                {req.status === 'cancelled' ? 'Zrušeno rodičem' : 'Zkráceno rodičem'}
+              </dt>
+              <dd className="text-gray-900 mt-0.5">
+                {new Date(req.cancelled_at).toLocaleString('cs-CZ')}
+                {req.puvodni_date_to && req.status !== 'cancelled' && (
+                  <span className="text-gray-400 text-xs block mt-0.5">
+                    původně do {new Date(req.puvodni_date_to).toLocaleDateString('cs-CZ')}
+                  </span>
+                )}
               </dd>
             </div>
           )}
@@ -230,6 +247,7 @@ function StatusBadge({ status }: { status: string }) {
     pending:  { label: 'Čeká na zpracování', cls: 'bg-amber-100 text-amber-800' },
     approved: { label: 'Schváleno',           cls: 'bg-green-100 text-green-800' },
     rejected: { label: 'Zamítnuto',           cls: 'bg-red-100 text-red-800' },
+    cancelled: { label: 'Zrušeno rodičem',    cls: 'bg-gray-100 text-gray-600' },
   }
   const { label, cls } = map[status] ?? { label: status, cls: 'bg-gray-100 text-gray-700' }
   return (

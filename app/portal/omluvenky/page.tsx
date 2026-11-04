@@ -1,19 +1,23 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { moznostZruseni, prvniOtevrenyDen } from '@/lib/omluvenky-zruseni'
+import ZrusitOmluvenkuButton from './_components/ZrusitOmluvenkuButton'
 
 // app/portal/omluvenky/page.tsx — seznam omluvenek zákonného zástupce
 
 const STATUS_LABEL: Record<string, string> = {
-  pending:  'Čeká na schválení',
-  approved: 'Schváleno',
-  rejected: 'Zamítnuto',
+  pending:   'Čeká na schválení',
+  approved:  'Schváleno',
+  rejected:  'Zamítnuto',
+  cancelled: 'Zrušeno',
 }
 
 const STATUS_CLASS: Record<string, string> = {
-  pending:  'bg-amber-100 text-amber-800',
-  approved: 'bg-green-100 text-green-800',
-  rejected: 'bg-red-100 text-red-800',
+  pending:   'bg-amber-100 text-amber-800',
+  approved:  'bg-green-100 text-green-800',
+  rejected:  'bg-red-100 text-red-800',
+  cancelled: 'bg-gray-100 text-gray-600',
 }
 
 export default async function PortalOmluvenkyPage() {
@@ -41,11 +45,14 @@ export default async function PortalOmluvenkyPage() {
       status,
       note_internal,
       created_at,
+      cancelled_at,
+      puvodni_date_to,
       students ( first_name, last_name )
     `)
     .order('created_at', { ascending: false })
 
   const requests = (rawRequests as any[]) ?? []
+  const prvniOtevreny = prvniOtevrenyDen()
 
   return (
     <div className="space-y-6">
@@ -72,6 +79,8 @@ export default async function PortalOmluvenkyPage() {
             const termín  = sameDay
               ? new Date(req.date_from).toLocaleDateString('cs-CZ')
               : `${new Date(req.date_from).toLocaleDateString('cs-CZ')} – ${new Date(req.date_to).toLocaleDateString('cs-CZ')}`
+            const moznost = moznostZruseni(req)
+            const prvniRuseny = moznost === 'zkratit' ? prvniOtevreny : req.date_from
 
             return (
               <div
@@ -85,11 +94,27 @@ export default async function PortalOmluvenkyPage() {
                     </p>
                     <p className="text-sm text-gray-500 mt-0.5">{termín}</p>
                   </div>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium shrink-0 ${STATUS_CLASS[req.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                    {STATUS_LABEL[req.status] ?? req.status}
-                  </span>
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_CLASS[req.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {STATUS_LABEL[req.status] ?? req.status}
+                    </span>
+                    {moznost && (
+                      <ZrusitOmluvenkuButton id={req.id} mode={moznost} prvniRusenyDen={prvniRuseny} />
+                    )}
+                  </div>
                 </div>
                 <p className="text-sm text-gray-600">{req.reason}</p>
+                {req.puvodni_date_to && req.status !== 'cancelled' && (
+                  <p className="text-xs text-gray-500">
+                    Zkráceno {new Date(req.cancelled_at).toLocaleDateString('cs-CZ')} — původně do{' '}
+                    {new Date(req.puvodni_date_to).toLocaleDateString('cs-CZ')}.
+                  </p>
+                )}
+                {req.status === 'cancelled' && req.cancelled_at && (
+                  <p className="text-xs text-gray-500">
+                    Zrušeno {new Date(req.cancelled_at).toLocaleDateString('cs-CZ')}.
+                  </p>
+                )}
                 {/* Interní poznámka průvodce — zobrazí se jen při zamítnutí */}
                 {req.status === 'rejected' && req.note_internal && (
                   <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-xs text-red-700">

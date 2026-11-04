@@ -4,6 +4,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 import {
   AttendanceRecord,
   BulkRangeParams,
@@ -18,6 +19,7 @@ import {
 import { listAllHolidays } from '@/lib/school-calendar-server'
 import { getActiveSchoolYear } from '@/lib/school-year'
 import { getNedochazejiciPsd } from '@/lib/zpusob-psd-server'
+import { notifyNeomluvenaAbsence } from '@/lib/neomluvena-absence-email'
 
 async function getSupabase() {
   const cookieStore = await cookies()
@@ -211,6 +213,20 @@ export async function saveDayAttendance(
   let saved = 0
   let deleted = 0
 
+  // Kdo je po uložení NOVĚ neomluvený (dosud jiný stav / bez záznamu) → e-mail ZZ.
+  const neomluveniIds = upserts.filter(r => r.status === 'absent_unexcused').map(r => r.studentId)
+  let noveNeomluveni: string[] = []
+  if (neomluveniIds.length > 0) {
+    const { data: predtim } = await supabase
+      .from('attendance_records')
+      .select('student_id')
+      .eq('date', date)
+      .eq('status', 'absent_unexcused')
+      .in('student_id', neomluveniIds)
+    const uz = new Set((predtim ?? []).map((r: { student_id: string }) => r.student_id))
+    noveNeomluveni = neomluveniIds.filter(id => !uz.has(id))
+  }
+
   if (upserts.length > 0) {
     // FIX: PostgREST odvozuje `columns=` jako union všech klíčů v poli.
     // Pokud je `id` přítomno u části záznamů a u jiných chybí, PostgREST
@@ -271,6 +287,12 @@ export async function saveDayAttendance(
     deleted = deletes.length
   }
 
+  // E-mail až po odpovědi — uložení docházky nečeká na Resend.
+  if (noveNeomluveni.length > 0) {
+    const nove = new Map(noveNeomluveni.map(id => [id, [date]]))
+    after(() => notifyNeomluvenaAbsence(nove))
+  }
+
   revalidatePath('/dashboard/dochazka')
   return { saved, deleted }
 }
@@ -316,11 +338,20 @@ export async function saveBulkRangeAbsence(params: BulkRangeParams): Promise<{
   const { data, error } = await supabase
     .from('attendance_records')
     .upsert(records, { onConflict: 'student_id,date', ignoreDuplicates: true })
-    .select('id')
+    .select('id, student_id, date')
 
   if (error) throw new Error(`saveBulkRangeAbsence: ${error.message}`)
 
   const created = data?.length ?? 0
+
+  // ignoreDuplicates → vrácené řádky jsou jen nově vložené; jeden e-mail na žáka.
+  if (params.status === 'absent_unexcused' && created > 0) {
+    const nove = new Map<string, string[]>()
+    for (const r of data as { student_id: string; date: string }[]) {
+      nove.set(r.student_id, [...(nove.get(r.student_id) ?? []), r.date])
+    }
+    after(() => notifyNeomluvenaAbsence(nove))
+  }
   revalidatePath('/dashboard/dochazka')
   return { created, skipped: pozadovano - created }
 }

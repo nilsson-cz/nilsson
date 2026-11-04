@@ -139,6 +139,30 @@ export function embedOmluvenkaRejected(opts: {
   }
 }
 
+export function embedOmluvenkaZrusena(opts: {
+  studentName:  string
+  dateFrom:     string
+  dateTo:       string
+  /** Vyplněno při zkrácení běžící omluvenky (nový konec). */
+  zkracenoDo:   string | null
+  guardianName: string
+}): DiscordEmbed {
+  const { studentName, dateFrom, dateTo, zkracenoDo, guardianName } = opts
+  const termin = dateFrom === dateTo ? dateFrom : `${dateFrom} – ${dateTo}`
+  return {
+    title:  zkracenoDo ? '✂️ Omluvenka zkrácena rodičem' : '🚫 Omluvenka zrušena rodičem',
+    color:  0x6b7280,
+    fields: [
+      { name: 'Žák',            value: studentName,  inline: true },
+      { name: 'Původní termín', value: termin,       inline: true },
+      ...(zkracenoDo ? [{ name: 'Nově do', value: zkracenoDo, inline: true }] : []),
+      { name: 'Zrušil/a',       value: guardianName, inline: true },
+    ],
+    footer:    { text: 'vilekula-is · rodičovský portál' },
+    timestamp: new Date().toISOString(),
+  }
+}
+
 // ─── Nástěnka ─────────────────────────────────────────────────────────────────
 
 import type { BulletinPostRow } from '@/types/bulletin'
