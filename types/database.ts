@@ -3223,6 +3223,72 @@ export type Database = {
           },
         ]
       }
+      potvrzeni_o_studiu: {
+        Row: {
+          datum_narozeni: string | null
+          id: string
+          jmeno_zaka: string
+          kod: string
+          plati_do: string
+          rocnik: number | null
+          skolni_rok: string
+          student_id: string
+          trida: string | null
+          ucel: string | null
+          vydal_guardian_id: string | null
+          vydano_at: string
+          zneplatneno_at: string | null
+          zneplatneno_duvod: string | null
+        }
+        Insert: {
+          datum_narozeni?: string | null
+          id?: string
+          jmeno_zaka: string
+          kod: string
+          plati_do: string
+          rocnik?: number | null
+          skolni_rok: string
+          student_id: string
+          trida?: string | null
+          ucel?: string | null
+          vydal_guardian_id?: string | null
+          vydano_at?: string
+          zneplatneno_at?: string | null
+          zneplatneno_duvod?: string | null
+        }
+        Update: {
+          datum_narozeni?: string | null
+          id?: string
+          jmeno_zaka?: string
+          kod?: string
+          plati_do?: string
+          rocnik?: number | null
+          skolni_rok?: string
+          student_id?: string
+          trida?: string | null
+          ucel?: string | null
+          vydal_guardian_id?: string | null
+          vydano_at?: string
+          zneplatneno_at?: string | null
+          zneplatneno_duvod?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "potvrzeni_o_studiu_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "potvrzeni_o_studiu_vydal_guardian_id_fkey"
+            columns: ["vydal_guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rozvrh_blok: {
         Row: {
           cas_do: string

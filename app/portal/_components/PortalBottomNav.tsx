@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from 'react'
 // app/portal/_components/PortalBottomNav.tsx
 // Fixed bottom navigace pro mobilní portál.
 // 5 hlavních položek (Přehled / Platby / Zprávy / Omluvenky / Více)
-// „Více" otevírá overlay s dalšími sekcemi (Třídnice, Docházka, Tripartity, Souhlasy).
+// „Více" otevírá overlay s dalšími sekcemi (Třídnice, Docházka, Tripartity, Souhlasy, Potvrzení…).
 // Aktivní barva: teal (--portal-accent) — sjednoceno se sidebarem a dashboardem.
 // Nástěnka = Zprávy: /portal/zpravy.
 
@@ -140,6 +140,16 @@ const MORE_NAV_ITEMS = [
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-5 h-5">
         <path strokeLinecap="round" strokeLinejoin="round"
           d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9 2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
+    href: '/portal/potvrzeni',
+    label: 'Potvrzení o studiu',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round"
+          d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
       </svg>
     ),
   },

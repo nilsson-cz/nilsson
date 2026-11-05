@@ -6,6 +6,8 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { computeSchoolYear, getVisibleSchoolYears, getActiveSchoolYear, nextSchoolYear } from '@/lib/school-year'
 import SkolniRokForm from './_components/SkolniRokForm'
 import YearTransition from './_components/YearTransition'
+import PotvrzeniPodpisForm from './_components/PotvrzeniPodpisForm'
+import { getPodpisy } from '@/lib/potvrzeni-o-studiu/podpis-storage'
 
 export const metadata = { title: 'Nastavení — IS Nilsson' }
 
@@ -42,6 +44,7 @@ export default async function NastaveniPage() {
   const allYears = await getVisibleSchoolYears()
   const activeYear = await getActiveSchoolYear()
   const targetYear = nextSchoolYear(activeYear)
+  const podpisy = await getPodpisy()
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-8">
@@ -74,6 +77,19 @@ export default async function NastaveniPage() {
 
       <section className="rounded-xl border border-gray-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-6">
         <YearTransition currentYear={activeYear} targetYear={targetYear} />
+      </section>
+
+      <section className="rounded-xl border border-gray-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-6">
+        <div className="mb-5">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-stone-100">
+            Podpis a razítko na potvrzení o studiu
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-stone-400 mt-0.5">
+            Vkládají se do potvrzení, která si rodiče stahují v portálu. Ideálně PNG s průhledným
+            pozadím, max. 800 kB. Uloženo v privátním úložišti; pravost ověří QR kód na potvrzení.
+          </p>
+        </div>
+        <PotvrzeniPodpisForm preview={podpisy} />
       </section>
     </div>
   )
