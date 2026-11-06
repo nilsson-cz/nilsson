@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireStaff }              from '@/lib/api-auth';
 import type { BulletinPostUpdate }   from '@/types/bulletin';
+import { eventDateToIso }            from '@/lib/bulletin/event-date';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -109,7 +110,8 @@ export async function PATCH(
   if (body.body          !== undefined) allowedUpdate.body           = body.body;
   if (body.valid_from    !== undefined) allowedUpdate.valid_from     = body.valid_from;
   if (body.valid_until   !== undefined) allowedUpdate.valid_until    = body.valid_until;
-  if (body.event_date    !== undefined) allowedUpdate.event_date     = body.event_date;
+  // datetime-local bez zóny → vždy Europe/Prague (server běží v UTC)
+  if (body.event_date    !== undefined) allowedUpdate.event_date     = eventDateToIso(body.event_date);
   if (body.event_location !== undefined) allowedUpdate.event_location = body.event_location;
   if (body.send_email    !== undefined) allowedUpdate.send_email     = body.send_email;
 

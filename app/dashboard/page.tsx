@@ -208,6 +208,7 @@ function alertGroupLink(alert_type: string, count: number, entity_id: string | n
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('cs-CZ', {
+    timeZone: 'Europe/Prague',
     day: 'numeric',
     month: 'numeric',
   })
@@ -215,6 +216,7 @@ function formatDate(dateStr: string): string {
 
 function formatDateFull(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('cs-CZ', {
+    timeZone: 'Europe/Prague',
     day: 'numeric',
     month: 'short',
   })

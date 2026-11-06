@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { CURRENT_SCHOOL_YEAR } from '@/lib/config'
+import { pragueLocalToIso } from '@/lib/prague-time'
 
 // ── Typy ─────────────────────────────────────────────────────────────────────
 
@@ -29,7 +30,7 @@ export type UpdateEventInput = {
 
 export type CreateSlotInput = {
   label: string
-  starts_at?: string   // ISO string nebo prázdný string
+  starts_at?: string   // datetime-local v pražském čase (YYYY-MM-DDTHH:mm) nebo prázdný string
   ends_at?: string
   capacity: number
   group_id?: string    // třída; prázdné = termín pro všechny třídy
@@ -60,10 +61,10 @@ async function getDirectorStaffId(): Promise<string | null> {
   return (staff as any).id
 }
 
+// Hodnota z datetime-local nemá zónu: vždy ji čteme jako pražský čas, ne jako
+// zónu serveru (Vercel = UTC → dřív se „14:00“ uložilo jako 15:00 SEČ).
 function parseTimestamp(val?: string): string | null {
-  if (!val || val.trim() === '') return null
-  const d = new Date(val)
-  return isNaN(d.getTime()) ? null : d.toISOString()
+  return pragueLocalToIso(val)
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────

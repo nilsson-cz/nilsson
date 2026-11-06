@@ -1,7 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { redirect } from 'next/navigation';
-import { format } from 'date-fns';
-import { cs } from 'date-fns/locale';
 
 type BulletinPost = {
   id: string;
@@ -40,7 +38,10 @@ const TYPE_BAR: Record<string, string> = {
 function formatDate(dateStr: string | null): string | null {
   if (!dateStr) return null;
   try {
-    return format(new Date(dateStr), 'd. MMMM yyyy', { locale: cs });
+    // Server běží v UTC → datum vždy v pražském čase.
+    return new Date(dateStr).toLocaleDateString('cs-CZ', {
+      timeZone: 'Europe/Prague', day: 'numeric', month: 'long', year: 'numeric',
+    });
   } catch {
     return dateStr;
   }

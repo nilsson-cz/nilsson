@@ -15,6 +15,7 @@
  * PRD: Nilsson_documentation/daily_notes/PRD-urazy-2026-09-10.md
  */
 
+import { pragueLocalToIso } from '@/lib/prague-time'
 import { createSupabaseServerClient as createServerClient } from '@/lib/supabase-server'
 import { getStudentAddresses, getGuardianAddresses, formatStreet } from '@/lib/addresses'
 import { CURRENT_SCHOOL_YEAR } from '@/lib/config'
@@ -72,12 +73,14 @@ const int = (fd: FormData, key: string): number | null => {
   return Number.isFinite(n) ? n : null
 }
 
-/** datetime-local / date string → ISO (timestamptz), nebo null. */
+/**
+ * datetime-local (příp. samotné datum) → ISO (timestamptz), nebo null.
+ * Hodnota nemá zónu — vždy ji čteme jako Europe/Prague (server běží v UTC).
+ */
 const ts = (fd: FormData, key: string): string | null => {
   const v = str(fd, key)
   if (v == null) return null
-  const d = new Date(v)
-  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+  return pragueLocalToIso(/^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T00:00` : v)
 }
 
 /** Pole záznamu společná pro insert i update (bez evidence/číslování a workflow). */
@@ -543,6 +546,7 @@ export async function notifyZzUraz(id: string): Promise<NotifyResult> {
   const dite = `${z.zraneny_jmeno} ${z.zraneny_prijmeni}`.trim()
   const datum = z.datum_cas
     ? new Date(z.datum_cas).toLocaleString('cs-CZ', {
+        timeZone: 'Europe/Prague',
         day: 'numeric',
         month: 'numeric',
         year: 'numeric',

@@ -52,6 +52,7 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { isoToPragueLocal } from '@/lib/prague-time';
 
 type PostType = 'message' | 'event';
 
@@ -136,7 +137,7 @@ export default function BulletinEditPage() {
         setType(postData.type ?? 'message');
         setValidFrom(postData.valid_from ?? '');
         setValidUntil(postData.valid_until ?? '');
-        setEventDate(postData.event_date ? postData.event_date.split('T')[0] : '');
+        setEventDate(isoToPragueLocal(postData.event_date));
         setEventLocation(postData.event_location ?? '');
 
         const recipRes = await fetch(`/api/bulletin/posts/${id}/recipients`);
@@ -435,9 +436,9 @@ export default function BulletinEditPage() {
         {type === 'event' && (
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Datum akce</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Datum a čas akce</label>
               <input
-                type="date"
+                type="datetime-local"
                 value={eventDate}
                 onChange={e => setEventDate(e.target.value)}
                 disabled={isLocked}

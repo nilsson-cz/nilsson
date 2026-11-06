@@ -55,7 +55,7 @@ function fmtDate(iso: string | null): string {
   if (!iso) return '—'
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' })
+  return d.toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague', day: 'numeric', month: 'numeric', year: 'numeric' })
 }
 
 function fmtDateTime(iso: string | null): string {
@@ -63,6 +63,7 @@ function fmtDateTime(iso: string | null): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '—'
   return d.toLocaleString('cs-CZ', {
+    timeZone: 'Europe/Prague',
     day: 'numeric',
     month: 'numeric',
     year: 'numeric',

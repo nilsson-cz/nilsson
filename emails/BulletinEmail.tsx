@@ -32,13 +32,13 @@ const defaultSchoolName = 'ZŠ Vilekula Teplice';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('cs-CZ', {
-    day: '2-digit', month: 'long', year: 'numeric',
+    timeZone: 'Europe/Prague', day: '2-digit', month: 'long', year: 'numeric',
   });
 }
 
 function formatDatetime(iso: string): string {
   return new Date(iso).toLocaleString('cs-CZ', {
-    day: '2-digit', month: 'long', year: 'numeric',
+    timeZone: 'Europe/Prague', day: '2-digit', month: 'long', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
 }

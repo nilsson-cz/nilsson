@@ -26,6 +26,7 @@ import {
   type UrazZaznam,
 } from '@/lib/urazy'
 import { createUraz, updateUraz, getUrazPrefill } from '@/app/actions/urazy'
+import { isoToPragueLocal } from '@/lib/prague-time'
 
 interface Student {
   id: string
@@ -40,14 +41,6 @@ interface UrazFormProps {
   schoolYear: string
   /** Existující záznam → režim úpravy. */
   initial?: UrazZaznam
-}
-
-function isoToLocalInput(iso: string | null): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
 export default function UrazForm({ students, schoolYear, initial }: UrazFormProps) {
@@ -193,12 +186,12 @@ export default function UrazForm({ students, schoolYear, initial }: UrazFormProp
       <Section title="Úraz a okolnosti">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Datum a čas úrazu" required>
-            <input type="datetime-local" name="datum_cas" required defaultValue={isoToLocalInput(initial?.datum_cas ?? null)} className={inputCls} />
+            <input type="datetime-local" name="datum_cas" required defaultValue={isoToPragueLocal(initial?.datum_cas ?? null)} className={inputCls} />
           </Field>
           <AnoNeField label="Zákonný zástupce vyrozuměn" name="zz_vyrozumen" defaultValue={initial?.zz_vyrozumen ?? ''} />
           <SelectField label="Způsob vyrozumění ZZ" name="zz_vyrozumen_zpusob" ciselnik={ZPUSOB_VYROZUMENI} defaultValue={initial?.zz_vyrozumen_zpusob ?? ''} />
           <Field label="Datum a čas vyrozumění ZZ">
-            <input type="datetime-local" name="zz_vyrozumen_datum_cas" defaultValue={isoToLocalInput(initial?.zz_vyrozumen_datum_cas ?? null)} className={inputCls} />
+            <input type="datetime-local" name="zz_vyrozumen_datum_cas" defaultValue={isoToPragueLocal(initial?.zz_vyrozumen_datum_cas ?? null)} className={inputCls} />
           </Field>
         </div>
 

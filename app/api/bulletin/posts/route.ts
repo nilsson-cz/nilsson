@@ -10,6 +10,7 @@ import { sendBulletinNotification }  from '@/lib/discord';
 import { Resend }                    from 'resend';
 import { BulletinEmail }             from '@/emails/BulletinEmail';
 import { CURRENT_SCHOOL_YEAR }       from '@/lib/config';
+import { eventDateToIso }            from '@/lib/bulletin/event-date';
 import type {
   BulletinPostRow,
   BulletinPostInsert,
@@ -69,7 +70,9 @@ export async function POST(req: NextRequest) {
   if (!body.body?.trim())        return NextResponse.json({ error: 'body je povinné' }, { status: 422 });
   if (!body.valid_from)          return NextResponse.json({ error: 'valid_from je povinný' }, { status: 422 });
   if (!body.valid_until)         return NextResponse.json({ error: 'valid_until je povinný' }, { status: 422 });
-  if (body.type === 'event' && !body.event_date)
+  // datetime-local bez zóny → vždy Europe/Prague (server běží v UTC)
+  const eventDate = eventDateToIso(body.event_date);
+  if (body.type === 'event' && !eventDate)
     return NextResponse.json({ error: 'event_date je povinný pro typ event' }, { status: 422 });
 
   const schoolYear = body.school_year ?? CURRENT_SCHOOL_YEAR;
@@ -81,7 +84,7 @@ export async function POST(req: NextRequest) {
     body:           body.body,
     valid_from:     body.valid_from,
     valid_until:    body.valid_until,
-    event_date:     body.event_date ?? null,
+    event_date:     eventDate,
     event_location: body.event_location ?? null,
     send_email:     body.send_email,
     author_id:      staffRow.id,

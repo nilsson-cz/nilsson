@@ -99,6 +99,7 @@ export default async function UrazyPage() {
           {rows.map((r) => {
             const datum = r.datum_cas
               ? new Date(r.datum_cas).toLocaleString('cs-CZ', {
+                  timeZone: 'Europe/Prague',
                   day: 'numeric',
                   month: 'numeric',
                   year: 'numeric',

@@ -12,13 +12,13 @@ import type { BulletinPostRow } from '@/types/bulletin';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('cs-CZ', {
-    day: '2-digit', month: 'long', year: 'numeric',
+    timeZone: 'Europe/Prague', day: '2-digit', month: 'long', year: 'numeric',
   });
 }
 
 function formatDatetime(iso: string): string {
   return new Date(iso).toLocaleString('cs-CZ', {
-    day: '2-digit', month: 'long', year: 'numeric',
+    timeZone: 'Europe/Prague', day: '2-digit', month: 'long', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
 }
@@ -91,10 +91,10 @@ function AgendaRow({ post }: { post: BulletinPostRow }) {
       {/* Datum badge */}
       <div className="flex-shrink-0 w-14 text-center bg-blue-50 border border-blue-100 rounded-lg py-2">
         <p className="text-xl font-bold text-blue-700 leading-none">
-          {new Date(post.event_date!).getDate().toString().padStart(2, '0')}
+          {new Date(post.event_date!).toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague', day: '2-digit' })}
         </p>
         <p className="text-xs text-blue-500 mt-0.5">
-          {new Date(post.event_date!).toLocaleDateString('cs-CZ', { month: 'short' })}
+          {new Date(post.event_date!).toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague', month: 'short' })}
         </p>
       </div>
 

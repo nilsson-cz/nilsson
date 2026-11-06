@@ -173,13 +173,13 @@ function truncate(text: string, maxLen = 300): string {
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('cs-CZ', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
+    timeZone: 'Europe/Prague', day: '2-digit', month: '2-digit', year: 'numeric',
   })
 }
 
 function formatDatetime(iso: string): string {
   return new Date(iso).toLocaleString('cs-CZ', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
+    timeZone: 'Europe/Prague', day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
 }

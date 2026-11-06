@@ -39,11 +39,12 @@ interface PageProps {
 }
 
 const fmtDate = (d: string | null) =>
-  d ? new Date(d).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' }) : '—'
+  d ? new Date(d).toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague', day: 'numeric', month: 'numeric', year: 'numeric' }) : '—'
 
 const fmtDateTime = (d: string | null) =>
   d
     ? new Date(d).toLocaleString('cs-CZ', {
+        timeZone: 'Europe/Prague',
         day: 'numeric',
         month: 'numeric',
         year: 'numeric',

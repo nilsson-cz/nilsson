@@ -8,6 +8,7 @@
  * měsíční osa je řazena v tomto školním pořadí.
  */
 
+import { isoToPragueLocal } from '@/lib/prague-time'
 import {
   ciselnikLabel,
   CAST_TELA,
@@ -104,9 +105,9 @@ export function aggregateUrazy(rows: UrazStatRow[], skolniRok: string): UrazStat
 
   for (const r of rows) {
     if (!r.datum_cas) continue
-    const d = new Date(r.datum_cas)
-    if (Number.isNaN(d.getTime())) continue
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    // Měsíc v pražském čase (server běží v UTC — úraz 1. 2. v 0:30 patří do února, ne do ledna).
+    const key = isoToPragueLocal(r.datum_cas).slice(0, 7)
+    if (!key) continue
     const bucket = byKey.get(key)
     if (bucket) bucket.count++
   }

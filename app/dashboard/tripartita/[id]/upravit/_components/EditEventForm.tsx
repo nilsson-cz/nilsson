@@ -13,6 +13,7 @@ import {
   updateSlot,
   deleteSlot,
 } from '@/app/actions/tripartita'
+import { isoToPragueLocal } from '@/lib/prague-time'
 
 type Slot = {
   id: string
@@ -44,9 +45,9 @@ type Props = {
 }
 
 function toDatetimeLocal(iso: string | null): string {
-  if (!iso) return ''
-  // Převod ISO → datetime-local formát (YYYY-MM-DDTHH:mm)
-  return iso.slice(0, 16)
+  // ISO → datetime-local (YYYY-MM-DDTHH:mm) v pražském čase; dřív slice(0, 16)
+  // vracel UTC, takže editace ukazovala čas o 1–2 h jinak
+  return isoToPragueLocal(iso)
 }
 
 const selectClass = 'w-full rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 px-3 py-2 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-orange-400'
@@ -404,7 +405,7 @@ export default function EditEventForm({ event, slots: initialSlots, groups }: Pr
                       </p>
                       <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
                         {groupName(slot.group_id) ?? 'Všechny třídy'} · Kapacita {slot.capacity} · obsazeno {slot.reserved_count}
-                        {slot.starts_at && <> · {new Date(slot.starts_at).toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</>}
+                        {slot.starts_at && <> · {new Date(slot.starts_at).toLocaleString('cs-CZ', { timeZone: 'Europe/Prague', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</>}
                       </p>
                       {slotErrors[slot.id] && (
                         <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{slotErrors[slot.id]}</p>
