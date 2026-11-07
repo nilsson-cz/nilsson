@@ -24,6 +24,7 @@ import {
   type Bunky, type Prepis, type RadekIX,
 } from '@/lib/vykaz-z201'
 import { nazevStatu } from '@/lib/staty-rast'
+import { csvZ201 } from '@/lib/vykaz-z201-csv'
 import Cislo from './_components/Cislo'
 import TiskButton from './_components/TiskButton'
 import ZmrazeniPanel from './_components/ZmrazeniPanel'
@@ -133,6 +134,7 @@ export default async function Z201Page({
   const b: Bunky = zmrazeno ? ((zaznam?.hodnoty ?? {}) as unknown as Bunky) : aplikujPrepisy(zive, prepisy)
   const kontroly = kontrolyZ201(b)
   const neprosle = kontroly.filter((k) => !k.ok)
+  const csv = csvZ201(b, env.izovZ201, rok)
   const rozdily = zmrazeno
     ? [...new Set([...Object.keys(b), ...Object.keys(zive)])].filter((k) => (b[k] ?? 0) !== (zive[k] ?? 0)).length
     : 0
@@ -208,6 +210,9 @@ export default async function Z201Page({
           <p className="mt-1 text-sm text-gray-500">
             Stav k 31. 10. {rok} · IZO zařízení {env.izoDruziny} · RED_IZO {env.redIzo} · část 01
           </p>
+          {env.izovZ201 !== env.izoDruziny && (
+            <p className="mt-0.5 text-xs text-gray-500">IZO výkazu (IZOV) pro CSV: {env.izovZ201}</p>
+          )}
           <p className="mt-1 text-xs text-gray-400 print:hidden">
             Vyplňuje se ve sberdat.uiv.cz (termín 2025 byl 11. 11.). Čísla přepište řádek po řádku;
             podtržené číslo ukáže, ze kterých dětí / pracovníků se skládá, ✎ hodnotu ručně přepíše.
@@ -223,6 +228,23 @@ export default async function Z201Page({
                 </Link>
               ))}
             </div>
+          )}
+          {csv.chyby.length === 0 ? (
+            <a
+              href={`/api/msmt/z201-csv?rok=${rok}`}
+              download={csv.nazevSouboru}
+              className="rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-stone-700 print:hidden"
+              title="Soubor pro import ve sberdat.uiv.cz (Načíst CSV)"
+            >
+              Stáhnout CSV pro sberdat
+            </a>
+          ) : (
+            <span
+              className="cursor-not-allowed rounded-lg bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 print:hidden"
+              title="Nejdřív opravte chyby CSV níže"
+            >
+              Stáhnout CSV pro sberdat
+            </span>
           )}
           <TiskButton />
         </div>
@@ -240,6 +262,12 @@ export default async function Z201Page({
 
       {/* Upozornění (jen živý výpočet) a kontroly */}
       <div className="space-y-2 print:hidden">
+        {csv.chyby.length > 0 && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+            CSV pro sberdat zatím nejde vytvořit — sberdat by ho při načtení odmítl:
+            <ul className="mt-0.5 list-disc pl-5">{csv.chyby.map((t, i) => <li key={i}>{t}</li>)}</ul>
+          </div>
+        )}
         {!zmrazeno && r.upozorneni.map((u, i) => (
           <div key={i} className={`rounded-md border px-3 py-2 text-xs ${
             u.zavaznost === 'chyba' ? 'border-red-200 bg-red-50 text-red-800'

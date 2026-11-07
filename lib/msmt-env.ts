@@ -31,6 +31,9 @@ export function msmtEnv() {
     inspisIzo:  envValue('INSPIS_IZO') ?? izo,
     // IZO školní družiny (výkaz Z 2-01) — jiné než IZO školy (MSMT_IZO).
     izoDruziny: (envValue('MSMT_IZO_DRUZINA') ?? '250015285').replace(/\s/g, ''),
+    // IZO výkazu Z 2-01 (IZOV, 1. položka CSV pro sberdat) — „ve většině případů
+    // se shoduje s IZO“ zařízení; ověřit na stránce ředitelství ve sberdat.
+    izovZ201: (envValue('MSMT_IZOV_Z201') ?? envValue('MSMT_IZO_DRUZINA') ?? '250015285').replace(/\s/g, ''),
     // Telefon do hlavičky MŠMT XML (<telefon>) — staff telefon neeviduje.
     // XSD přijímá jen číslice (přijaté soubory: 777323557); prázdný element
     // validace odmítne (testovací server 2026-09-29). Mezery a +420 se odstraní.
