@@ -1,3 +1,4 @@
+import type { Metadata, Viewport } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
@@ -12,6 +13,22 @@ import { PortalSidebar } from './_components/PortalSidebar'
 // Dark mode: ThemeSwitcher v sidebaru (light/system/dark) — stejná logika
 //            jako v personálním rozhraní (ARCH-NOTES sekce 33).
 // Nástěnka = Zprávy (jeden endpoint /portal/zpravy).
+
+// PWA na iPhonu (přidání na plochu → web push, Mikrozprávy TRD §4.2).
+export const metadata: Metadata = {
+  appleWebApp: {
+    capable: true,
+    title: 'Nilsson',
+    statusBarStyle: 'default',
+  },
+  icons: {
+    apple: '/icons/apple-touch-icon.png',
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#F97316',
+}
 
 export default async function PortalLayout({
   children,

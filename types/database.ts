@@ -3289,6 +3289,567 @@ export type Database = {
           },
         ]
       }
+      discord_channel_groups: {
+        Row: {
+          created_at: string
+          discord_channel_id: string
+          group_id: string
+        }
+        Insert: {
+          created_at?: string
+          discord_channel_id: string
+          group_id: string
+        }
+        Update: {
+          created_at?: string
+          discord_channel_id?: string
+          group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discord_channel_groups_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guardian_notification_prefs: {
+        Row: {
+          channel_mode: string
+          guardian_id: string
+          mute_non_urgent: boolean
+          updated_at: string
+        }
+        Insert: {
+          channel_mode?: string
+          guardian_id: string
+          mute_non_urgent?: boolean
+          updated_at?: string
+        }
+        Update: {
+          channel_mode?: string
+          guardian_id?: string
+          mute_non_urgent?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guardian_notification_prefs_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: true
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      micro_events: {
+        Row: {
+          id: number
+          kind: Database["public"]["Enums"]["micro_event_kind"]
+          meta: Json | null
+          occurred_at: string
+          recipient_id: string
+        }
+        Insert: {
+          id?: number
+          kind: Database["public"]["Enums"]["micro_event_kind"]
+          meta?: Json | null
+          occurred_at?: string
+          recipient_id: string
+        }
+        Update: {
+          id?: number
+          kind?: Database["public"]["Enums"]["micro_event_kind"]
+          meta?: Json | null
+          occurred_at?: string
+          recipient_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "micro_events_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "micro_recipients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      micro_message_groups: {
+        Row: {
+          group_id: string
+          message_id: string
+        }
+        Insert: {
+          group_id: string
+          message_id: string
+        }
+        Update: {
+          group_id?: string
+          message_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "micro_message_groups_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "micro_message_groups_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "micro_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      micro_message_log: {
+        Row: {
+          action: string
+          at: string
+          detail: Json | null
+          id: number
+          message_id: string
+          staff_id: string | null
+        }
+        Insert: {
+          action: string
+          at?: string
+          detail?: Json | null
+          id?: number
+          message_id: string
+          staff_id?: string | null
+        }
+        Update: {
+          action?: string
+          at?: string
+          detail?: Json | null
+          id?: number
+          message_id?: string
+          staff_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "micro_message_log_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "micro_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "micro_message_log_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      micro_messages: {
+        Row: {
+          author_staff_id: string
+          body: string
+          cancelled_at: string | null
+          created_at: string
+          discord_channel_id: string | null
+          discord_mirror_message_id: string | null
+          discord_preview_token: string | null
+          discord_preview_token_at: string | null
+          discord_source_message_id: string | null
+          discord_thread_id: string | null
+          escalated_at: string | null
+          exclude_absent: boolean
+          held_by_quiet_hours: boolean
+          id: string
+          kind: Database["public"]["Enums"]["micro_kind"]
+          link_preview: Json | null
+          link_url: string | null
+          mirror_dirty: boolean
+          mirror_updated_at: string | null
+          only_author: boolean
+          poll_closed_posted_at: string | null
+          poll_closes_at: string | null
+          results_visibility: Database["public"]["Enums"]["micro_results_visibility"]
+          retracted_at: string | null
+          revision: number
+          school_year: string
+          send_at: string | null
+          sent_at: string | null
+          source: string
+          status: Database["public"]["Enums"]["micro_status"]
+          updated_at: string
+          urgent: boolean
+        }
+        Insert: {
+          author_staff_id: string
+          body?: string
+          cancelled_at?: string | null
+          created_at?: string
+          discord_channel_id?: string | null
+          discord_mirror_message_id?: string | null
+          discord_preview_token?: string | null
+          discord_preview_token_at?: string | null
+          discord_source_message_id?: string | null
+          discord_thread_id?: string | null
+          escalated_at?: string | null
+          exclude_absent?: boolean
+          held_by_quiet_hours?: boolean
+          id?: string
+          kind?: Database["public"]["Enums"]["micro_kind"]
+          link_preview?: Json | null
+          link_url?: string | null
+          mirror_dirty?: boolean
+          mirror_updated_at?: string | null
+          only_author?: boolean
+          poll_closed_posted_at?: string | null
+          poll_closes_at?: string | null
+          results_visibility?: Database["public"]["Enums"]["micro_results_visibility"]
+          retracted_at?: string | null
+          revision?: number
+          school_year: string
+          send_at?: string | null
+          sent_at?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["micro_status"]
+          updated_at?: string
+          urgent?: boolean
+        }
+        Update: {
+          author_staff_id?: string
+          body?: string
+          cancelled_at?: string | null
+          created_at?: string
+          discord_channel_id?: string | null
+          discord_mirror_message_id?: string | null
+          discord_preview_token?: string | null
+          discord_preview_token_at?: string | null
+          discord_source_message_id?: string | null
+          discord_thread_id?: string | null
+          escalated_at?: string | null
+          exclude_absent?: boolean
+          held_by_quiet_hours?: boolean
+          id?: string
+          kind?: Database["public"]["Enums"]["micro_kind"]
+          link_preview?: Json | null
+          link_url?: string | null
+          mirror_dirty?: boolean
+          mirror_updated_at?: string | null
+          only_author?: boolean
+          poll_closed_posted_at?: string | null
+          poll_closes_at?: string | null
+          results_visibility?: Database["public"]["Enums"]["micro_results_visibility"]
+          retracted_at?: string | null
+          revision?: number
+          school_year?: string
+          send_at?: string | null
+          sent_at?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["micro_status"]
+          updated_at?: string
+          urgent?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "micro_messages_author_staff_id_fkey"
+            columns: ["author_staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      micro_poll_options: {
+        Row: {
+          id: string
+          label: string
+          message_id: string
+          position: number
+        }
+        Insert: {
+          id?: string
+          label: string
+          message_id: string
+          position: number
+        }
+        Update: {
+          id?: string
+          label?: string
+          message_id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "micro_poll_options_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "micro_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      micro_poll_votes: {
+        Row: {
+          id: number
+          message_id: string
+          option_id: string
+          recipient_id: string
+          student_id: string
+          voted_at: string
+        }
+        Insert: {
+          id?: number
+          message_id: string
+          option_id: string
+          recipient_id: string
+          student_id: string
+          voted_at?: string
+        }
+        Update: {
+          id?: number
+          message_id?: string
+          option_id?: string
+          recipient_id?: string
+          student_id?: string
+          voted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "micro_poll_votes_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "micro_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "micro_poll_votes_option_id_fkey"
+            columns: ["option_id"]
+            isOneToOne: false
+            referencedRelation: "micro_poll_options"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "micro_poll_votes_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "micro_recipients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      micro_replies: {
+        Row: {
+          body: string
+          channel: string
+          id: string
+          message_id: string
+          meta: Json | null
+          notified_at: string | null
+          received_at: string
+          recipient_id: string
+        }
+        Insert: {
+          body: string
+          channel: string
+          id?: string
+          message_id: string
+          meta?: Json | null
+          notified_at?: string | null
+          received_at?: string
+          recipient_id: string
+        }
+        Update: {
+          body?: string
+          channel?: string
+          id?: string
+          message_id?: string
+          meta?: Json | null
+          notified_at?: string | null
+          received_at?: string
+          recipient_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "micro_replies_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "micro_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "micro_replies_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "micro_recipients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      micro_recipient_students: {
+        Row: {
+          group_id: string
+          message_id: string
+          recipient_id: string
+          student_id: string
+        }
+        Insert: {
+          group_id: string
+          message_id: string
+          recipient_id: string
+          student_id: string
+        }
+        Update: {
+          group_id?: string
+          message_id?: string
+          recipient_id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "micro_recipient_students_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "micro_recipient_students_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "micro_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "micro_recipient_students_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "micro_recipients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "micro_recipient_students_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      micro_recipients: {
+        Row: {
+          best_state: number
+          created_at: string
+          email_at_send: string | null
+          guardian_id: string
+          id: string
+          message_id: string
+          phone_at_send: string | null
+          plan_email: boolean
+          plan_push: boolean
+          token_expires_at: string
+          token_enc: string | null
+          token_hash: string
+        }
+        Insert: {
+          best_state?: number
+          created_at?: string
+          email_at_send?: string | null
+          guardian_id: string
+          id?: string
+          message_id: string
+          phone_at_send?: string | null
+          plan_email: boolean
+          plan_push: boolean
+          token_expires_at: string
+          token_enc?: string | null
+          token_hash: string
+        }
+        Update: {
+          best_state?: number
+          created_at?: string
+          email_at_send?: string | null
+          guardian_id?: string
+          id?: string
+          message_id?: string
+          phone_at_send?: string | null
+          plan_email?: boolean
+          plan_push?: boolean
+          token_expires_at?: string
+          token_enc?: string | null
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "micro_recipients_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "micro_recipients_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "micro_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          guardian_id: string
+          id: string
+          last_success_at: string | null
+          p256dh: string
+          platform: string | null
+          revoke_reason: string | null
+          revoked_at: string | null
+          updated_at: string
+          user_agent: string | null
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          guardian_id: string
+          id?: string
+          last_success_at?: string | null
+          p256dh: string
+          platform?: string | null
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          guardian_id?: string
+          id?: string
+          last_success_at?: string | null
+          p256dh?: string
+          platform?: string | null
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rozvrh_blok: {
         Row: {
           cas_do: string
@@ -4456,6 +5017,7 @@ export type Database = {
           created_at: string
           discord_user_id: string
           discord_username: string | null
+          self_guardian_id: string | null
           staff_id: string
           updated_at: string
         }
@@ -4463,6 +5025,7 @@ export type Database = {
           created_at?: string
           discord_user_id: string
           discord_username?: string | null
+          self_guardian_id?: string | null
           staff_id: string
           updated_at?: string
         }
@@ -4470,6 +5033,7 @@ export type Database = {
           created_at?: string
           discord_user_id?: string
           discord_username?: string | null
+          self_guardian_id?: string | null
           staff_id?: string
           updated_at?: string
         }
@@ -7307,6 +7871,24 @@ export type Database = {
           title: string
         }[]
       }
+      get_guardian_micro_messages: {
+        Args: { p_limit?: number }
+        Returns: {
+          acked: boolean
+          body: string
+          group_label: string
+          id: string
+          kind: Database["public"]["Enums"]["micro_kind"]
+          link_url: string
+          only_author: boolean
+          poll_closes_at: string
+          revision: number
+          sent_at: string
+          status: Database["public"]["Enums"]["micro_status"]
+          token_enc: string
+          urgent: boolean
+        }[]
+      }
       get_guardian_unpaid_receivables: {
         Args: never
         Returns: {
@@ -7711,6 +8293,80 @@ export type Database = {
           kept: Json
         }[]
       }
+      micro_claim_due: {
+        Args: { p_limit: number }
+        Returns: Database["public"]["Tables"]["micro_messages"]["Row"][]
+      }
+      micro_message_stats: {
+        Args: { p_message_id: string }
+        Returns: {
+          acked: number
+          children: number
+          emailed: number
+          nothing: number
+          opened: number
+          shown: number
+          undelivered: number
+        }[]
+      }
+      micro_poll_stats: {
+        Args: { p_message_id: string }
+        Returns: {
+          label: string
+          option_id: string
+          pos: number
+          votes: number
+        }[]
+      }
+      micro_preview_counts: {
+        Args: {
+          p_date: string
+          p_exclude_absent: boolean
+          p_group_ids: string[]
+          p_school_year: string
+        }
+        Returns: {
+          children: number
+          email_only: number
+          guardians: number
+          no_contact: number
+          with_push: number
+        }[]
+      }
+      micro_record_event: {
+        Args: {
+          p_kind: Database["public"]["Enums"]["micro_event_kind"]
+          p_meta?: Json
+          p_recipient_id: string
+        }
+        Returns: boolean
+      }
+      micro_resolve_recipients: {
+        Args: {
+          p_date: string
+          p_exclude_absent: boolean
+          p_group_ids: string[]
+          p_school_year: string
+        }
+        Returns: {
+          email: string
+          group_id: string
+          guardian_id: string
+          phone: string
+          student_id: string
+        }[]
+      }
+      push_subscribe: {
+        Args: {
+          p_auth: string
+          p_endpoint: string
+          p_p256dh: string
+          p_platform: string
+          p_user_agent: string
+        }
+        Returns: string
+      }
+      push_unsubscribe: { Args: { p_endpoint: string }; Returns: undefined }
       recalculate_semester_summary: {
         Args: {
           p_group_id: string
@@ -7828,6 +8484,25 @@ export type Database = {
       zrusit_potvrzeni_blok: { Args: { p_blok_id: string }; Returns: undefined }
     }
     Enums: {
+      micro_event_kind:
+        | "push_sent"
+        | "push_failed"
+        | "push_shown"
+        | "email_queued"
+        | "opened"
+        | "acked"
+        | "sms_sent"
+        | "sms_failed"
+      micro_kind: "info" | "confirm" | "poll"
+      micro_results_visibility: "never" | "after_vote" | "after_close"
+      micro_status:
+        | "draft"
+        | "scheduled"
+        | "sending"
+        | "sent"
+        | "cancelled"
+        | "retracted"
+        | "failed"
       address_typ: "trvale" | "kontaktni"
       alert_severity: "info" | "warning" | "critical"
       contract_type: "enrollment" | "amendment" | "termination"
@@ -8349,6 +9024,27 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      micro_event_kind: [
+        "push_sent",
+        "push_failed",
+        "push_shown",
+        "email_queued",
+        "opened",
+        "acked",
+        "sms_sent",
+        "sms_failed",
+      ],
+      micro_kind: ["info", "confirm", "poll"],
+      micro_results_visibility: ["never", "after_vote", "after_close"],
+      micro_status: [
+        "draft",
+        "scheduled",
+        "sending",
+        "sent",
+        "cancelled",
+        "retracted",
+        "failed",
+      ],
       address_typ: ["trvale", "kontaktni"],
       alert_severity: ["info", "warning", "critical"],
       contract_type: ["enrollment", "amendment", "termination"],

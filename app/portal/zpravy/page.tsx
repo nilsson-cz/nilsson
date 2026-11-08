@@ -1,5 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
+import { MicroFeed, type MicroFeedRow } from './MicroFeed';
 
 type BulletinPost = {
   id: string;
@@ -66,6 +68,11 @@ export default async function ZpravyPage() {
 
   const bulletinPosts: BulletinPost[] = (posts as BulletinPost[] | null) ?? [];
 
+  // Rychlé zprávy (mikrozprávy z Discordu) — migrace 180.
+  const { data: microRows, error: microError } = await supabase.rpc('get_guardian_micro_messages', { p_limit: 30 });
+  if (microError) console.error('[/portal/zpravy] micro RPC error:', microError);
+  const micro = (microRows ?? []) as MicroFeedRow[];
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Hlavička */}
@@ -74,9 +81,14 @@ export default async function ZpravyPage() {
         <p className="mt-0.5 text-sm text-gray-500">
           Oznámení a informace určené vaší rodině
         </p>
+        <Link href="/portal/upozorneni" className="mt-2 inline-block text-xs text-emerald-700 underline">
+          🔔 Nastavení upozornění
+        </Link>
       </div>
 
       <div className="px-4 py-4">
+        <MicroFeed rows={micro} />
+
         {/* Chyba */}
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -86,7 +98,7 @@ export default async function ZpravyPage() {
         )}
 
         {/* Prázdný stav */}
-        {!error && bulletinPosts.length === 0 && (
+        {!error && bulletinPosts.length === 0 && micro.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="text-4xl mb-3">📭</div>
             <p className="text-gray-500 font-medium">Žádné zprávy</p>

@@ -8,6 +8,8 @@
 import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import DiscordIdRow from './_components/DiscordIdRow'
+import { ChannelMapping, SelfGuardianRow } from './_components/MikrozpravySettings'
+import { getActiveSchoolYear } from '@/lib/school-year'
 
 export const metadata = { title: 'Discord ID — IS Nilsson' }
 
@@ -37,15 +39,24 @@ export default async function DiscordAdminPage() {
   }
 
   const today = new Date().toISOString().slice(0, 10)
-  const [{ data: staffRaw }, { data: discordRaw }] = await Promise.all([
+  const schoolYear = await getActiveSchoolYear()
+  const [{ data: staffRaw }, { data: discordRaw }, { data: groupsRaw }, { data: mapRaw }, { data: guardiansRaw }] = await Promise.all([
     supabase.from('staff').select('id, first_name, last_name, role, employment_end').order('last_name'),
-    supabase.from('staff_discord').select('staff_id, discord_user_id, discord_username'),
+    supabase.from('staff_discord').select('staff_id, discord_user_id, discord_username, self_guardian_id'),
+    supabase.from('groups').select('id, name').eq('school_year', schoolYear).order('name'),
+    supabase.from('discord_channel_groups').select('discord_channel_id, group_id').order('discord_channel_id'),
+    supabase.from('guardians').select('id, first_name, last_name, email').order('last_name'),
   ])
+  const groupOptions = (groupsRaw ?? []).map(g => ({ id: g.id, label: g.name }))
+  const groupName = new Map(groupOptions.map(g => [g.id, g.label]))
+  const mappings = (mapRaw ?? []).map(m => ({ channelId: m.discord_channel_id, groupId: m.group_id, groupName: groupName.get(m.group_id) ?? '(jiný školní rok)' }))
+  const guardianOptions = (guardiansRaw ?? []).map(g => ({ id: g.id, label: `${g.last_name} ${g.first_name}${g.email ? ` · ${g.email}` : ''}` }))
+  const selfGuardian = new Map((discordRaw ?? []).map(d => [d.staff_id, d.self_guardian_id ?? '']))
   const staff = ((staffRaw ?? []) as StaffRow[])
     .map((s) => ({ ...s, active: !s.employment_end || s.employment_end >= today }))
     .sort((a, b) => (a.active === b.active ? 0 : a.active ? -1 : 1))
   const discordMap = new Map<string, { id: string; username: string }>(
-    ((discordRaw ?? []) as any[]).map((d) => [d.staff_id, { id: d.discord_user_id, username: d.discord_username ?? '' }]),
+    (discordRaw ?? []).map((d) => [d.staff_id, { id: d.discord_user_id, username: d.discord_username ?? '' }]),
   )
 
   return (
@@ -89,6 +100,43 @@ export default async function DiscordAdminPage() {
       {staff.length === 0 && (
         <p className="text-sm text-gray-400">Žádní zaměstnanci.</p>
       )}
+
+      {/* ── Mikrozprávy ───────────────────────────────────────────── */}
+      <section className="space-y-3 border-t border-gray-200 pt-6 dark:border-stone-700">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-stone-100">Mikrozprávy: výchozí skupina kanálu</h2>
+          <p className="text-sm text-gray-500 dark:text-stone-400">
+            Když učitel pošle <code>/rodicum</code> nebo <code>/anketa</code> v kanálu bez zadané skupiny, předvyplní se tahle. Jde změnit v náhledu.
+            ID kanálu: pravý klik na kanál → <em>Kopírovat ID kanálu</em>.
+          </p>
+        </div>
+        <ChannelMapping mappings={mappings} groups={groupOptions} />
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-stone-100">Mikrozprávy: „jen mně“ (testovací zprávy)</h2>
+          <p className="text-sm text-gray-500 dark:text-stone-400">
+            Pro <code>/rodicum jen_mne:True</code>: který záznam rodiče patří zaměstnanci. Automaticky se najde, když má rodič stejné přihlášení nebo e-mail; jinak vyberte ručně.
+          </p>
+        </div>
+        <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-stone-700">
+          <table className="w-full text-sm">
+            <tbody className="divide-y divide-gray-100 dark:divide-stone-800">
+              {staff.filter(s => s.active && discordMap.has(s.id)).map(s => (
+                <SelfGuardianRow
+                  key={s.id}
+                  staffId={s.id}
+                  name={`${s.last_name} ${s.first_name}`}
+                  current={selfGuardian.get(s.id) ?? ''}
+                  guardians={guardianOptions}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs text-gray-400">Zobrazují se jen aktivní zaměstnanci s vyplněným Discord ID.</p>
+      </section>
     </div>
   )
 }

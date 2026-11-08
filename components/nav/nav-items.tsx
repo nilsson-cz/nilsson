@@ -294,6 +294,16 @@ export const NAV_ITEMS: NavItem[] = [
     bottomNav: false,
   },
   {
+    // Archiv rychlých zpráv z Discordu — posílá se z Discordu, sem se jen nahlíží.
+    href: '/dashboard/mikrozpravy',
+    label: 'Mikrozprávy',
+    icon: Icons.messages,
+    roles: ['director', 'vp', 'guide', 'assistant', 'readonly'],
+    primaryFor: [],
+    desc: 'Archiv rychlých zpráv a anket rodičům z Discordu',
+    tint: T.sky,
+  },
+  {
     href: '/dashboard/zivot/prispevky',
     label: 'Fotogalerie',
     icon: Icons.photo,

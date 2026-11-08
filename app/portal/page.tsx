@@ -1,5 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import Link from 'next/link'
+import { PushOnboarding } from './_components/PushOnboarding'
+import { pushPilotEnabled } from '@/lib/push/pilot'
 
 // app/portal/page.tsx
 // Dashboard rodičovského portálu.
@@ -28,8 +30,15 @@ export default async function PortalDashboardPage() {
 
   const bulletinPosts = (bulletinRows ?? []) as BulletinPost[]
 
+  // Karta upozornění (web push) — během pilotu jen vybraným ZZ (env), viz pushPilotEnabled.
+  const { data: selfRows } = await supabase.rpc('get_or_link_guardian_self')
+  const showPush = pushPilotEnabled(selfRows?.[0]?.id ?? null)
+
   return (
     <div className="space-y-6">
+
+      {/* ── Upozornění (web push, Mikrozprávy F1-0) ────────────────── */}
+      {showPush && <PushOnboarding />}
 
       {/* ── Metriky ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3">
