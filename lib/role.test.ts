@@ -1,7 +1,7 @@
 // Spuštění: npx tsx --test lib/role.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { cilPoPrihlaseni, dnesPraha, jeAktivniZamestnanec, parseRole, roleForPath, safeNext } from './role'
+import { cilPoPrihlaseni, dnesPraha, DOMOV_APP, jeAktivniZamestnanec, parseRole, roleForPath, safeNext } from './role'
 
 test('roleForPath', () => {
   assert.equal(roleForPath('/dashboard'), 'skola')
@@ -56,4 +56,12 @@ test('jeAktivniZamestnanec — do dne konce včetně', () => {
 test('dnesPraha — po půlnoci v Praze už je další den', () => {
   assert.equal(dnesPraha(new Date('2026-11-12T23:30:00Z')), '2026-11-13')
   assert.equal(dnesPraha(new Date('2026-07-01T21:59:00Z')), '2026-07-01')
+})
+
+test('appka z plochy používá DOMOV_APP (next má dál přednost)', () => {
+  const obe = { isStaff: true, isGuardian: true, app: true }
+  assert.equal(cilPoPrihlaseni({ ...obe, lastRole: 'skola' }), DOMOV_APP.skola)
+  assert.equal(cilPoPrihlaseni({ ...obe, lastRole: 'rodic' }), DOMOV_APP.rodic)
+  assert.equal(cilPoPrihlaseni({ isStaff: true, isGuardian: false, app: true }), DOMOV_APP.skola)
+  assert.equal(cilPoPrihlaseni({ ...obe, next: '/portal/platby' }), '/portal/platby')
 })

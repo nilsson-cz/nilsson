@@ -7,14 +7,16 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
-import { cilPoPrihlaseni, jeAktivniZamestnanec, parseRole, ROLE_COOKIE } from '@/lib/role'
+import { cilPoPrihlaseni, jeAktivniZamestnanec, parseRole, ROLE_COOKIE, ZDROJ_APP } from '@/lib/role'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.redirect(new URL('/login', request.url))
+  // Appka z plochy (manifest start_url ?zdroj=app) — příznak přežije i přihlášení.
+  const app = request.nextUrl.searchParams.get('zdroj') === ZDROJ_APP
+  if (!user) return NextResponse.redirect(new URL(app ? `/login?zdroj=${ZDROJ_APP}` : '/login', request.url))
 
   const [{ data: staff }, { data: guardianRows }] = await Promise.all([
     supabase.from('staff').select('id, employment_end').eq('user_id', user.id).maybeSingle(),
@@ -27,6 +29,7 @@ export async function GET(request: NextRequest) {
     isGuardian: (guardianRows?.length ?? 0) > 0,
     next: request.nextUrl.searchParams.get('next'),
     lastRole: parseRole(request.cookies.get(ROLE_COOKIE)?.value),
+    app,
   })
 
   if (!cil) {

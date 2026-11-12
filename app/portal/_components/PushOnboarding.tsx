@@ -14,6 +14,7 @@
 // testovacího upozornění — slouží k ověření na reálném iPhonu/Androidu.
 
 import { useCallback, useEffect, useState } from 'react'
+import { isIos, isStandalone } from '@/lib/pwa-detect'
 
 type State = 'loading' | 'ios-install' | 'unsupported' | 'denied' | 'off' | 'on'
 
@@ -25,16 +26,6 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   const out = new Uint8Array(new ArrayBuffer(raw.length))
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i)
   return out
-}
-
-function isIos(): boolean {
-  const ua = navigator.userAgent
-  return /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1)
-}
-
-function isStandalone(): boolean {
-  const nav = navigator as Navigator & { standalone?: boolean }
-  return window.matchMedia('(display-mode: standalone)').matches || nav.standalone === true
 }
 
 function pushSupported(): boolean {

@@ -249,6 +249,15 @@ export const NAV_ITEMS: NavItem[] = [
     bottomNav: true,
   },
   {
+    // Mobilní přehled dne (PRD-pwa F2) — sem otevírá appka z plochy.
+    href: '/dashboard/dnes',
+    label: 'Dnes',
+    icon: Icons.sun,
+    roles: ['director', 'vp', 'guide', 'assistant', 'readonly', 'vychovatel'],
+    primaryFor: ['director', 'vp', 'guide', 'assistant', 'vychovatel'],
+    desc: 'Moje třída na dnešek: kdo chybí, omluvenky, obědy, družina',
+  },
+  {
     href: '/dashboard/dochazka',
     label: 'Docházka',
     icon: Icons.attendance,

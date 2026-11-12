@@ -17,6 +17,7 @@ import AppNav from '@/components/nav/AppNav'
 import type { Database } from '@/types/database'
 import { NilssonLogo } from '@/components/NilssonLogo'
 import { jeAktivniZamestnanec } from '@/lib/role'
+import { InstallAppBanner } from '@/components/InstallAppBanner'
 
 export type StaffRole = Database['public']['Enums']['staff_role']
 export type AllRoles = StaffRole | 'vychovatel'
@@ -104,6 +105,7 @@ export default async function DashboardLayout({
 
         {/* Page content — scrollovatelný */}
         <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
+          <InstallAppBanner />
           {children}
         </main>
       </div>

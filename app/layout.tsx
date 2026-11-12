@@ -16,6 +16,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "IS Nilsson",
   description: "Informační systém ZŠ Vilekula Teplice",
+  // Appka „Nilsson" na ploše (PRD-pwa-zamestnanci R3): iPhone přidá na plochu
+  // jako samostatnou appku z jakékoli stránky — dashboardu, portálu i /login.
+  appleWebApp: { capable: true, title: "Nilsson", statusBarStyle: "default" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
 };
 
 export default function RootLayout({

@@ -47,10 +47,12 @@ function LoginInner() {
   const [callbackError, setCallbackError]   = useState<string | null>(null)
   const [captchaToken, setCaptchaToken]     = useState<string | null>(null)
   const [next, setNext]                     = useState<string | null>(null)
+  const [zdroj, setZdroj]                   = useState<string | null>(null)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     setNext(params.get('next'))
+    setZdroj(params.get('zdroj'))
     const err = params.get('error')
     if (err && ERROR_MESSAGES[err]) {
       setCallbackError(ERROR_MESSAGES[err])
@@ -123,9 +125,10 @@ function LoginInner() {
     }
 
     // Kam dál (dashboard / portál / poslední použitá role) rozhodne server.
-    window.location.href = next
-      ? `/auth/rozcestnik?next=${encodeURIComponent(next)}`
-      : '/auth/rozcestnik'
+    const q = new URLSearchParams()
+    if (next) q.set('next', next)
+    if (zdroj) q.set('zdroj', zdroj) // appka z plochy (PRD-pwa R4)
+    window.location.href = q.size ? `/auth/rozcestnik?${q.toString()}` : '/auth/rozcestnik'
   }
 
   function handleReset() {
