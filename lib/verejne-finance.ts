@@ -153,7 +153,7 @@ type Pageable = {
   range: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>
 }
 
-async function fetchAll<T>(build: () => Pageable): Promise<T[]> {
+export async function fetchAll<T>(build: () => Pageable): Promise<T[]> {
   const out: T[] = []
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await build().range(from, from + PAGE - 1)

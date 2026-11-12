@@ -9,6 +9,7 @@
 //   4) úklid: drafty starší 24 h → cancelled
 
 import { NextRequest, NextResponse } from 'next/server'
+import { isCronAuthorized } from '@/lib/cron-auth'
 import { createSupabaseAdmin } from '@/lib/supabase-server'
 import { dispatchMessage } from '@/lib/mikrozpravy/dispatch'
 import { closeDuePolls, publishMirror, refreshDirtyMirrors } from '@/lib/mikrozpravy/mirror'
@@ -79,7 +80,7 @@ async function tick() {
 }
 
 export async function POST(req: NextRequest) {
-  if (!process.env.CRON_SECRET || req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {

@@ -17,6 +17,8 @@ import { getActiveSchoolYear } from '@/lib/school-year'
 import { getMissingTKDays } from '@/lib/tridni-kniha-missing'
 import { getEnrollmentPendingDecisionCount } from '@/lib/enrollment/dashboard-queries'
 import { NAV_ITEMS, type NavItem } from '@/components/nav/nav-items'
+import { Suspense } from 'react'
+import ManagementFinanceWidget, { ManagementFinanceWidgetFallback } from './_components/ManagementFinanceWidget'
 
 type AlertGroup = {
   alert_type: string
@@ -650,6 +652,11 @@ export default async function DashboardPage() {
         <PendingOmluvenkyWidget omluvenky={pendingOmluvenky} />
         {isDirectorOrVP && <PaymentsWidget unmatchedCount={unmatchedCount} />}
         {isDirector && <QuickLinksWidget />}
+        {isDirector && (
+          <Suspense fallback={<ManagementFinanceWidgetFallback />}>
+            <ManagementFinanceWidget />
+          </Suspense>
+        )}
       </div>
     </div>
   )

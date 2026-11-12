@@ -164,6 +164,11 @@ export const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2M5 12h14M8 7h.01M8 17h.01" />
     </svg>
   ),
+  chartBar: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18M7 15v2m4-6v6m4-9v9m4-12v12" />
+    </svg>
+  ),
   vykazKu: (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2a2 2 0 012-2h2a2 2 0 012 2v2M9 7h6m-8 14h10a2 2 0 002-2V7a2 2 0 00-2-2h-2.586a1 1 0 01-.707-.293l-1.414-1.414A1 1 0 0011.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -573,6 +578,15 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['director'],
     primaryFor: [],
     desc: 'Nárok na státní dotaci po IZO a měsících — normativy, koeficienty, kapacita',
+    tint: T.emerald,
+  },
+  {
+    href: '/dashboard/manazerske-ucetnictvi',
+    label: 'Manažerské účetnictví',
+    icon: Icons.chartBar,
+    roles: ['director'],
+    primaryFor: [],
+    desc: 'Výsledek po činnostech a akcích — příjmy z IS, náklady z ABRA Flexi',
     tint: T.emerald,
   },
   {

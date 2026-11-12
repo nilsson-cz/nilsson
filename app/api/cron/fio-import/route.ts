@@ -11,15 +11,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { isCronAuthorized } from '@/lib/cron-auth'
 import { createSupabaseAdmin } from '@/lib/supabase-server'
-import { fetchFioTransactions } from '@/lib/fio'
+import { fetchFioStatement } from '@/lib/fio'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
   // Ochrana endpointu — Vercel Cron posílá Authorization header automaticky
-  const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -35,11 +35,22 @@ export async function GET(req: NextRequest) {
   const from = req.nextUrl.searchParams.get('from') ?? undefined
 
   let transactions
+  let info
   try {
-    transactions = await fetchFioTransactions(token, from)
+    ({ transactions, info } = await fetchFioStatement(token, from))
   } catch (err) {
     console.error('[fio-import] Fio API chyba:', err)
     return NextResponse.json({ error: 'Fio API nedostupné' }, { status: 502 })
+  }
+
+  // Zůstatek účtu pro cash-flow (Manažerské účetnictví F5, migrace 157).
+  // Nekritické — chyba (např. migrace ještě neběžela) import neshodí.
+  if (info.closingBalance !== null && info.dateEnd) {
+    const { error: balErr } = await createSupabaseAdmin().from('mu_ucet_zustatek').upsert(
+      { datum: info.dateEnd, zustatek: info.closingBalance, zdroj: 'fio', zapsano: new Date().toISOString() },
+      { onConflict: 'datum' },
+    )
+    if (balErr) console.warn('[fio-import] Zůstatek se nepodařilo uložit:', balErr.message)
   }
 
   if (transactions.length === 0) {

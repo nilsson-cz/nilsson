@@ -32,7 +32,20 @@ interface FioApiTransaction {
   column25: { value: string } | null   // Komentář
 }
 
+/** Hlavička výpisu (accountStatement.info) — zůstatek pro cash-flow (Manažerské účetnictví F5). */
+export interface FioStatementInfo {
+  openingBalance: number | null
+  closingBalance: number | null
+  dateStart: string | null   // 'YYYY-MM-DD'
+  dateEnd: string | null     // 'YYYY-MM-DD' — ke dni zůstatku closingBalance
+}
+
 export async function fetchFioTransactions(token: string, from?: string): Promise<FioTransaction[]> {
+  return (await fetchFioStatement(token, from)).transactions
+}
+
+/** Výpis: transakce + hlavička se zůstatkem. Hlavička přijde i při nulovém počtu transakcí. */
+export async function fetchFioStatement(token: string, from?: string): Promise<{ transactions: FioTransaction[]; info: FioStatementInfo }> {
   const today = new Date().toISOString().slice(0, 10)
   const url = from
     ? `https://fioapi.fio.cz/v1/rest/periods/${token}/${from}/${today}/transactions.json`
@@ -52,8 +65,17 @@ export async function fetchFioTransactions(token: string, from?: string): Promis
   const json = await res.json()
   const transactions: FioApiTransaction[] =
     json?.accountStatement?.transactionList?.transaction ?? []
+  const rawInfo = json?.accountStatement?.info ?? {}
+  const numOrNull = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+  const dateOrNull = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null)
+  const info: FioStatementInfo = {
+    openingBalance: numOrNull(rawInfo.openingBalance),
+    closingBalance: numOrNull(rawInfo.closingBalance),
+    dateStart: dateOrNull(rawInfo.dateStart),
+    dateEnd: dateOrNull(rawInfo.dateEnd),
+  }
 
-  return transactions.map((t) => ({
+  return { info, transactions: transactions.map((t) => ({
     fioTransactionId: String(t.column22?.value ?? ''),
     date:             (t.column0?.value ?? '').slice(0, 10),  // '2026-05-14T00:00:00+02:00' → '2026-05-14'
     amount:           t.column1?.value ?? 0,
@@ -63,5 +85,5 @@ export async function fetchFioTransactions(token: string, from?: string): Promis
     variableSymbol:      t.column5?.value ?? null,
     specificSymbol:      t.column6?.value ?? null,  // ← přidáno
     note:                t.column25?.value ?? null,
-  }))
+  })) }
 }

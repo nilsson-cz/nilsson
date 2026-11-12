@@ -3050,6 +3050,1011 @@ export type Database = {
           },
         ]
       }
+      mu_abra_ciselnik: {
+        Row: {
+          druh: string
+          kod: string
+          nazev: string | null
+        }
+        Insert: {
+          druh: string
+          kod: string
+          nazev?: string | null
+        }
+        Update: {
+          druh?: string
+          kod?: string
+          nazev?: string | null
+        }
+        Relationships: []
+      }
+      mu_abra_override: {
+        Row: {
+          cil_akce_id: string | null
+          cil_cinnost_id: string | null
+          flexi_id: number
+          kategorie_id: string | null
+          period: string | null
+          poznamka: string
+          updated_at: string
+          updated_by: string | null
+          vyloucit: boolean
+        }
+        Insert: {
+          cil_akce_id?: string | null
+          cil_cinnost_id?: string | null
+          flexi_id: number
+          kategorie_id?: string | null
+          period?: string | null
+          poznamka: string
+          updated_at?: string
+          updated_by?: string | null
+          vyloucit?: boolean
+        }
+        Update: {
+          cil_akce_id?: string | null
+          cil_cinnost_id?: string | null
+          flexi_id?: number
+          kategorie_id?: string | null
+          period?: string | null
+          poznamka?: string
+          updated_at?: string
+          updated_by?: string | null
+          vyloucit?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mu_abra_override_cil_akce_id_fkey"
+            columns: ["cil_akce_id"]
+            isOneToOne: false
+            referencedRelation: "mu_akce"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mu_abra_override_cil_cinnost_id_fkey"
+            columns: ["cil_cinnost_id"]
+            isOneToOne: false
+            referencedRelation: "mu_cinnost"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mu_abra_override_flexi_id_fkey"
+            columns: ["flexi_id"]
+            isOneToOne: true
+            referencedRelation: "mu_abra_radek"
+            referencedColumns: ["flexi_id"]
+          },
+          {
+            foreignKeyName: "mu_abra_override_kategorie_id_fkey"
+            columns: ["kategorie_id"]
+            isOneToOne: false
+            referencedRelation: "mu_kategorie"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mu_abra_override_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mu_abra_radek: {
+        Row: {
+          castka: number
+          cinnost_abra: string | null
+          dal_ucet: string | null
+          dat_splat: string | null
+          dat_ucto: string
+          dat_uhr: string | null
+          doklad: string | null
+          duzp: string | null
+          evidence_path: string | null
+          firma: string | null
+          flexi_id: number
+          id_dokl: number | null
+          last_update: string | null
+          md_ucet: string | null
+          modul: string | null
+          popis: string | null
+          posting_period: string | null
+          rok: number
+          seen_run: string | null
+          smazano: boolean
+          stav: string | null
+          stredisko: string | null
+          synced_at: string
+          zakazka: string | null
+          zuctovano: boolean | null
+        }
+        Insert: {
+          castka: number
+          cinnost_abra?: string | null
+          dal_ucet?: string | null
+          dat_splat?: string | null
+          dat_ucto: string
+          dat_uhr?: string | null
+          doklad?: string | null
+          duzp?: string | null
+          evidence_path?: string | null
+          firma?: string | null
+          flexi_id: number
+          id_dokl?: number | null
+          last_update?: string | null
+          md_ucet?: string | null
+          modul?: string | null
+          popis?: string | null
+          posting_period?: string | null
+          rok: number
+          seen_run?: string | null
+          smazano?: boolean
+          stav?: string | null
+          stredisko?: string | null
+          synced_at?: string
+          zakazka?: string | null
+          zuctovano?: boolean | null
+        }
+        Update: {
+          castka?: number
+          cinnost_abra?: string | null
+          dal_ucet?: string | null
+          dat_splat?: string | null
+          dat_ucto?: string
+          dat_uhr?: string | null
+          doklad?: string | null
+          duzp?: string | null
+          evidence_path?: string | null
+          firma?: string | null
+          flexi_id?: number
+          id_dokl?: number | null
+          last_update?: string | null
+          md_ucet?: string | null
+          modul?: string | null
+          popis?: string | null
+          posting_period?: string | null
+          rok?: number
+          seen_run?: string | null
+          smazano?: boolean
+          stav?: string | null
+          stredisko?: string | null
+          synced_at?: string
+          zakazka?: string | null
+          zuctovano?: boolean | null
+        }
+        Relationships: []
+      }
+      mu_abra_split: {
+        Row: {
+          castka: number
+          cil_akce_id: string | null
+          cil_cinnost_id: string | null
+          flexi_id: number
+          id: string
+          kategorie_id: string
+          poznamka: string | null
+          ucet: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          castka: number
+          cil_akce_id?: string | null
+          cil_cinnost_id?: string | null
+          flexi_id: number
+          id?: string
+          kategorie_id: string
+          poznamka?: string | null
+          ucet: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          castka?: number
+          cil_akce_id?: string | null
+          cil_cinnost_id?: string | null
+          flexi_id?: number
+          id?: string
+          kategorie_id?: string
+          poznamka?: string | null
+          ucet?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mu_abra_split_cil_akce_id_fkey"
+            columns: ["cil_akce_id"]
+            isOneToOne: false
+            referencedRelation: "mu_akce"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mu_abra_split_cil_cinnost_id_fkey"
+            columns: ["cil_cinnost_id"]
+            isOneToOne: false
+            referencedRelation: "mu_cinnost"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mu_abra_split_flexi_id_fkey"
+            columns: ["flexi_id"]
+            isOneToOne: false
+            referencedRelation: "mu_abra_radek"
+            referencedColumns: ["flexi_id"]
+          },
+          {
+            foreignKeyName: "mu_abra_split_kategorie_id_fkey"
+            columns: ["kategorie_id"]
+            isOneToOne: false
+            referencedRelation: "mu_kategorie"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mu_abra_split_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mu_abra_sync_log: {
+        Row: {
+          chyba: string | null
+          id: string
+          konec: string | null
+          novych: number
+          radku: number
+          roky: number[]
+          smazanych: number
+          spustil: string
+          stav: string
+          zacatek: string
+          zmenenych: number
+        }
+        Insert: {
+          chyba?: string | null
+          id: string
+          konec?: string | null
+          novych?: number
+          radku?: number
+          roky?: number[]
+          smazanych?: number
+          spustil?: string
+          stav?: string
+          zacatek?: string
+          zmenenych?: number
+        }
+        Update: {
+          chyba?: string | null
+          id?: string
+          konec?: string | null
+          novych?: number
+          radku?: number
+          roky?: number[]
+          smazanych?: number
+          spustil?: string
+          stav?: string
+          zacatek?: string
+          zmenenych?: number
+        }
+        Relationships: []
+      }
+      mu_akce: {
+        Row: {
+          abra_zakazka: string | null
+          archiv: boolean
+          created_at: string
+          datum_do: string | null
+          datum_od: string
+          id: string
+          nazev: string
+          personalni_naklady: number | null
+          personalni_period: string | null
+          poznamka: string | null
+          rozpocet_naklady: number | null
+          rozpocet_prijmy: number | null
+          typ: string
+          updated_at: string
+        }
+        Insert: {
+          abra_zakazka?: string | null
+          archiv?: boolean
+          created_at?: string
+          datum_do?: string | null
+          datum_od: string
+          id?: string
+          nazev: string
+          personalni_naklady?: number | null
+          personalni_period?: string | null
+          poznamka?: string | null
+          rozpocet_naklady?: number | null
+          rozpocet_prijmy?: number | null
+          typ?: string
+          updated_at?: string
+        }
+        Update: {
+          abra_zakazka?: string | null
+          archiv?: boolean
+          created_at?: string
+          datum_do?: string | null
+          datum_od?: string
+          id?: string
+          nazev?: string
+          personalni_naklady?: number | null
+          personalni_period?: string | null
+          poznamka?: string | null
+          rozpocet_naklady?: number | null
+          rozpocet_prijmy?: number | null
+          typ?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mu_akce_ss: {
+        Row: {
+          akce_id: string
+          ss_kod: string
+        }
+        Insert: {
+          akce_id: string
+          ss_kod: string
+        }
+        Update: {
+          akce_id?: string
+          ss_kod?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mu_akce_ss_akce_id_fkey"
+            columns: ["akce_id"]
+            isOneToOne: false
+            referencedRelation: "mu_akce"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mu_cinnost: {
+        Row: {
+          aktivni: boolean
+          created_at: string
+          id: string
+          kod: string
+          nazev: string
+          poradi: number
+        }
+        Insert: {
+          aktivni?: boolean
+          created_at?: string
+          id?: string
+          kod: string
+          nazev: string
+          poradi?: number
+        }
+        Update: {
+          aktivni?: boolean
+          created_at?: string
+          id?: string
+          kod?: string
+          nazev?: string
+          poradi?: number
+        }
+        Relationships: []
+      }
+      mu_dotace_balik: {
+        Row: {
+          aktivni: boolean
+          cinnost_id: string | null
+          created_at: string
+          id: string
+          kod: string
+          nazev: string
+          poradi: number
+        }
+        Insert: {
+          aktivni?: boolean
+          cinnost_id?: string | null
+          created_at?: string
+          id?: string
+          kod: string
+          nazev: string
+          poradi?: number
+        }
+        Update: {
+          aktivni?: boolean
+          cinnost_id?: string | null
+          created_at?: string
+          id?: string
+          kod?: string
+          nazev?: string
+          poradi?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mu_dotace_balik_cinnost_id_fkey"
+            columns: ["cinnost_id"]
+            isOneToOne: false
+            referencedRelation: "mu_cinnost"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mu_dotace_balik_kategorie: {
+        Row: {
+          balik_id: string
+          kategorie_id: string
+        }
+        Insert: {
+          balik_id: string
+          kategorie_id: string
+        }
+        Update: {
+          balik_id?: string
+          kategorie_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mu_dotace_balik_kategorie_balik_id_fkey"
+            columns: ["balik_id"]
+            isOneToOne: false
+            referencedRelation: "mu_dotace_balik"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mu_dotace_balik_kategorie_kategorie_id_fkey"
+            columns: ["kategorie_id"]
+            isOneToOne: false
+            referencedRelation: "mu_kategorie"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mu_dotace_balik_polozka: {
+        Row: {
+          balik_id: string
+          polozka_id: string
+        }
+        Insert: {
+          balik_id: string
+          polozka_id: string
+        }
+        Update: {
+          balik_id?: string
+          polozka_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mu_dotace_balik_polozka_balik_id_fkey"
+            columns: ["balik_id"]
+            isOneToOne: false
+            referencedRelation: "mu_dotace_balik"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mu_dotace_balik_polozka_polozka_id_fkey"
+            columns: ["polozka_id"]
+            isOneToOne: false
+            referencedRelation: "vf_polozka"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mu_dotace_vyhled: {
+        Row: {
+          castka: number
+          created_at: string
+          datum: string
+          id: string
+          obdobi_do: string
+          obdobi_od: string
+          poznamka: string | null
+          zdroj: string
+        }
+        Insert: {
+          castka: number
+          created_at?: string
+          datum: string
+          id?: string
+          obdobi_do: string
+          obdobi_od: string
+          poznamka?: string | null
+          zdroj?: string
+        }
+        Update: {
+          castka?: number
+          created_at?: string
+          datum?: string
+          id?: string
+          obdobi_do?: string
+          obdobi_od?: string
+          poznamka?: string | null
+          zdroj?: string
+        }
+        Relationships: []
+      }
+      mu_kategorie: {
+        Row: {
+          aktivni: boolean
+          created_at: string
+          id: string
+          kod: string
+          nazev: string
+          parent_id: string | null
+          poradi: number
+          typ: string
+        }
+        Insert: {
+          aktivni?: boolean
+          created_at?: string
+          id?: string
+          kod: string
+          nazev: string
+          parent_id?: string | null
+          poradi?: number
+          typ: string
+        }
+        Update: {
+          aktivni?: boolean
+          created_at?: string
+          id?: string
+          kod?: string
+          nazev?: string
+          parent_id?: string | null
+          poradi?: number
+          typ?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mu_kategorie_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "mu_kategorie"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mu_kontrola_inventura: {
+        Row: {
+          castka: number
+          created_at: string
+          created_by: string | null
+          datum: string
+          id: string
+          poznamka: string | null
+        }
+        Insert: {
+          castka: number
+          created_at?: string
+          created_by?: string | null
+          datum: string
+          id?: string
+          poznamka?: string | null
+        }
+        Update: {
+          castka?: number
+          created_at?: string
+          created_by?: string | null
+          datum?: string
+          id?: string
+          poznamka?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mu_kontrola_inventura_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mu_kontrola_pocatek: {
+        Row: {
+          castka: number
+          poznamka: string | null
+          rok: number
+          ucet: string
+          updated_at: string
+        }
+        Insert: {
+          castka: number
+          poznamka?: string | null
+          rok: number
+          ucet: string
+          updated_at?: string
+        }
+        Update: {
+          castka?: number
+          poznamka?: string | null
+          rok?: number
+          ucet?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mu_nastaveni: {
+        Row: {
+          abra_uzavreny_rok: number | null
+          dar_fondy: string[]
+          dotace_sablona: string
+          dotace_ucet: string
+          horizont_mesicu: number
+          id: number
+          min_zustatek: number
+          updated_at: string
+        }
+        Insert: {
+          abra_uzavreny_rok?: number | null
+          dar_fondy?: string[]
+          dotace_sablona?: string
+          dotace_ucet?: string
+          horizont_mesicu?: number
+          id?: number
+          min_zustatek?: number
+          updated_at?: string
+        }
+        Update: {
+          abra_uzavreny_rok?: number | null
+          dar_fondy?: string[]
+          dotace_sablona?: string
+          dotace_ucet?: string
+          horizont_mesicu?: number
+          id?: number
+          min_zustatek?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mu_obedy_rezie_davka: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          due_date: string
+          id: string
+          pololeti: number
+          popis: string
+          skolni_rok: string
+          ss_kod: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          due_date: string
+          id?: string
+          pololeti: number
+          popis: string
+          skolni_rok: string
+          ss_kod: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          due_date?: string
+          id?: string
+          pololeti?: number
+          popis?: string
+          skolni_rok?: string
+          ss_kod?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mu_obedy_rezie_davka_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mu_obedy_rezie_mesic: {
+        Row: {
+          na_obed: number
+          obedu: number
+          period: string
+          potvrdil: string | null
+          potvrzeno_at: string | null
+          poznamka: string | null
+          prispevek: number
+          prispevek_rucne: number | null
+          prispevek_zdroj: string
+          rezie_abra: number | null
+          rezie_rucne: number | null
+          vypocteno_at: string
+        }
+        Insert: {
+          na_obed: number
+          obedu: number
+          period: string
+          potvrdil?: string | null
+          potvrzeno_at?: string | null
+          poznamka?: string | null
+          prispevek: number
+          prispevek_rucne?: number | null
+          prispevek_zdroj: string
+          rezie_abra?: number | null
+          rezie_rucne?: number | null
+          vypocteno_at?: string
+        }
+        Update: {
+          na_obed?: number
+          obedu?: number
+          period?: string
+          potvrdil?: string | null
+          potvrzeno_at?: string | null
+          poznamka?: string | null
+          prispevek?: number
+          prispevek_rucne?: number | null
+          prispevek_zdroj?: string
+          rezie_abra?: number | null
+          rezie_rucne?: number | null
+          vypocteno_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mu_obedy_rezie_mesic_potvrdil_fkey"
+            columns: ["potvrdil"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mu_obedy_rezie_pohledavka: {
+        Row: {
+          castka_presna: number
+          davka_id: string
+          obligation_id: string
+          student_id: string
+        }
+        Insert: {
+          castka_presna: number
+          davka_id: string
+          obligation_id: string
+          student_id: string
+        }
+        Update: {
+          castka_presna?: number
+          davka_id?: string
+          obligation_id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mu_obedy_rezie_pohledavka_davka_id_fkey"
+            columns: ["davka_id"]
+            isOneToOne: false
+            referencedRelation: "mu_obedy_rezie_davka"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mu_obedy_rezie_pohledavka_obligation_id_fkey"
+            columns: ["obligation_id"]
+            isOneToOne: true
+            referencedRelation: "payment_obligations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mu_obedy_rezie_pohledavka_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mu_obedy_rezie_zak: {
+        Row: {
+          doplatek: number
+          obedu: number
+          period: string
+          student_id: string
+        }
+        Insert: {
+          doplatek: number
+          obedu: number
+          period: string
+          student_id: string
+        }
+        Update: {
+          doplatek?: number
+          obedu?: number
+          period?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mu_obedy_rezie_zak_period_fkey"
+            columns: ["period"]
+            isOneToOne: false
+            referencedRelation: "mu_obedy_rezie_mesic"
+            referencedColumns: ["period"]
+          },
+          {
+            foreignKeyName: "mu_obedy_rezie_zak_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mu_plan: {
+        Row: {
+          castka: number
+          cinnost_id: string
+          kategorie_id: string
+          period: string
+          typ: string
+          updated_at: string
+        }
+        Insert: {
+          castka: number
+          cinnost_id: string
+          kategorie_id: string
+          period: string
+          typ?: string
+          updated_at?: string
+        }
+        Update: {
+          castka?: number
+          cinnost_id?: string
+          kategorie_id?: string
+          period?: string
+          typ?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mu_plan_cinnost_id_fkey"
+            columns: ["cinnost_id"]
+            isOneToOne: false
+            referencedRelation: "mu_cinnost"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mu_plan_kategorie_id_fkey"
+            columns: ["kategorie_id"]
+            isOneToOne: false
+            referencedRelation: "mu_kategorie"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mu_pravidlo: {
+        Row: {
+          aktivni: boolean
+          cil_akce_id: string | null
+          cil_cinnost_id: string | null
+          cinnost_abra: string | null
+          created_at: string
+          id: string
+          kategorie_id: string | null
+          poznamka: string | null
+          stredisko: string | null
+          ucet_prefix: string
+          updated_at: string
+          vyloucit: boolean
+          zakazka: string | null
+        }
+        Insert: {
+          aktivni?: boolean
+          cil_akce_id?: string | null
+          cil_cinnost_id?: string | null
+          cinnost_abra?: string | null
+          created_at?: string
+          id?: string
+          kategorie_id?: string | null
+          poznamka?: string | null
+          stredisko?: string | null
+          ucet_prefix: string
+          updated_at?: string
+          vyloucit?: boolean
+          zakazka?: string | null
+        }
+        Update: {
+          aktivni?: boolean
+          cil_akce_id?: string | null
+          cil_cinnost_id?: string | null
+          cinnost_abra?: string | null
+          created_at?: string
+          id?: string
+          kategorie_id?: string | null
+          poznamka?: string | null
+          stredisko?: string | null
+          ucet_prefix?: string
+          updated_at?: string
+          vyloucit?: boolean
+          zakazka?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mu_pravidlo_cil_akce_id_fkey"
+            columns: ["cil_akce_id"]
+            isOneToOne: false
+            referencedRelation: "mu_akce"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mu_pravidlo_cil_cinnost_id_fkey"
+            columns: ["cil_cinnost_id"]
+            isOneToOne: false
+            referencedRelation: "mu_cinnost"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mu_pravidlo_kategorie_id_fkey"
+            columns: ["kategorie_id"]
+            isOneToOne: false
+            referencedRelation: "mu_kategorie"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mu_ucet_zustatek: {
+        Row: {
+          datum: string
+          poznamka: string | null
+          zapsano: string
+          zdroj: string
+          zustatek: number
+        }
+        Insert: {
+          datum: string
+          poznamka?: string | null
+          zapsano?: string
+          zdroj?: string
+          zustatek: number
+        }
+        Update: {
+          datum?: string
+          poznamka?: string | null
+          zapsano?: string
+          zdroj?: string
+          zustatek?: number
+        }
+        Relationships: []
+      }
+      mu_vf_polozka_cinnost: {
+        Row: {
+          cinnost_id: string
+          kategorie_id: string | null
+          polozka_id: string
+        }
+        Insert: {
+          cinnost_id: string
+          kategorie_id?: string | null
+          polozka_id: string
+        }
+        Update: {
+          cinnost_id?: string
+          kategorie_id?: string | null
+          polozka_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mu_vf_polozka_cinnost_cinnost_id_fkey"
+            columns: ["cinnost_id"]
+            isOneToOne: false
+            referencedRelation: "mu_cinnost"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mu_vf_polozka_cinnost_kategorie_id_fkey"
+            columns: ["kategorie_id"]
+            isOneToOne: false
+            referencedRelation: "mu_kategorie"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mu_vf_polozka_cinnost_polozka_id_fkey"
+            columns: ["polozka_id"]
+            isOneToOne: true
+            referencedRelation: "vf_polozka"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_matches: {
         Row: {
           donation_amount: number
