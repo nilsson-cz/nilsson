@@ -16,6 +16,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 import AppNav from '@/components/nav/AppNav'
 import type { Database } from '@/types/database'
 import { NilssonLogo } from '@/components/NilssonLogo'
+import { jeAktivniZamestnanec } from '@/lib/role'
 
 export type StaffRole = Database['public']['Enums']['staff_role']
 export type AllRoles = StaffRole | 'vychovatel'
@@ -41,19 +42,26 @@ export default async function DashboardLayout({
 
   const { data: staff } = await supabase
     .from('staff')
-    .select('id, first_name, last_name, role, email')
+    .select('id, first_name, last_name, role, email, employment_end')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
+
+  if (!staff) redirect('/login?error=not_staff')
+  // Po konci pracovního poměru už dashboard ne (DB helpery current_staff_* vrací NULL).
+  if (!jeAktivniZamestnanec(staff.employment_end)) redirect('/login?error=inactive')
 
   const today = new Date().toISOString().slice(0, 10)
   const { data: extraRolesRaw } = await supabase
     .from('staff_roles')
     .select('role')
-    .eq('staff_id', (staff as any).id)
+    .eq('staff_id', staff.id)
     .lte('valid_from', today)
     .or(`valid_to.is.null,valid_to.gte.${today}`)
 
-  if (!staff) redirect('/login?error=not_staff')
+  // Zaměstnanec i zákonný zástupce → přepínač Škola ⇄ Rodič (jednotné přihlášení).
+  // RPC zároveň napáruje rodičovský záznam podle e-mailu, pokud ještě není.
+  const { data: guardianSelf } = await supabase.rpc('get_or_link_guardian_self')
+  const jeRodic = (guardianSelf?.length ?? 0) > 0
 
   const s = staff as any
   const currentStaff: CurrentStaff = {
@@ -69,7 +77,7 @@ export default async function DashboardLayout({
     <div className="flex h-dvh bg-stone-50 dark:bg-stone-950 overflow-hidden">
       {/* ── SIDEBAR (desktop lg+) ────────────────────────────────────────── */}
       <aside className="hidden lg:flex lg:flex-shrink-0">
-        <AppNav staff={currentStaff} variant="sidebar" />
+        <AppNav staff={currentStaff} variant="sidebar" prepnoutNaRodice={jeRodic} />
       </aside>
 
       {/* ── MAIN AREA ───────────────────────────────────────────────────── */}
@@ -82,9 +90,16 @@ export default async function DashboardLayout({
             </div>
             <span className="text-sm font-semibold text-stone-900 dark:text-stone-100">Nilsson</span>
           </div>
-          <span className="text-xs text-stone-500 dark:text-stone-400">
-            {s.first_name} {s.last_name}
-          </span>
+          <div className="flex items-center gap-3">
+            {jeRodic && (
+              <a href="/portal" className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                Rodič →
+              </a>
+            )}
+            <span className="text-xs text-stone-500 dark:text-stone-400">
+              {s.first_name} {s.last_name}
+            </span>
+          </div>
         </header>
 
         {/* Page content — scrollovatelný */}
@@ -95,7 +110,7 @@ export default async function DashboardLayout({
 
       {/* ── BOTTOM NAV (mobile <lg) ──────────────────────────────────────── */}
       <div className="lg:hidden">
-        <AppNav staff={currentStaff} variant="bottom" />
+        <AppNav staff={currentStaff} variant="bottom" prepnoutNaRodice={jeRodic} />
       </div>
     </div>
   )

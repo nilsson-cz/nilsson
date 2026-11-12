@@ -9,7 +9,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { isAttending } from '@/lib/portal-children'
 import { redirect } from 'next/navigation'
-import { payliboUrl } from '@/lib/paylibo'
+import { qrPlatbaDataUrl } from '@/lib/qr-platba'
 
 // ---------------------------------------------------------------------------
 // Typy
@@ -113,6 +113,7 @@ async function fetchGuardianData(): Promise<{
   }
 
   // Sestavit strukturu per žák
+  const qrJobs: Promise<void>[] = []
   const result: StudentWithObligations[] = students
     .slice()
     .sort((a: any, b: any) => a.last_name.localeCompare(b.last_name, 'cs'))
@@ -130,17 +131,7 @@ async function fetchGuardianData(): Promise<{
           else if (matchedTotal < amount) status = 'partial'
           else                            status = 'paid'
 
-          const qrUrl =
-            o.ss_kod && status !== 'paid'
-              ? payliboUrl({
-                  amount,
-                  vs,
-                  ss:      o.ss_kod,
-                  message: o.popis ?? '',
-                })
-              : null
-
-          return {
+          const ob: StudentObligation = {
             id:           o.id,
             popis:        o.popis,
             amount,
@@ -152,8 +143,13 @@ async function fetchGuardianData(): Promise<{
             donationTotal: donationMap[o.id] ?? 0,
             status,
             vs,
-            qrUrl,
+            qrUrl:        null,
           }
+          // QR generujeme v IS (SPAYD) — asynchronně, doplní se po sestavení struktury
+          if (o.ss_kod && status !== 'paid') {
+            qrJobs.push(qrPlatbaDataUrl({ amount, vs, ss: o.ss_kod, message: o.popis ?? '' }).then((u) => { ob.qrUrl = u }))
+          }
+          return ob
         })
 
       const totalUnpaid = obligations
@@ -169,6 +165,8 @@ async function fetchGuardianData(): Promise<{
         totalUnpaid,
       }
     })
+
+  await Promise.all(qrJobs)
 
   return {
     guardianName: `${guardian.first_name} ${guardian.last_name}`,

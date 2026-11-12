@@ -76,9 +76,11 @@ const ROLE_LABELS: Record<AllRoles, string> = {
 type AppNavProps = {
   staff: CurrentStaff
   variant: 'sidebar' | 'bottom'
+  /** Zaměstnanec je zároveň zákonný zástupce → odkaz do rodičovského portálu. */
+  prepnoutNaRodice?: boolean
 }
 
-export default function AppNav({ staff, variant }: AppNavProps) {
+export default function AppNav({ staff, variant, prepnoutNaRodice = false }: AppNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -163,6 +165,16 @@ export default function AppNav({ staff, variant }: AppNavProps) {
               </div>
             </div>
           </div>
+
+          {prepnoutNaRodice && (
+            <a
+              href="/portal"
+              className="flex items-center justify-between w-full px-3 py-2 mb-1 rounded-xl text-sm font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors"
+            >
+              Přepnout na rodiče
+              <span aria-hidden="true">→</span>
+            </a>
+          )}
 
           {/* Theme toggle */}
           <ThemeToggle />
@@ -261,6 +273,15 @@ export default function AppNav({ staff, variant }: AppNavProps) {
             </ul>
             {/* Theme toggle + odhlášení v draweru */}
             <div className="border-t border-stone-100 dark:border-stone-700 px-5 py-3 space-y-1">
+              {prepnoutNaRodice && (
+                <a
+                  href="/portal"
+                  className="flex items-center gap-3 w-full py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400"
+                >
+                  <span className="w-5 h-5 shrink-0 text-center" aria-hidden="true">⇄</span>
+                  Přepnout na rodiče
+                </a>
+              )}
               <ThemeToggle />
               <button
                 onClick={handleSignOut}

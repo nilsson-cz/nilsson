@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { jeAktivniZamestnanec } from '@/lib/role'
 import { PortalBottomNav } from './_components/PortalBottomNav'
 import { PortalSidebar } from './_components/PortalSidebar'
 
@@ -55,6 +56,11 @@ export default async function PortalLayout({
 
   if (!guardian) redirect('/portal/login?error=not_guardian')
 
+  // Zaměstnanec i rodič → přepínač Škola ⇄ Rodič (jednotné přihlášení).
+  const { data: staffSelf } = await supabase
+    .from('staff').select('id, employment_end').eq('user_id', user.id).maybeSingle()
+  const jeZamestnanec = !!staffSelf && jeAktivniZamestnanec(staffSelf.employment_end)
+
   const fullName = `${guardian.last_name} ${guardian.first_name}`
   const initials = `${guardian.last_name[0] ?? ''}${guardian.first_name[0] ?? ''}`
 
@@ -69,6 +75,7 @@ export default async function PortalLayout({
         fullName={fullName}
         initials={initials}
         className="hidden sm:flex"
+        prepnoutDoSkoly={jeZamestnanec}
       />
 
       {/* ── Hlavní oblast ─────────────────────────────────────────────────  */}
@@ -80,6 +87,11 @@ export default async function PortalLayout({
           <span className="font-medium text-(--portal-text) text-sm">ZŠ Vilekula</span>
           <div className="flex items-center gap-3">
             <span className="text-xs text-(--portal-text-muted)">{guardian.last_name}</span>
+            {jeZamestnanec && (
+              <a href="/dashboard" className="text-xs font-medium text-(--portal-accent)">
+                Škola →
+              </a>
+            )}
             <form action="/auth/signout" method="POST">
               <button
                 type="submit"

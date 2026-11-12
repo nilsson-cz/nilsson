@@ -5,7 +5,7 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
-import { payliboUrl } from '@/lib/paylibo'
+import { qrPlatbaDataUrl } from '@/lib/qr-platba'
 import { NotifyButton } from './_components/NotifyButton'
 import { ManualMatchForm } from './_components/ManualMatchForm'
 import UnmatchButton from '../../_components/UnmatchButton'
@@ -196,7 +196,7 @@ export default async function PohledavkaDetailPage({
   if (!obligation) notFound()
 
   const qrUrl = obligation.ss_kod
-    ? payliboUrl({
+    ? await qrPlatbaDataUrl({
         amount:  obligation.amount,
         vs:      obligation.vs,
         ss:      obligation.ss_kod,

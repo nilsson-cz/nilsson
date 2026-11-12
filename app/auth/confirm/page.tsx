@@ -17,7 +17,7 @@ function ConfirmInner() {
   useEffect(() => {
     const token_hash = searchParams.get("token_hash")
     const type       = searchParams.get("type") ?? "magiclink"
-    const next       = searchParams.get("next") ?? "/portal/omluvenky"
+    const next       = searchParams.get("next") ?? ""
 
     if (!token_hash) {
       router.replace("/auth/error?reason=missing_token")
@@ -38,7 +38,8 @@ function ConfirmInner() {
         console.error("auth confirm error:", error.message, error.status, error)
         router.replace(`/auth/error?reason=invalid_token&msg=${encodeURIComponent(error.message)}`)
       } else {
-        router.replace(next)
+        // Rozcestník po přihlášení rozhodne podle rolí (a next, má-li na něj právo).
+        router.replace(`/auth/rozcestnik${next ? `?next=${encodeURIComponent(next)}` : ""}`)
       }
     })
   }, [])

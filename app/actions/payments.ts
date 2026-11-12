@@ -4,7 +4,7 @@
 import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { createSupabaseAdmin } from '@/lib/supabase-server'
-import { payliboUrl } from '@/lib/paylibo'
+import { qrPlatbaPng } from '@/lib/qr-platba'
 import { Resend } from 'resend'
 
 // ---------------------------------------------------------------------------
@@ -229,8 +229,9 @@ export async function sendNotifications(
 
   if (recipients.length === 0) return { sent: 0, error: 'Žádní zákonní zástupci s emailem' }
 
-  const qrUrl = payliboUrl({
-    amount:  obligation.amount,
+  // QR jako inline příloha (cid:) — Gmail a další klienti nezobrazují data: URI.
+  const qrPng = await qrPlatbaPng({
+    amount:  Number(obligation.amount),
     vs,
     ss:      obligation.ss_kod ?? '',
     message: obligation.popis ?? '',
@@ -242,6 +243,7 @@ export async function sendNotifications(
       from:    'ZŠ Vilekula <nilsson@zsvilekula.cz>',
       to:      guardian.email,
       subject: `Platba: ${obligation.popis}`,
+      attachments: qrPng ? [{ filename: 'qr-platba.png', content: qrPng, contentId: 'qr-platba' }] : undefined,
       html: `
         <p>Vážení,</p>
         <p>evidujeme pohledávku pro žáka <strong>${(student as any).first_name} ${(student as any).last_name}</strong>:</p>
@@ -253,8 +255,7 @@ export async function sendNotifications(
           <tr><td>Specifický symbol:</td><td>${obligation.ss_kod}</td></tr>
           <tr><td>Číslo účtu:</td><td>${process.env.NEXT_PUBLIC_BANK_ACCOUNT_NUMBER}/${process.env.NEXT_PUBLIC_BANK_CODE}</td></tr>
         </table>
-        <p>Pro platbu naskenujte QR kód:</p>
-        <img src="${qrUrl}" alt="QR platba" style="max-width:200px" />
+        ${qrPng ? '<p>Pro platbu naskenujte QR kód:</p><img src="cid:qr-platba" alt="QR platba" width="200" height="200" style="max-width:200px" />' : ''}
         <p>
           Pohledávku a historii plateb najdete také v
           <a href="${process.env.NEXT_PUBLIC_APP_URL}/portal/platby">rodičovském portálu</a>.

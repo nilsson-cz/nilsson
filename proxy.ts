@@ -1,6 +1,7 @@
 ﻿import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 import { handleZivot } from "@/lib/zivot-gate"
+import { ROLE_COOKIE, roleForPath } from "@/lib/role"
 
 export async function proxy(request: NextRequest) {
   // --- Web wall „Ze života školy" (izolovaná větev, viz lib/zivot-gate.ts) ---
@@ -45,10 +46,19 @@ export async function proxy(request: NextRequest) {
     pathname !== "/login"
 
   if (isProtected && !user) {
-    const loginUrl = pathname.startsWith("/portal")
-      ? "/portal/login"
-      : "/login"
-    return NextResponse.redirect(new URL(loginUrl, request.url))
+    // Jednotné přihlášení: po přihlášení rozcestník vrátí uživatele sem (next).
+    const loginUrl = new URL("/login", request.url)
+    loginUrl.searchParams.set("next", pathname + request.nextUrl.search)
+    return NextResponse.redirect(loginUrl)
+  }
+
+  // Poslední použitá role (Škola / Rodič) — rozcestník po přihlášení podle ní
+  // pošle lidi, kteří jsou zaměstnanci i zákonnými zástupci.
+  const role = user ? roleForPath(pathname) : null
+  if (role && request.cookies.get(ROLE_COOKIE)?.value !== role) {
+    supabaseResponse.cookies.set(ROLE_COOKIE, role, {
+      path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax", httpOnly: true, secure: true,
+    })
   }
 
   return supabaseResponse

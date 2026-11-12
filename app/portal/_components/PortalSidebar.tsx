@@ -164,9 +164,11 @@ interface PortalSidebarProps {
   fullName: string
   initials: string
   className?: string
+  /** Uživatel je zároveň zaměstnanec školy → odkaz pro přepnutí do dashboardu. */
+  prepnoutDoSkoly?: boolean
 }
 
-export function PortalSidebar({ fullName, initials, className = '' }: PortalSidebarProps) {
+export function PortalSidebar({ fullName, initials, className = '', prepnoutDoSkoly = false }: PortalSidebarProps) {
   const pathname = usePathname()
 
   // Aktivní položka: přesná shoda pro /portal (dashboard), prefix pro ostatní
@@ -221,6 +223,18 @@ export function PortalSidebar({ fullName, initials, className = '' }: PortalSide
 
       {/* Spodní část: přepínač motivu + uživatel */}
       <div className="mt-auto border-t border-(--portal-border)">
+        {prepnoutDoSkoly && (
+          <div className="px-3 pt-3">
+            <a
+              href="/dashboard"
+              className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium
+                text-(--portal-accent) bg-(--portal-accent-subtle) hover:opacity-90 transition-opacity"
+            >
+              Přepnout do školy
+              <span aria-hidden="true">→</span>
+            </a>
+          </div>
+        )}
         <div className="px-3 py-3">
           <PortalThemeSwitcher />
         </div>

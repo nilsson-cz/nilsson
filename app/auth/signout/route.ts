@@ -1,14 +1,12 @@
-﻿import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 
-export async function POST(request: Request) {
+// Odhlášení → vždy jednotná přihlašovací stránka (zaměstnanci i rodiče).
+export async function POST() {
   const supabase = await createSupabaseServerClient()
   await supabase.auth.signOut()
 
-  const referer = request.headers.get('referer') ?? ''
-  const loginUrl = referer.includes('/portal') ? '/portal/login' : '/login'
-
   return NextResponse.redirect(
-    new URL(loginUrl, process.env.NEXT_PUBLIC_APP_URL!)
+    new URL('/login', process.env.NEXT_PUBLIC_APP_URL!)
   )
 }

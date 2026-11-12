@@ -8,7 +8,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { payliboUrl } from '@/lib/paylibo'
+import { qrPlatbaDataUrl } from '@/lib/qr-platba'
 import NotifyButton from './_components/NotifyButton'
 
 // ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ export default async function PohledavkaDetailPage({
   const vs = obligation.student.kodZaka.split('-').pop() ?? ''
 
   const qrUrl = obligation.ssKod
-    ? payliboUrl({
+    ? await qrPlatbaDataUrl({
         amount:  obligation.amount,
         vs,
         ss:      obligation.ssKod,
