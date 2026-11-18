@@ -5,12 +5,14 @@
  * Server Actions pro tripartity v rodičovském portálu:
  *   reserveSlot        — RPC reserve_tripartita_slot (atomická rezervace) + potvrzovací email
  *   cancelReservation  — RPC cancel_tripartita_reservation (nejpozději 7 dní před termínem)
- *                        + potvrzovací email o zrušení
+ *                        + potvrzovací email o zrušení + DM průvodcům třídy (bot Nilsson)
  */
 
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 import { Resend } from 'resend'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { notifyGuidesReservationCancelled } from '@/lib/tripartita-notify'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -166,6 +168,14 @@ export async function cancelReservation(reservationId: string): Promise<CancelRe
       supabase.from('students').select('first_name, last_name').eq('id', reservation.student_id).maybeSingle(),
       supabase.from('guardians').select('first_name, last_name, email').eq('user_id', user.id).maybeSingle(),
     ])
+
+    // Upozornění průvodců na Discordu (bot Nilsson, DM) — po odpovědi, neblokující
+    after(() => notifyGuidesReservationCancelled({
+      eventId: reservation.event_id,
+      slotId: reservation.slot_id,
+      studentId: reservation.student_id,
+      guardianName: guardian ? `${guardian.first_name} ${guardian.last_name}` : 'rodič',
+    }))
 
     if (guardian?.email) {
       const eventName = event?.name ?? 'Tripartita'

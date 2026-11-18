@@ -10,12 +10,13 @@ export const metadata = { title: 'Docházka | vilekula-is' }
 export default async function DochazkaPage({
   searchParams,
 }: {
-  searchParams: { group?: string; date?: string }
+  searchParams: Promise<{ group?: string; date?: string }>
 }) {
+  const sp = await searchParams
   const [groups, holidays] = await Promise.all([getGroupsForUser(), getHolidayDates()])
   const defaultGroupId =
-    groups.find(g => g.id === searchParams.group)?.id ?? groups[0]?.id ?? null
-  const defaultDate = searchParams.date ?? todayString()
+    groups.find(g => g.id === sp.group)?.id ?? groups[0]?.id ?? null
+  const defaultDate = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : todayString()
 
   if (groups.length === 0) {
     return (

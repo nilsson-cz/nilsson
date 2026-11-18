@@ -19,6 +19,7 @@ import { getEnrollmentPendingDecisionCount } from '@/lib/enrollment/dashboard-qu
 import { NAV_ITEMS, type NavItem } from '@/components/nav/nav-items'
 import { Suspense } from 'react'
 import ManagementFinanceWidget, { ManagementFinanceWidgetFallback } from './_components/ManagementFinanceWidget'
+import { fetchNeomluveneAbsence, type NeomluvenyZak } from '@/lib/neomluvene-alert'
 
 type AlertGroup = {
   alert_type: string
@@ -306,15 +307,17 @@ function AlertsWidget({
   missingTK,
   enrollmentPending,
   tripartity,
+  neomluvene,
 }: {
   alertGroups: AlertGroup[]
   total: number
   missingTK: number
   enrollmentPending: number
   tripartity: RunningTripartita[]
+  neomluvene: NeomluvenyZak[]
 }) {
   const totalWithExtra =
-    total + (missingTK > 0 ? 1 : 0) + (enrollmentPending > 0 ? 1 : 0) + tripartity.length
+    total + (missingTK > 0 ? 1 : 0) + (enrollmentPending > 0 ? 1 : 0) + tripartity.length + neomluvene.length
 
   return (
     <WidgetCard>
@@ -337,6 +340,7 @@ function AlertsWidget({
         </div>
       ) : (
         <div className="space-y-2">
+          {neomluvene.length > 0 && <NeomluveneAlert zaci={neomluvene} />}
           {tripartity.map((t) => (
             <AlertRow
               key={t.id}
@@ -373,6 +377,45 @@ function AlertsWidget({
         </div>
       )}
     </WidgetCard>
+  )
+}
+
+function NeomluveneAlert({ zaci }: { zaci: NeomluvenyZak[] }) {
+  return (
+    <div className="rounded-xl px-3 py-2.5 border bg-red-50 border-red-100 dark:bg-red-950/40 dark:border-red-900">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="w-2 h-2 rounded-full shrink-0 bg-red-500" />
+        <span className="text-sm font-medium text-red-700 dark:text-red-300">Neomluvené hodiny</span>
+      </div>
+      <ul className="space-y-2 pl-4">
+        {zaci.map((z) => {
+          const hodiny = z.dny.reduce((sum, d) => sum + (d.hodiny ?? 0), 0)
+          return (
+            <li key={z.studentId}>
+              <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                {z.name}
+                {hodiny > 0 && (
+                  <span className="ml-1.5 text-xs font-normal text-red-600 dark:text-red-400">{hodiny} h</span>
+                )}
+              </p>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {z.dny.map((d) => (
+                  <Link
+                    key={d.date}
+                    href={d.href}
+                    title={d.hodiny ? `${d.hodiny} h neomluveno` : 'Neomluvená absence'}
+                    className="text-xs rounded-md px-1.5 py-0.5 bg-white/70 dark:bg-stone-900/60 text-red-700 dark:text-red-300 border border-red-100 dark:border-red-900 hover:bg-white dark:hover:bg-stone-900 underline-offset-2 hover:underline"
+                  >
+                    {formatDate(d.date)}
+                    {d.hodiny ? ` (${d.hodiny} h)` : ''}
+                  </Link>
+                ))}
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }
 
@@ -600,6 +643,7 @@ export default async function DashboardPage() {
   const pendingOmluvenky = await fetchPendingOmluvenky()
   const unmatchedCount = await fetchUnmatchedCount()
   const runningTripartity = await fetchRunningTripartity()
+  const neomluvene = await fetchNeomluveneAbsence()
 
   const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -646,6 +690,7 @@ export default async function DashboardPage() {
           missingTK={missingTK}
           enrollmentPending={enrollmentPending}
           tripartity={runningTripartity}
+          neomluvene={neomluvene}
         />
         <StudentsOverviewWidget count={studentCount} schoolYear={activeYear} />
         <BulletinWidget posts={bulletinPosts} />

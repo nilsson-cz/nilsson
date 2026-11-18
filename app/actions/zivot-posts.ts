@@ -11,6 +11,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { slugify } from '@/lib/slug'
+import { after } from 'next/server'
+import { cancelPendingGalleryNotice, currentStaffId, notifyParentsAboutNewGallery } from '@/lib/zivot-notify'
 
 const LIST_PATH = '/dashboard/zivot/prispevky'
 
@@ -94,6 +96,14 @@ export async function setPostStatus(formData: FormData) {
   const web = (await createSupabaseServerClient()).schema('web')
   const { error } = await web.from('posts').update(patch).eq('id', id)
   if (error) throw error
+
+  // Nová galerie viditelná rodičům → mikrozpráva (stažení v okně na zrušení ji zruší)
+  const staffId = await currentStaffId()
+  after(() =>
+    status === 'published'
+      ? notifyParentsAboutNewGallery({ postId: id }, staffId)
+      : cancelPendingGalleryNotice({ postId: id }, staffId),
+  )
 
   revalidatePath(LIST_PATH)
   revalidatePath(`${LIST_PATH}/${id}`)
