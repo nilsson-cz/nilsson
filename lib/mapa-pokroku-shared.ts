@@ -121,6 +121,17 @@ export function getCurrentSchoolYearAndSemester(): {
 }
 
 /**
+ * Je (schoolYear, semester) aktuální pololetí? Jen v aktuálním pololetí smí
+ * hodnotit průvodkyně; uzavřená pololetí jsou mimo vedení jen ke čtení.
+ * Autoritativní kontrola je v DB (mapa_pokroku_muze_zapsat, migrace 185) —
+ * tady jen pro UI (skrytí tlačítka Hodnotit v přehledu).
+ */
+export function isAktualniPololeti(schoolYear: string, semester: number): boolean {
+  const cur = getCurrentSchoolYearAndSemester()
+  return cur.schoolYear === schoolYear && cur.semester === semester
+}
+
+/**
  * Rozsah dat pololetí ze školního roku — stejná konvence jako
  * getCurrentSchoolYearAndSemester (1. pol. = zář–led, 2. pol. = úno–srp).
  * schoolYear ve tvaru '2025/2026'. Vrací ISO datumy (včetně obou konců).

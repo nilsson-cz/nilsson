@@ -16,41 +16,47 @@ export * from '@/lib/mapa-pokroku-shared'
 type SupabaseServer = Awaited<ReturnType<typeof createSupabaseServerClient>>
 
 /**
- * Ročník per žák pro ZOBRAZOVANÝ školní rok — ne „k dnešku". Po přechodu roku
- * (povýšení platí od 1. 9.) by čtení k dnešku dalo loňským hodnocením nový
- * ročník → výstupy by nesouhlasily a hodnocení by v detailu „zmizela".
- * Bereme záznam platný KDYKOLI během roku (1. 9. – 31. 8.), při více záznamech
- * vyhrává nejnovější — stejná logika jako /dashboard/zaci.
- * studentIds = null → všichni žáci viditelní přes RLS.
+ * Žáci pro Mapu pokroku + ročník v ZOBRAZOVANÉM školním roce (ne „k dnešku" —
+ * po přechodu roku by loňská hodnocení dostala nový ročník). Logika ročníku
+ * (záznam platný kdykoli 1. 9.–31. 8., vyhrává nejnovější) žije v RPC
+ * mapa_pokroku_zaci (migrace 185). RPC je SECURITY DEFINER: vedení a průvodkyně
+ * vidí všechny děti, ostatní svou skupinu — bez rozšiřování RLS na students.
+ * studentIds = null → všichni žáci, které smí aktuální uživatel v Mapě vidět.
  */
-async function getRocnikyForSchoolYear(
+async function getZaciMapy(
   supabase: SupabaseServer,
   schoolYear: string,
   studentIds: string[] | null
-): Promise<Map<string, number>> {
-  const startYear = Number(schoolYear.slice(0, 4))
-  const yearStart = `${startYear}-09-01`
-  const yearEnd = `${startYear + 1}-08-31`
-
-  let query = supabase
-    .from('student_education_mode')
-    .select('student_id, rocnik, valid_from')
-    .lte('valid_from', yearEnd)
-    .or(`valid_to.is.null,valid_to.gte.${yearStart}`)
-    .not('rocnik', 'is', null)
-  if (studentIds) query = query.in('student_id', studentIds)
-
-  const { data, error } = await query.order('valid_from', { ascending: false })
+) {
+  const { data, error } = await supabase.rpc('mapa_pokroku_zaci', {
+    p_school_year: schoolYear,
+    ...(studentIds ? { p_student_ids: studentIds } : {}),
+  })
   if (error) throw error
+  return data ?? []
+}
 
-  // Data seřazená valid_from DESC → první výskyt per žák je nejnovější.
-  const rocnikByStudent = new Map<string, number>()
-  for (const em of data ?? []) {
-    if (!rocnikByStudent.has(em.student_id)) {
-      rocnikByStudent.set(em.student_id, em.rocnik as number)
-    }
+/**
+ * Smí aktuální uživatel měnit hodnocení žáka v daném období? Stejný predikát
+ * jako RLS (mapa_pokroku_muze_zapsat, migrace 185): vedení vždy, průvodkyně
+ * u všech dětí, ostatní u své skupiny — mimo vedení jen v aktuálním pololetí.
+ */
+export async function canEditMapa(
+  studentId: string,
+  schoolYear: string,
+  semester: number
+): Promise<boolean> {
+  const supabase = await createSupabaseServerClient()
+  const { data, error } = await supabase.rpc('mapa_pokroku_muze_zapsat', {
+    p_student_id: studentId,
+    p_school_year: schoolYear,
+    p_semester: semester,
+  })
+  if (error) {
+    console.error('[MapaPokroku] canEditMapa:', error)
+    return false
   }
-  return rocnikByStudent
+  return data === true
 }
 
 // ---------------------------------------------------------------------------
@@ -60,7 +66,7 @@ async function getRocnikyForSchoolYear(
 /**
  * Přehled žáků s počtem vyplněných/celkových hodnocení.
  * Řazení: rocnik ASC, příjmení ASC, jméno ASC.
- * RLS zajišťuje, že průvodce vidí jen žáky své skupiny.
+ * Rozsah žáků určuje RPC mapa_pokroku_zaci (vedení + průvodkyně vše).
  */
 export async function getStudentsWithProgress(
   schoolYear: string,
@@ -68,21 +74,13 @@ export async function getStudentsWithProgress(
 ) {
   const supabase = await createSupabaseServerClient()
 
-  // 1. Ročník per žák v zobrazovaném školním roce
-  const rocnikByStudent = await getRocnikyForSchoolYear(supabase, schoolYear, null)
-  if (!rocnikByStudent.size) return []
+  // 1. Žáci + ročník v zobrazovaném školním roce (RPC hlídá oprávnění)
+  const students = await getZaciMapy(supabase, schoolYear, null)
+  if (!students.length) return []
+  const studentIds = students.map((s) => s.id)
+  const rocnikByStudent = new Map(students.map((s) => [s.id, s.rocnik]))
 
-  // 2. Žáci (RLS filtruje přístup)
-  const studentIds = Array.from(rocnikByStudent.keys())
-  const { data: students, error: studError } = await supabase
-    .from('students')
-    .select('id, first_name, last_name, kod_zaka')
-    .in('id', studentIds)
-
-  if (studError) throw studError
-  if (!students?.length) return []
-
-  // 3. Aktivní výstupy per ročník
+  // 2. Aktivní výstupy per ročník
   const { data: vystupy, error: vystError } = await supabase
     .from('svp_vystupy')
     .select('id, rocnik')
@@ -98,7 +96,7 @@ export async function getStudentsWithProgress(
     rocnikByVystup.set(v.id, r)
   }
 
-  // 4. Vyplněná hodnocení per žák v daném období — počítáme jen výstupy
+  // 3. Vyplněná hodnocení per žák v daném období — počítáme jen výstupy
   // žákova ročníku (stejně jako detail), aby čitatel seděl se jmenovatelem.
   // Stránkujeme po 1000 (PostgREST limit řádků na odpověď).
   const hodnoceniCountByStudent = new Map<string, number>()
@@ -124,7 +122,7 @@ export async function getStudentsWithProgress(
     if (!page || page.length < PAGE) break
   }
 
-  // 5. Sestavení a seřazení výsledku
+  // 4. Sestavení a seřazení výsledku
   const result = []
   for (const s of students) {
     const rocnik = rocnikByStudent.get(s.id)
@@ -157,19 +155,8 @@ export async function getStudentsWithProgress(
 export async function getStudentInfo(studentId: string, schoolYear: string) {
   const supabase = await createSupabaseServerClient()
 
-  const [studResult, rocnikByStudent] = await Promise.all([
-    supabase
-      .from('students')
-      .select('id, first_name, last_name, kod_zaka')
-      .eq('id', studentId)
-      .single(),
-    getRocnikyForSchoolYear(supabase, schoolYear, [studentId]),
-  ])
-
-  const rocnik = rocnikByStudent.get(studentId)
-  if (studResult.error || rocnik == null) return null
-
-  return { ...studResult.data, rocnik }
+  const [student] = await getZaciMapy(supabase, schoolYear, [studentId])
+  return student ?? null
 }
 
 /**

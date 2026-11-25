@@ -7,6 +7,7 @@ import {
   getVystupyWithHodnoceni,
   getPoznamkyForStudent,
   getCurrentSchoolYearAndSemester,
+  canEditMapa,
 } from '@/lib/mapa-pokroku'
 import { getActiveSchoolYear } from '@/lib/school-year'
 import VystupRadek from './_components/VystupRadek'
@@ -29,9 +30,10 @@ export default async function StudentDetailPage({ params, searchParams }: Props)
   const student = await getStudentInfo(studentId, schoolYear)
   if (!student) notFound()
 
-  const [vstupyByPredmet, poznamkyByVystup] = await Promise.all([
+  const [vstupyByPredmet, poznamkyByVystup, canEdit] = await Promise.all([
     getVystupyWithHodnoceni(studentId, student.rocnik, schoolYear, semester),
     getPoznamkyForStudent(studentId),
+    canEditMapa(studentId, schoolYear, semester),
   ])
 
   const allVystupy = Object.values(vstupyByPredmet).flat()
@@ -65,12 +67,18 @@ export default async function StudentDetailPage({ params, searchParams }: Props)
         </div>
 
         <div className="flex flex-col items-end gap-2 flex-shrink-0">
-          <Link
-            href={`/dashboard/mapa-pokroku/${studentId}/edit?year=${schoolYear}&semester=${semester}`}
-            className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition"
-          >
-            Hodnotit
-          </Link>
+          {canEdit ? (
+            <Link
+              href={`/dashboard/mapa-pokroku/${studentId}/edit?year=${schoolYear}&semester=${semester}`}
+              className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition"
+            >
+              Hodnotit
+            </Link>
+          ) : (
+            <span className="px-3 py-1.5 text-xs text-amber-700 bg-amber-50 rounded-lg">
+              Uzavřené pololetí — jen ke čtení
+            </span>
+          )}
           <div className="flex gap-1">
             {([1, 2] as const).map((s) => (
               <Link

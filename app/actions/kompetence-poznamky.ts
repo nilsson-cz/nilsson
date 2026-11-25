@@ -1,7 +1,8 @@
 'use server'
 
 // F1 modulu Doklad kompetencí — server akce pro poznámky ke kompetenci.
-// Autorizace se opírá o RLS (guide = svá skupina + vlastní autor_id; vedení = vše).
+// Autorizace se opírá o RLS (průvodkyně = všechny děti od migrace 185, ostatní svá
+// skupina; úprava/mazání jen vlastních poznámek; vedení = vše).
 // kompetence_poznamky je otypovaná ručně v types/database.ts (migrace 084 se pouští
 // v Supabase ručně; db:types potřebuje service-role) → žádné casty, ratchet zůstává 0.
 

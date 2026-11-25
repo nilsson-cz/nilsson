@@ -395,7 +395,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Tripartity',
     icon: Icons.calendar,
     roles: ['director', 'vp', 'guide', 'assistant', 'readonly'],
-    primaryFor: [],
+    primaryFor: ['guide'], // průvodkyně v hlavním menu (jen náhled), ostatní → rozcestník
     desc: 'Schůzky rodič–průvodce–žák',
     tint: T.cyan,
   },

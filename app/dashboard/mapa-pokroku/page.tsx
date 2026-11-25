@@ -5,6 +5,7 @@ import Link from 'next/link'
 import {
   getStudentsWithProgress,
   getCurrentSchoolYearAndSemester,
+  isAktualniPololeti,
   StudentWithProgress,
 } from '@/lib/mapa-pokroku'
 import { getActiveSchoolYear, getVisibleSchoolYears } from '@/lib/school-year'
@@ -31,6 +32,9 @@ export default async function MapaPokrokuPage({
     defaultSemester) as 1 | 2
 
   const students = await getStudentsWithProgress(schoolYear, semester)
+  // Uzavřené pololetí: průvodkyně jen čtou (DB to vynucuje, tady jen skryjeme
+  // „Hodnotit"; vedení se k editaci dostane přes detail žáka).
+  const aktualni = isAktualniPololeti(schoolYear, semester)
 
   const byRocnik = new Map<number, StudentWithProgress[]>()
   for (const s of students) {
@@ -43,7 +47,14 @@ export default async function MapaPokrokuPage({
       <div className="flex items-start justify-between gap-4 mb-8 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Mapa pokroku</h1>
-          <p className="text-sm text-gray-400 mt-0.5">{schoolYear}</p>
+          <p className="text-sm text-gray-400 mt-0.5">
+            {schoolYear}
+            {!aktualni && (
+              <span className="ml-2 text-xs text-amber-700 bg-amber-50 rounded px-1.5 py-0.5">
+                Uzavřené pololetí — jen ke čtení
+              </span>
+            )}
+          </p>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -101,6 +112,7 @@ export default async function MapaPokrokuPage({
                     student={student}
                     schoolYear={schoolYear}
                     semester={semester}
+                    aktualni={aktualni}
                   />
                 ))}
               </div>
@@ -116,10 +128,12 @@ function StudentRow({
   student,
   schoolYear,
   semester,
+  aktualni,
 }: {
   student: StudentWithProgress
   schoolYear: string
   semester: number
+  aktualni: boolean
 }) {
   const pct =
     student.total_vystupy > 0
@@ -127,16 +141,21 @@ function StudentRow({
       : 0
   const isDone = pct === 100 && student.total_vystupy > 0
 
+  // Mobil: celý blok jména je odkaz na detail (tlačítka na hover na dotyku nejdou)
+  // a akce jsou skryté, aby jménu zbylo místo. Desktop: akce na hover jako dřív.
   return (
-    <div className="flex items-center gap-4 px-4 py-3 group hover:bg-gray-50 transition">
-      <div className="flex-1 min-w-0">
+    <div className="flex items-center gap-3 sm:gap-4 px-4 py-3 group hover:bg-gray-50 transition">
+      <Link
+        href={`/dashboard/mapa-pokroku/${student.id}?year=${schoolYear}&semester=${semester}`}
+        className="flex-1 min-w-0"
+      >
         <p className="font-medium text-gray-900 truncate">
           {student.last_name} {student.first_name}
         </p>
-        <p className="text-xs text-gray-400">{student.kod_zaka}</p>
-      </div>
+        <p className="text-xs text-gray-400 truncate">{student.kod_zaka}</p>
+      </Link>
 
-      <div className="flex items-center gap-2.5 w-48 flex-shrink-0">
+      <div className="flex items-center gap-2.5 w-28 sm:w-48 flex-shrink-0">
         <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-300 ${
@@ -154,19 +173,21 @@ function StudentRow({
         </span>
       </div>
 
-      <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition flex-shrink-0">
+      <div className="hidden sm:flex gap-1.5 opacity-0 group-hover:opacity-100 transition flex-shrink-0">
         <Link
           href={`/dashboard/mapa-pokroku/${student.id}?year=${schoolYear}&semester=${semester}`}
           className="text-xs px-2.5 py-1 rounded-md text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition"
         >
           Detail
         </Link>
-        <Link
-          href={`/dashboard/mapa-pokroku/${student.id}/edit?year=${schoolYear}&semester=${semester}`}
-          className="text-xs px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-medium transition"
-        >
-          Hodnotit
-        </Link>
+        {aktualni && (
+          <Link
+            href={`/dashboard/mapa-pokroku/${student.id}/edit?year=${schoolYear}&semester=${semester}`}
+            className="text-xs px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-medium transition"
+          >
+            Hodnotit
+          </Link>
+        )}
       </div>
     </div>
   )

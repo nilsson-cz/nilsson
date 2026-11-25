@@ -1,13 +1,14 @@
 // app/dashboard/mapa-pokroku/[studentId]/edit/page.tsx
 
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import {
   getStudentInfo,
   getVystupyWithHodnoceni,
   getPoznamkyForStudent,
   getDenniDukazForStudent,
   getCurrentSchoolYearAndSemester,
+  canEditMapa,
 } from '@/lib/mapa-pokroku'
 import { getActiveSchoolYear } from '@/lib/school-year'
 import { EditForm } from './_components/EditForm'
@@ -29,6 +30,11 @@ export default async function EditPage({ params, searchParams }: Props) {
 
   const student = await getStudentInfo(studentId, schoolYear)
   if (!student) notFound()
+
+  // Uzavřené pololetí (mimo vedení) → jen ke čtení, editace přesměruje na detail.
+  if (!(await canEditMapa(studentId, schoolYear, semester))) {
+    redirect(`/dashboard/mapa-pokroku/${studentId}?year=${encodeURIComponent(schoolYear)}&semester=${semester}`)
+  }
 
   const [vstupyByPredmet, denniDukaz, poznamky] = await Promise.all([
     getVystupyWithHodnoceni(studentId, student.rocnik, schoolYear, semester),

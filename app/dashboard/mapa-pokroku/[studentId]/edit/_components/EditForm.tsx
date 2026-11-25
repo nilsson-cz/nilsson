@@ -118,7 +118,7 @@ export function EditForm({
               school_year: schoolYear,
               semester: semester,
               stupen: newStupen,
-              // hodnotil_id: null — průvodkyně zatím nemají Auth účty v Nilssonu
+              // hodnotil_id doplní DB trigger (poslední editor) + zápis do mapa_pokroku_log (migrace 185)
             })
             .select('id')
             .single()
